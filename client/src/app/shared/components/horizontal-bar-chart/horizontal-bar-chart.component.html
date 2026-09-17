@@ -1,0 +1,1 @@
+<div class="bars" *ngIf="data.length;else empty"><div class="row" *ngFor="let d of data"><label [title]="d.name">{{d.name}}</label><div class="track"><div class="bar" [style.width.%]="d.value/max*100" [title]="d.name+': '+d.value"></div></div></div><div class="axis"><span>0</span><span>{{max}}</span></div></div><ng-template #empty><div class="empty">Sem dados</div></ng-template>

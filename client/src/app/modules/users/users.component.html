@@ -1,0 +1,208 @@
+<div class="page">
+  <div
+    style="
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    "
+  >
+    <div>
+      <h1 class="title">
+        Usuários
+      </h1>
+
+      <p class="subtitle">
+        Usuários cadastrados no ECO CONTROL.
+      </p>
+    </div>
+
+    <button
+      class="btn btn-primary"
+      type="button"
+      (click)="toggleForm()"
+    >
+      {{ showForm ? 'Cancelar' : '+ Novo Usuário' }}
+    </button>
+  </div>
+
+
+  <section
+    *ngIf="showForm"
+    class="card"
+    style="
+      margin-top: 20px;
+      max-width: 700px;
+    "
+  >
+    <h3 style="margin-top: 0">
+      Novo Usuário
+    </h3>
+
+    <form
+      [formGroup]="form"
+      (ngSubmit)="submit()"
+    >
+      <div
+        class="grid grid-2"
+      >
+        <div>
+          <label>
+            Nome
+          </label>
+
+          <input
+            class="input"
+            style="width: 100%"
+            formControlName="full_name"
+            placeholder="Nome completo"
+          >
+        </div>
+
+
+        <div>
+          <label>
+            E-mail
+          </label>
+
+          <input
+            class="input"
+            style="width: 100%"
+            type="email"
+            formControlName="email"
+            placeholder="analista@eco.com"
+          >
+        </div>
+
+
+        <div>
+          <label>
+            Senha inicial
+          </label>
+
+          <input
+            class="input"
+            style="width: 100%"
+            type="password"
+            formControlName="password"
+            placeholder="Mínimo 6 caracteres"
+          >
+        </div>
+
+
+        <div>
+          <label>
+            Perfil
+          </label>
+
+          <select
+            class="select"
+            style="width: 100%"
+            formControlName="role"
+          >
+            <option value="analyst">
+              Analista
+            </option>
+
+            <option value="admin">
+              Administrador
+            </option>
+          </select>
+        </div>
+      </div>
+
+
+      <div
+        style="
+          margin-top: 16px;
+          display: flex;
+          gap: 10px;
+        "
+      >
+        <button
+          class="btn btn-primary"
+          type="submit"
+          [disabled]="loading"
+        >
+          {{
+            loading
+              ? 'Salvando...'
+              : 'Criar usuário'
+          }}
+        </button>
+
+        <button
+          class="btn btn-ghost"
+          type="button"
+          (click)="toggleForm()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </section>
+
+
+  <div
+    *ngIf="error"
+    class="danger"
+    style="margin-top: 14px"
+  >
+    {{ error }}
+  </div>
+
+  <div
+    *ngIf="success"
+    class="success"
+    style="margin-top: 14px"
+  >
+    {{ success }}
+  </div>
+
+
+  <div
+    class="table-wrap"
+    style="margin-top: 20px"
+  >
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th>Perfil</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr
+          *ngFor="let user of rows"
+        >
+          <td>
+            {{ user.full_name }}
+          </td>
+
+          <td>
+            {{ user.email }}
+          </td>
+
+          <td>
+            {{
+              user.role === 'admin'
+                ? 'Administrador'
+                : 'Analista'
+            }}
+          </td>
+
+          <td>
+            {{
+              user.active
+                ? 'Ativo'
+                : 'Inativo'
+            }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

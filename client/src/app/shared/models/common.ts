@@ -1,0 +1,1 @@
+export interface ChartDatum{name:string;value:number}export interface DashboardStats{total:number;working:number;on_hold:number;processing:number;released:number;rejected:number;cancelled:number;overdue:number;gap7:number;gap14:number}

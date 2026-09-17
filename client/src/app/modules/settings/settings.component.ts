@@ -1,0 +1,1 @@
+import{Component,OnInit}from'@angular/core';import{ApiService}from'../../core/services/api.service';@Component({templateUrl:'./settings.component.html'})export class SettingsComponent implements OnInit{data:any={obu_au:[],owner_group:[],managers:[]};constructor(private api:ApiService){}ngOnInit(){this.api.get<any>('/settings').subscribe(x=>this.data=x)}}

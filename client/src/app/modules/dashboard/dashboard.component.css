@@ -1,0 +1,1 @@
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:25px}.charts{margin-top:24px}.summary{margin-top:14px}.summary h3{margin:0;font-size:14px}@media(max-width:1200px){.stats{grid-template-columns:repeat(2,1fr)}}

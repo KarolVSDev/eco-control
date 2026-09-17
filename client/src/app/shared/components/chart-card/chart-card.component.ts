@@ -1,0 +1,1 @@
+import{Component,EventEmitter,Input,Output}from'@angular/core';@Component({selector:'app-chart-card',templateUrl:'./chart-card.component.html',styleUrls:['./chart-card.component.css']})export class ChartCardComponent{@Input()title='';@Input()subtitle='';@Input()months:string[]=[];@Input()filter=true;@Input()month='';@Output()monthChange=new EventEmitter<string>();}

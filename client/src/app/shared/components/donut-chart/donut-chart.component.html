@@ -1,0 +1,1 @@
+<div class="wrap" *ngIf="total;else empty"><div class="donut" [style.background]="gradient"><i></i></div><div class="legend"><div *ngFor="let d of data;let i=index"><b [style.background]="colors[i%colors.length]"></b><span>{{d.name}} — {{(d.value/total*100)|number:'1.0-0'}}%</span></div></div></div><ng-template #empty><div class="empty">Sem dados</div></ng-template>

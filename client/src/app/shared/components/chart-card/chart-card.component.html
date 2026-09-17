@@ -1,0 +1,1 @@
+<section class="chart-card"><header><div><h3>{{title}}</h3><p>{{subtitle}}</p></div><select *ngIf="filter" class="select" [ngModel]="month" (ngModelChange)="monthChange.emit($event)"><option value="">Todos os meses</option><option *ngFor="let m of months" [value]="m">{{m}}</option></select></header><div class="body"><ng-content></ng-content></div></section>

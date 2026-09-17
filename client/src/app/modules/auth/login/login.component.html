@@ -1,0 +1,42 @@
+<div class="auth">
+  <div class="box">
+    <h1>ECO <span>CONTROL</span></h1>
+
+    <p>Acesse o ambiente local</p>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label>E-mail</label>
+
+      <input
+        class="input"
+        formControlName="email"
+      >
+
+      <label>Senha</label>
+
+      <input
+        class="input"
+        type="password"
+        formControlName="password"
+      >
+
+      <button
+        class="btn btn-primary"
+        [disabled]="loading"
+      >
+        {{ loading ? 'Entrando...' : 'Entrar' }}
+      </button>
+
+      <small
+        class="danger"
+        *ngIf="error"
+      >
+        {{ error }}
+      </small>
+    </form>
+
+    <div class="hint">
+      Dev: admin&#64;eco.com / admin123
+    </div>
+  </div>
+</div>

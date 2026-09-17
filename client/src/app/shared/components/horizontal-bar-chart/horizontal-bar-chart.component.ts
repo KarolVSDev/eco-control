@@ -1,0 +1,1 @@
+import{Component,Input}from'@angular/core';import{ChartDatum}from'../../models/common';@Component({selector:'app-horizontal-bar-chart',templateUrl:'./horizontal-bar-chart.component.html',styleUrls:['./horizontal-bar-chart.component.css']})export class HorizontalBarChartComponent{@Input()data:ChartDatum[]=[];get max(){return Math.max(1,...this.data.map(x=>x.value))}}

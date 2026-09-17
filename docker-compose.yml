@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eco_control
+      POSTGRES_USER: eco_user
+      POSTGRES_PASSWORD: eco_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - eco_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eco_user -d eco_control"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  eco_pgdata:

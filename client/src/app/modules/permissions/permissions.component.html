@@ -1,0 +1,348 @@
+<div class="page">
+
+  <h1 class="title">
+    Permissões
+  </h1>
+
+  <p class="subtitle">
+    Defina, campo a campo, o que cada
+    analista pode visualizar e editar.
+  </p>
+
+
+  <!-- ANALISTA -->
+
+  <section
+    class="card"
+    style="
+      margin-top: 20px;
+      max-width: 700px;
+    "
+  >
+
+    <label>
+      Analista
+    </label>
+
+    <select
+      class="select"
+      style="
+        width: 100%;
+        margin-top: 8px;
+      "
+      [(ngModel)]="selectedEmail"
+      (change)="loadPermissions()"
+    >
+
+      <option
+        *ngFor="let user of users"
+        [value]="user.email"
+      >
+        {{ user.full_name }}
+        — {{ user.email }}
+      </option>
+
+    </select>
+
+  </section>
+
+
+  <div
+    *ngIf="loading"
+    style="
+      margin-top: 20px;
+      color: #999;
+    "
+  >
+    Carregando permissões...
+  </div>
+
+
+  <ng-container *ngIf="!loading">
+
+
+    <!-- PERMISSÕES GERAIS -->
+
+    <section
+      class="card"
+      style="
+        margin-top: 20px;
+        max-width: 700px;
+      "
+    >
+
+      <h3 style="margin-top: 0">
+        Permissões gerais
+      </h3>
+
+
+      <label
+        style="
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin-top: 16px;
+        "
+      >
+
+        <input
+          type="checkbox"
+          [(ngModel)]="
+            general.can_create_eco
+          "
+        >
+
+        Pode criar novas ECOs
+
+      </label>
+
+
+      <label
+        style="
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin-top: 14px;
+        "
+      >
+
+        <input
+          type="checkbox"
+          [(ngModel)]="
+            general.can_bulk_edit
+          "
+        >
+
+        Pode editar em massa
+
+      </label>
+
+
+      <label
+        style="
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin-top: 14px;
+        "
+      >
+
+        <input
+          type="checkbox"
+          [(ngModel)]="
+            general.can_view_history
+          "
+        >
+
+        Pode visualizar histórico
+
+      </label>
+
+    </section>
+
+
+    <!-- CAMPOS -->
+
+    <div
+      style="
+        display: grid;
+        grid-template-columns:
+          repeat(
+            auto-fit,
+            minmax(420px, 1fr)
+          );
+        gap: 18px;
+        margin-top: 20px;
+      "
+    >
+
+      <section
+        *ngFor="
+          let group of permissionGroups;
+          trackBy: trackGroup
+        "
+        class="card"
+        style="
+          padding: 0;
+          overflow: hidden;
+        "
+      >
+
+        <!-- TÍTULO DO GRUPO -->
+
+        <div
+          style="
+            padding: 12px 16px;
+            background: #202020;
+            border-bottom:
+              1px solid #303030;
+            color: #e7194a;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .06em;
+          "
+        >
+          {{ group.label }}
+        </div>
+
+
+        <!-- CABEÇALHO -->
+
+        <div
+          style="
+            display: grid;
+            grid-template-columns:
+              1fr 100px 100px;
+            padding: 10px 16px;
+            background: #181818;
+            color: #8f8f8f;
+            font-size: 11px;
+            font-weight: 700;
+          "
+        >
+
+          <span>
+            CAMPO
+          </span>
+
+          <span
+            style="
+              text-align: center;
+            "
+          >
+            VISUALIZAR
+          </span>
+
+          <span
+            style="
+              text-align: center;
+            "
+          >
+            EDITAR
+          </span>
+
+        </div>
+
+
+        <!-- CAMPOS -->
+
+        <div
+          *ngFor="
+            let field of group.fields;
+            trackBy: trackField
+          "
+          style="
+            display: grid;
+            grid-template-columns:
+              1fr 100px 100px;
+            align-items: center;
+            padding: 12px 16px;
+            border-top:
+              1px solid #292929;
+          "
+        >
+
+          <span
+            style="
+              font-size: 13px;
+            "
+          >
+            {{ field.label }}
+          </span>
+
+
+          <div
+            style="
+              text-align: center;
+            "
+          >
+
+            <input
+              type="checkbox"
+              [(ngModel)]="
+                field.can_view
+              "
+              (change)="
+                onViewChange(field)
+              "
+            >
+
+          </div>
+
+
+          <div
+            style="
+              text-align: center;
+            "
+          >
+
+            <input
+              type="checkbox"
+              [(ngModel)]="
+                field.can_edit
+              "
+              (change)="
+                onEditChange(field)
+              "
+            >
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+
+
+    <!-- SALVAR -->
+
+    <button
+      class="btn btn-primary"
+      style="
+        margin-top: 22px;
+        margin-bottom: 30px;
+      "
+      type="button"
+      [disabled]="
+        saving ||
+        !selectedEmail
+      "
+      (click)="save()"
+    >
+
+      {{
+        saving
+          ? 'Salvando...'
+          : 'Salvar permissões'
+      }}
+
+    </button>
+
+  </ng-container>
+
+
+  <!-- MENSAGENS -->
+
+  <div
+    *ngIf="success"
+    class="success"
+    style="
+      margin-bottom: 20px;
+    "
+  >
+    {{ success }}
+  </div>
+
+
+  <div
+    *ngIf="error"
+    class="danger"
+    style="
+      margin-bottom: 20px;
+    "
+  >
+    {{ error }}
+  </div>
+
+</div>

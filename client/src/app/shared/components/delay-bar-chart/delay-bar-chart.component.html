@@ -1,0 +1,1 @@
+<div class="delay"><div class="col" *ngFor="let d of data;let i=index"><div class="bar-space"><div class="bar" [style.height.%]="d.value/max*100" [style.background]="colors[i]" [title]="d.name+': '+d.value"></div></div><span>{{d.name}}</span></div></div>

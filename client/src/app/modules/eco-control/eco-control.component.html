@@ -1,0 +1,523 @@
+<div class="page">
+
+  <h1 class="title">
+    ECO Control
+  </h1>
+
+  <p class="subtitle">
+    Controle e manutenção das ECOs.
+  </p>
+
+
+  <!-- ======================================== -->
+  <!-- TOOLBAR -->
+  <!-- ======================================== -->
+
+  <div class="toolbar">
+
+    <input
+      class="input"
+      placeholder="Buscar ECO ou owner"
+      [(ngModel)]="search"
+      (keyup.enter)="searchEcos()"
+    >
+
+    <select
+      class="select"
+      [(ngModel)]="status"
+      (change)="changeStatus()"
+    >
+      <option
+        *ngFor="let item of statuses"
+        [value]="item"
+      >
+        {{
+          item || 'Todos os status'
+        }}
+      </option>
+    </select>
+
+    <button
+      *ngIf="permissions.canCreateEco"
+      class="btn btn-primary"
+      type="button"
+      (click)="open()"
+    >
+      + Nova ECO
+    </button>
+
+  </div>
+
+
+  <!-- ======================================== -->
+  <!-- TABELA COMPLETA -->
+  <!-- ======================================== -->
+
+  <div class="eco-table-wrapper">
+
+    <table class="table eco-table">
+
+      <thead>
+
+        <!-- PRIMEIRA LINHA: GRUPOS -->
+
+        <tr class="group-row">
+
+          <th
+            *ngFor="let group of columnGroups"
+            class="group-header"
+            [attr.colspan]="group.columns.length"
+          >
+            {{ group.label }}
+          </th>
+
+          <th
+            *ngIf="canEditAny || permissions.isAdmin"
+            class="group-header action-header"
+            rowspan="2"
+          >
+            AÇÕES
+          </th>
+
+        </tr>
+
+
+        <!-- SEGUNDA LINHA: CAMPOS -->
+
+        <tr class="column-row">
+
+          <ng-container
+            *ngFor="let group of columnGroups"
+          >
+
+            <th
+              *ngFor="
+                let column of group.columns;
+                trackBy: trackColumn
+              "
+              [title]="column.label"
+            >
+              {{ column.label }}
+            </th>
+
+          </ng-container>
+
+        </tr>
+
+      </thead>
+
+
+      <tbody>
+
+        <tr
+          *ngFor="
+            let row of rows;
+            trackBy: trackRow
+          "
+        >
+
+          <td
+            *ngFor="
+              let column of columns;
+              trackBy: trackColumn
+            "
+            [class.mono]="isEcoColumn(column)"
+            [class.eco-code]="isEcoColumn(column)"
+            [class.boolean-cell]="isBooleanColumn(column)"
+            [title]="displayValue(row, column)"
+          >
+
+            <!-- STATUS -->
+
+            <span
+              *ngIf="isStatusColumn(column)"
+              class="badge"
+            >
+              {{ displayValue(row, column) }}
+            </span>
+
+
+            <!-- DEMAIS CAMPOS -->
+
+            <ng-container
+              *ngIf="!isStatusColumn(column)"
+            >
+              {{ displayValue(row, column) }}
+            </ng-container>
+
+          </td>
+
+
+          <!-- AÇÕES -->
+
+          <td
+            *ngIf="canEditAny || permissions.isAdmin"
+            class="actions-column"
+          >
+
+            <button
+              *ngIf="canEditAny"
+              class="btn btn-ghost"
+              type="button"
+              (click)="open(row)"
+            >
+              Editar
+            </button>
+
+            <button
+              *ngIf="permissions.isAdmin"
+              class="btn btn-ghost danger"
+              type="button"
+              (click)="remove(row)"
+            >
+              Excluir
+            </button>
+
+          </td>
+
+        </tr>
+
+
+        <!-- SEM RESULTADOS -->
+
+        <tr *ngIf="rows.length === 0">
+
+          <td
+            class="empty-state"
+            [attr.colspan]="columns.length + (canEditAny || permissions.isAdmin ? 1 : 0)"
+          >
+            Nenhuma ECO encontrada.
+          </td>
+
+        </tr>
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+
+  <!-- ======================================== -->
+  <!-- PAGINAÇÃO -->
+  <!-- ======================================== -->
+
+  <div class="pager">
+
+    <button
+      class="btn btn-ghost"
+      type="button"
+      [disabled]="page <= 1"
+      (click)="previousPage()"
+    >
+      Anterior
+    </button>
+
+    <span>
+      Página
+      {{ page }}
+      de
+      {{ pages() }}
+    </span>
+
+    <button
+      class="btn btn-ghost"
+      type="button"
+      [disabled]="page >= pages()"
+      (click)="nextPage()"
+    >
+      Próxima
+    </button>
+
+  </div>
+
+
+  <!-- ======================================== -->
+  <!-- NOVA ECO / EDITAR ECO -->
+  <!-- ======================================== -->
+
+  <div
+    class="modal"
+    *ngIf="editing !== undefined"
+  >
+
+    <div class="eco-form-modal">
+
+      <!-- CABEÇALHO -->
+
+      <div class="eco-form-header">
+
+        <div>
+
+          <h2>
+            {{
+              editing?.id
+                ? 'Editar ECO'
+                : 'Nova ECO'
+            }}
+          </h2>
+
+          <p>
+            {{
+              editing?.id
+                ? 'Atualize os campos da ECO selecionada.'
+                : 'Preencha os dados para cadastrar uma nova ECO.'
+            }}
+          </p>
+
+        </div>
+
+
+        <button
+          class="modal-close"
+          type="button"
+          (click)="closeModal()"
+          aria-label="Fechar"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <!-- FORMULÁRIO -->
+
+      <form
+        [formGroup]="form"
+        (ngSubmit)="save()"
+      >
+
+        <div class="eco-form-body">
+
+          <!-- GRUPOS -->
+
+          <section
+            *ngFor="
+              let group of editableGroups;
+              trackBy: trackGroup
+            "
+            class="eco-form-section"
+          >
+
+            <div class="eco-form-section-title">
+              {{ group.label }}
+            </div>
+
+
+            <div class="eco-form-grid">
+
+              <!-- CAMPOS -->
+
+              <div
+                *ngFor="
+                  let column of group.columns;
+                  trackBy: trackColumn
+                "
+                class="eco-field"
+                [class.eco-field-wide]="
+                  column.type === fieldTypes.TEXTAREA
+                "
+              >
+
+                <label
+                  [for]="'eco-field-' + column.key"
+                >
+                  {{ column.label }}
+                </label>
+
+
+                <!-- ================================= -->
+                <!-- TEXT -->
+                <!-- ================================= -->
+
+                <input
+                  *ngIf="
+                    column.type === fieldTypes.TEXT
+                  "
+                  class="input"
+                  [id]="'eco-field-' + column.key"
+                  type="text"
+                  [formControlName]="column.key"
+                >
+
+
+                <!-- ================================= -->
+                <!-- MONO -->
+                <!-- ================================= -->
+
+                <input
+                  *ngIf="
+                    column.type === fieldTypes.MONO
+                  "
+                  class="input mono"
+                  [id]="'eco-field-' + column.key"
+                  type="text"
+                  [formControlName]="column.key"
+                >
+
+
+                <!-- ================================= -->
+                <!-- DATE -->
+                <!-- ================================= -->
+
+                <input
+                  *ngIf="
+                    column.type === fieldTypes.DATE
+                  "
+                  class="input"
+                  [id]="'eco-field-' + column.key"
+                  type="date"
+                  [formControlName]="column.key"
+                >
+
+
+                <!-- ================================= -->
+                <!-- TEXTAREA -->
+                <!-- ================================= -->
+
+                <textarea
+                  *ngIf="
+                    column.type === fieldTypes.TEXTAREA
+                  "
+                  class="input eco-textarea"
+                  [id]="'eco-field-' + column.key"
+                  rows="3"
+                  [formControlName]="column.key"
+                ></textarea>
+
+
+                <!-- ================================= -->
+                <!-- SELECT -->
+                <!-- ================================= -->
+
+                <select
+                  *ngIf="
+                    column.type === fieldTypes.SELECT
+                  "
+                  class="select"
+                  [id]="'eco-field-' + column.key"
+                  [formControlName]="column.key"
+                >
+
+                  <option [ngValue]="null">
+                    Selecione
+                  </option>
+
+                  <option
+                    *ngFor="let option of column.options"
+                    [value]="option"
+                  >
+                    {{ option }}
+                  </option>
+
+                </select>
+
+
+                <!-- ================================= -->
+                <!-- YES / NO -->
+                <!-- ================================= -->
+
+                <select
+                  *ngIf="
+                    column.type === fieldTypes.BOOL_YN
+                  "
+                  class="select"
+                  [id]="'eco-field-' + column.key"
+                  [formControlName]="column.key"
+                >
+
+                  <option [ngValue]="null">
+                    Selecione
+                  </option>
+
+                  <option
+                    *ngFor="let option of column.options"
+                    [value]="option"
+                  >
+                    {{ option }}
+                  </option>
+
+                </select>
+
+
+                <!-- ================================= -->
+                <!-- STATUS -->
+                <!-- ================================= -->
+
+                <select
+                  *ngIf="
+                    column.type === fieldTypes.BADGE_STATUS
+                  "
+                  class="select"
+                  [id]="'eco-field-' + column.key"
+                  [formControlName]="column.key"
+                >
+
+                  <option [ngValue]="null">
+                    Selecione
+                  </option>
+
+                  <option
+                    *ngFor="let option of column.options"
+                    [value]="option"
+                  >
+                    {{ option }}
+                  </option>
+
+                </select>
+
+              </div>
+
+            </div>
+
+          </section>
+
+
+          <!-- ERRO -->
+
+          <div
+            *ngIf="saveError"
+            class="danger eco-save-error"
+          >
+            {{ saveError }}
+          </div>
+
+        </div>
+
+
+        <!-- ======================================== -->
+        <!-- RODAPÉ DO MODAL -->
+        <!-- ======================================== -->
+
+        <div class="eco-form-footer">
+
+          <button
+            type="button"
+            class="btn btn-ghost"
+            [disabled]="saving"
+            (click)="closeModal()"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="saving"
+          >
+            {{
+              saving
+                ? 'Salvando...'
+                : 'Salvar'
+            }}
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+</div>
