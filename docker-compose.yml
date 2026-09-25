@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: eco_user
       POSTGRES_PASSWORD: eco_pass
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - eco_pgdata:/var/lib/postgresql/data
     healthcheck:

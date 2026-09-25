@@ -75,7 +75,11 @@ class EcoService:
         ).all()
 
         return {
-            permission.field_key: permission
+            (
+                "group"
+                if permission.field_key == "group_name"
+                else permission.field_key
+            ): permission
             for permission in permissions
         }
 
