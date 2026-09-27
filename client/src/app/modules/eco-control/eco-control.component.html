@@ -50,9 +50,22 @@
 
 
   <!-- ======================================== -->
+  <!-- ESTADOS DE LOADING / ERRO -->
+  <!-- ======================================== -->
+
+  <p class="muted" *ngIf="loading">Carregando ECOs...</p>
+
+  <p class="danger" *ngIf="loadError && !loading">
+    {{ loadError }}
+    <button class="btn btn-ghost" type="button" (click)="load()">Tentar novamente</button>
+  </p>
+
+
+  <!-- ======================================== -->
   <!-- TABELA COMPLETA -->
   <!-- ======================================== -->
 
+  <ng-container *ngIf="!loading && !loadError">
   <div class="eco-table-wrapper">
 
     <table class="table eco-table">
@@ -230,6 +243,8 @@
     </button>
 
   </div>
+
+  </ng-container>
 
 
   <!-- ======================================== -->

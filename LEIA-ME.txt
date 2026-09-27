@@ -1,0 +1,57 @@
+COMO APLICAR ESTE PACOTE
+=========================
+
+A pasta "eco-control/" dentro deste zip espelha exatamente a estrutura
+do seu repositório. É só copiar o conteúdo por cima da sua pasta do
+projeto (sobrescrevendo os arquivos indicados). NÃO copie a pasta
+inteira por cima do repo — copie arquivo por arquivo, respeitando as
+branches abaixo, para não misturar tudo num commit só.
+
+Ordem recomendada (siga o fluxo de branches combinado):
+
+1) chore: normalizar CRLF -> direto na main
+   - .gitattributes  (arquivo novo, na raiz do projeto)
+   git add .gitattributes
+   git commit -m "chore: normalizar final de linha para LF"
+   git push origin main
+
+2) fix/restaurar-arquivos-server
+   - server/main.py
+   - server/requirements.txt
+   - server/app/__init__.py
+   - server/app/services/__init__.py
+   - server/app/utils/__init__.py
+   - server/app/utils/security.py
+   - server/app/utils/eco_calculations.py
+   - server/tests/test_calculations.py
+   git add server/
+   git commit -m "fix: restaurar arquivos essenciais do backend removidos por engano"
+   git push -u origin fix/restaurar-arquivos-server
+   -> abra PR, aguarde merge, depois: git switch main && git pull origin main
+
+3) feature/backend-history-export
+   - server/app/controller/history_controller.py
+   - server/app/repository/history_repository.py
+   git add server/app/controller/history_controller.py server/app/repository/history_repository.py
+   git commit -m "feat: adicionar filtro por tipo de acao, endpoint de acoes e exportacao csv do historico"
+   git push -u origin feature/backend-history-export
+
+4) feature/frontend-relatorios-historico
+   - client/src/app/core/services/api.service.ts
+   - client/src/app/modules/reports/reports.component.ts
+   - client/src/app/modules/reports/reports.component.html
+   git add client/src/app/core/services/api.service.ts client/src/app/modules/reports/
+   git commit -m "feat: filtro de acao, colunas item/acao, exportacao csv e permissao can_view_history nos relatorios"
+   git push -u origin feature/frontend-relatorios-historico
+
+5) feature/frontend-eco-control-loading
+   - client/src/app/modules/eco-control/eco-control.component.ts
+   - client/src/app/modules/eco-control/eco-control.component.html
+   git add client/src/app/modules/eco-control/
+   git commit -m "feat: adicionar estados de loading e erro no carregamento de ECOs"
+   git push -u origin feature/frontend-eco-control-loading
+
+ANTES DE COMMITAR: rode a aplicação localmente (client e server) e
+teste os checklists de cada tarefa (login admin/analista, filtros,
+exportação, loading) — isso ainda precisa ser feito manualmente por
+você, eu não consigo rodar o projeto por aqui.

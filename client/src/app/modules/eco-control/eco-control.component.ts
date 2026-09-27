@@ -72,6 +72,9 @@ export class EcoControlComponent
   page = 1;
   pageSize = 25;
 
+  loading = false;
+  loadError = '';
+
   search = '';
   status = '';
 
@@ -278,6 +281,9 @@ export class EcoControlComponent
 
 
   load(): void {
+    this.loading = true;
+    this.loadError = '';
+
     this.api
       .get<any>(
         '/ecos',
@@ -302,6 +308,8 @@ export class EcoControlComponent
 
           this.total =
             response.total;
+
+          this.loading = false;
         },
 
         error: error => {
@@ -309,6 +317,11 @@ export class EcoControlComponent
             'Erro ao carregar ECOs:',
             error,
           );
+
+          this.loadError =
+            'Não foi possível carregar as ECOs. Tente novamente.';
+
+          this.loading = false;
         },
       });
   }
