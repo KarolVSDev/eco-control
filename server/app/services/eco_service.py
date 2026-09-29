@@ -213,6 +213,36 @@ class EcoService:
             .upper()
         )
 
+    def _history_value(self, value):
+        if value is None:
+            return None
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    def _record_history_fields(
+        self,
+        eco,
+        action,
+        fields,
+    ):
+        for key, (old_value, new_value) in fields.items():
+            history_key = self._history_field_key(key)
+            self.history.add(
+                EcoHistory(
+                    eco_id=eco.id,
+                    eco_code=eco.eco,
+                    item=eco.item,
+                    field_key=history_key,
+                    field_label=self._history_field_label(key),
+                    old_value=self._history_value(old_value),
+                    new_value=self._history_value(new_value),
+                    user_email=self.user.email,
+                    user_name=self.user.full_name,
+                    action=action,
+                )
+            )
+
     # =========================================================
     # LISTAGEM
     # =========================================================
@@ -396,15 +426,14 @@ class EcoService:
         # ITEM
         # -----------------------------------------------------
 
-        next_item = (
-            self.repo.next_item()
-        )
+        next_item = self.repo.next_item()
+        next_position = self.repo.next_position()
 
         eco = Eco(
             **data,
             group_name=group,
             item=next_item,
-            position=next_item,
+            position=next_position,
             month=MONTHS[
                 datetime.now().month - 1
             ],
@@ -416,19 +445,21 @@ class EcoService:
         # AUDITORIA
         # -----------------------------------------------------
 
-        self.history.add(
-            EcoHistory(
-                eco_id=eco.id,
-                eco_code=eco.eco,
-                item=eco.item,
-                field_key="eco",
-                field_label="ECO criada",
-                new_value=eco.eco,
-                user_email=self.user.email,
-                user_name=self.user.full_name,
-                action="created",
+        created_fields = {}
+        for submitted_key in raw_data:
+            field_key = (
+                "group_name"
+                if submitted_key == "group"
+                else submitted_key
             )
-        )
+            value = getattr(eco, field_key, None)
+            if value is not None:
+                created_fields[field_key] = (None, value)
+
+        if not created_fields:
+            created_fields["eco"] = (None, eco.eco)
+
+        self._record_history_fields(eco, "created", created_fields)
 
         self.db.commit()
 
@@ -520,6 +551,7 @@ class EcoService:
         # ALTERAÇÕES + HISTÓRICO
         # -----------------------------------------------------
 
+        updated_fields = {}
         for key, value in changes.items():
 
             old_value = getattr(
@@ -535,50 +567,13 @@ class EcoService:
                 key,
                 value,
             )
+            updated_fields[key] = (old_value, value)
 
-            history_key = (
-                self._history_field_key(
-                    key
-                )
-            )
-
-            self.history.add(
-                EcoHistory(
-                    eco_id=eco.id,
-                    eco_code=eco.eco,
-                    item=eco.item,
-
-                    field_key=history_key,
-
-                    field_label=(
-                        self._history_field_label(
-                            key
-                        )
-                    ),
-
-                    old_value=str(
-                        old_value
-                        if old_value is not None
-                        else ""
-                    ),
-
-                    new_value=str(
-                        value
-                        if value is not None
-                        else ""
-                    ),
-
-                    user_email=(
-                        self.user.email
-                    ),
-
-                    user_name=(
-                        self.user.full_name
-                    ),
-
-                    action="updated",
-                )
-            )
+        self._record_history_fields(
+            eco,
+            "updated",
+            updated_fields,
+        )
 
         self.db.commit()
 
@@ -608,36 +603,27 @@ class EcoService:
                 detail="ECO não encontrada",
             )
 
-        deleted_item = (
-            eco.item or 0
-        )
+        deleted_position = eco.position
 
-        # -----------------------------------------------------
-        # AUDITORIA
-        # -----------------------------------------------------
+        deleted_fields = {
+            column.name: (getattr(eco, column.name), None)
+            for column in eco.__table__.columns
+            if column.name not in {"id", "created_at", "updated_at"}
+            and getattr(eco, column.name) is not None
+        }
+        self._record_history_fields(eco, "deleted", deleted_fields)
 
-        self.history.add(
-            EcoHistory(
-                eco_id=eco.id,
-                eco_code=eco.eco,
-                item=eco.item,
-
-                field_key="eco",
-                field_label="ECO excluída",
-
-                old_value=eco.eco,
-
-                user_email=(
-                    self.user.email
-                ),
-
-                user_name=(
-                    self.user.full_name
-                ),
-
-                action="deleted",
-            )
-        )
+        shifted_ecos = []
+        if deleted_position is not None:
+            shifted_ecos = self.db.scalars(
+                select(Eco).where(Eco.position > deleted_position)
+            ).all()
+            for shifted_eco in shifted_ecos:
+                self._record_history_fields(
+                    shifted_eco,
+                    "updated",
+                    {"position": (shifted_eco.position, shifted_eco.position - 1)},
+                )
 
         # -----------------------------------------------------
         # DELETE
@@ -647,18 +633,16 @@ class EcoService:
 
         self.db.flush()
 
-        # Mantém a sequência ITEM
-        # utilizada atualmente pelo sistema.
-        if deleted_item:
-
+        # Mantém a sequência visual sem alterar o identificador ITEM.
+        if deleted_position is not None:
             self.db.execute(
                 update(Eco)
                 .where(
-                    Eco.item
-                    > deleted_item
+                    Eco.position
+                    > deleted_position
                 )
                 .values(
-                    item=Eco.item - 1
+                    position=Eco.position - 1,
                 )
             )
 
