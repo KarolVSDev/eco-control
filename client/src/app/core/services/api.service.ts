@@ -45,6 +45,38 @@ export class ApiService {
     );
   }
 
+  getBlob(
+    path: string,
+    params: Record<
+      string,
+      string | number | undefined
+    > = {},
+  ) {
+    let httpParams = new HttpParams();
+
+    Object.entries(params).forEach(
+      ([key, value]) => {
+        if (
+          value !== undefined &&
+          value !== ''
+        ) {
+          httpParams = httpParams.set(
+            key,
+            String(value),
+          );
+        }
+      },
+    );
+
+    return this.http.get(
+      `${environment.apiUrl}${path}`,
+      {
+        params: httpParams,
+        responseType: 'blob',
+      },
+    );
+  }
+
   post<T>(
     path: string,
     body: unknown,
