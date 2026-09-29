@@ -78,8 +78,14 @@ def test_analyst_does_not_receive_hidden_history_fields(monkeypatch):
         def __init__(self, db):
             pass
 
-        def list(self, *args):
-            return [history_item], 1
+        def list(self, *args, **kwargs):
+            hidden_fields = kwargs.get('hidden_fields', set())
+            visible_items = (
+                []
+                if history_item.field_key in hidden_fields
+                else [history_item]
+            )
+            return visible_items, len(visible_items)
 
     monkeypatch.setattr(history_controller, 'HistoryRepository', FakeHistoryRepository)
     db = SimpleNamespace(
@@ -91,7 +97,7 @@ def test_analyst_does_not_receive_hidden_history_fields(monkeypatch):
     response = list_history(db=db, user=user)
 
     assert response['items'] == []
-    assert response['total'] == 1
+    assert response['total'] == 0
 
 
 def test_analyst_snapshot_omits_hidden_fields(monkeypatch):
@@ -118,7 +124,7 @@ def test_analyst_snapshot_omits_hidden_fields(monkeypatch):
         def __init__(self, db):
             pass
 
-        def list(self, *args):
+        def list(self, *args, **kwargs):
             return [history_item], 1
 
     monkeypatch.setattr(history_controller, 'HistoryRepository', FakeHistoryRepository)
