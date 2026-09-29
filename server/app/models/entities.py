@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Integer, Boolean, Date, DateTime, Text, ForeignKey, UniqueConstraint, func
+from sqlalchemy import String, Integer, Boolean, Date, DateTime, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -74,7 +74,7 @@ class Eco(Base):
 class EcoHistory(Base):
     __tablename__ = "eco_history"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    eco_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ecos.id", ondelete="SET NULL"), nullable=True, index=True)
+    eco_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     eco_code: Mapped[str | None] = mapped_column(String(100), index=True)
     item: Mapped[int | None] = mapped_column(Integer)
     field_key: Mapped[str] = mapped_column(String(100), index=True)

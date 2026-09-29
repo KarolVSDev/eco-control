@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from fastapi import APIRouter,Depends,HTTPException
 from sqlalchemy import select
@@ -24,5 +25,24 @@ def list_history(page:int=1,page_size:int=20,date_start:datetime|None=None,date_
         items = [item for item in items if item.field_key not in hidden_fields]
 
     data=[{c.name:getattr(x,c.name) for c in x.__table__.columns} for x in items]
-    for x in data: x['id']=str(x['id']); x['eco_id']=str(x['eco_id']) if x['eco_id'] else None
+    for x in data:
+        x['id']=str(x['id'])
+        x['eco_id']=str(x['eco_id']) if x['eco_id'] else None
+        if (
+            user.role != 'admin'
+            and x['action'] == 'created'
+            and x['field_key'] == 'eco'
+            and x['new_value']
+        ):
+            try:
+                snapshot = json.loads(x['new_value'])
+            except (TypeError, json.JSONDecodeError):
+                continue
+            for hidden_field in hidden_fields:
+                snapshot.pop(hidden_field, None)
+            x['new_value'] = json.dumps(
+                snapshot,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
     return {'items':data,'total':total,'page':page,'page_size':page_size}

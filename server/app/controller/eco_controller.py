@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -93,7 +95,7 @@ def create_eco(
 
 @router.patch("/{eco_id}")
 def update_eco(
-    eco_id: str,
+    eco_id: UUID,
     body: EcoUpdate,
     db: Session = Depends(get_db),
     user=Depends(current_user),
@@ -118,7 +120,7 @@ def update_eco(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 def delete_eco(
-    eco_id: str,
+    eco_id: UUID,
     db: Session = Depends(get_db),
     user=Depends(current_user),
 ):
