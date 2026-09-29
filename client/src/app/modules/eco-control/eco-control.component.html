@@ -1,460 +1,615 @@
 <div class="page">
 
+  <!-- ================================================= -->
+  <!-- CABEÇALHO -->
+  <!-- ================================================= -->
+
   <h1 class="title">
     ECO Control
   </h1>
 
-  <p class="subtitle">
-    Controle e manutenção das ECOs.
+  <p class="eco-subtitle">
+    {{ total }} ECOs · clique em uma linha para selecioná-la e edite as células diretamente.
   </p>
 
 
-  <!-- ======================================== -->
+  <!-- ================================================= -->
   <!-- TOOLBAR -->
-  <!-- ======================================== -->
+  <!-- ================================================= -->
 
-  <div class="toolbar">
+  <div class="eco-toolbar">
 
-    <input
-      class="input"
-      placeholder="Buscar ECO ou owner"
-      [(ngModel)]="search"
-      (keyup.enter)="searchEcos()"
-    >
+    <div class="eco-toolbar-left">
 
-    <select
-      class="select"
-      [(ngModel)]="status"
-      (change)="changeStatus()"
-    >
-      <option
-        *ngFor="let item of statuses"
-        [value]="item"
-      >
-        {{
-          item || 'Todos os status'
-        }}
-      </option>
-    </select>
+      <!-- BUSCA -->
 
-    <button
-      *ngIf="permissions.canCreateEco"
-      class="btn btn-primary"
-      type="button"
-      (click)="open()"
-    >
-      + Nova ECO
-    </button>
+      <div class="eco-search">
 
-  </div>
-
-
-  <!-- ======================================== -->
-  <!-- TABELA COMPLETA -->
-  <!-- ======================================== -->
-
-  <div class="eco-table-wrapper">
-
-    <table class="table eco-table">
-
-      <thead>
-
-        <!-- PRIMEIRA LINHA: GRUPOS -->
-
-        <tr class="group-row">
-
-          <th
-            *ngFor="let group of columnGroups"
-            class="group-header"
-            [attr.colspan]="group.columns.length"
-          >
-            {{ group.label }}
-          </th>
-
-          <th
-            *ngIf="canEditAny || permissions.isAdmin"
-            class="group-header action-header"
-            rowspan="2"
-          >
-            AÇÕES
-          </th>
-
-        </tr>
-
-
-        <!-- SEGUNDA LINHA: CAMPOS -->
-
-        <tr class="column-row">
-
-          <ng-container
-            *ngFor="let group of columnGroups"
-          >
-
-            <th
-              *ngFor="
-                let column of group.columns;
-                trackBy: trackColumn
-              "
-              [title]="column.label"
-            >
-              {{ column.label }}
-            </th>
-
-          </ng-container>
-
-        </tr>
-
-      </thead>
-
-
-      <tbody>
-
-        <tr
-          *ngFor="
-            let row of rows;
-            trackBy: trackRow
-          "
+        <span
+          class="eco-search-icon"
+          aria-hidden="true"
         >
+          ⌕
+        </span>
 
-          <td
-            *ngFor="
-              let column of columns;
-              trackBy: trackColumn
-            "
-            [class.mono]="isEcoColumn(column)"
-            [class.eco-code]="isEcoColumn(column)"
-            [class.boolean-cell]="isBooleanColumn(column)"
-            [title]="displayValue(row, column)"
-          >
-
-            <!-- STATUS -->
-
-            <span
-              *ngIf="isStatusColumn(column)"
-              class="badge"
-            >
-              {{ displayValue(row, column) }}
-            </span>
-
-
-            <!-- DEMAIS CAMPOS -->
-
-            <ng-container
-              *ngIf="!isStatusColumn(column)"
-            >
-              {{ displayValue(row, column) }}
-            </ng-container>
-
-          </td>
-
-
-          <!-- AÇÕES -->
-
-          <td
-            *ngIf="canEditAny || permissions.isAdmin"
-            class="actions-column"
-          >
-
-            <button
-              *ngIf="canEditAny"
-              class="btn btn-ghost"
-              type="button"
-              (click)="open(row)"
-            >
-              Editar
-            </button>
-
-            <button
-              *ngIf="permissions.isAdmin"
-              class="btn btn-ghost danger"
-              type="button"
-              (click)="remove(row)"
-            >
-              Excluir
-            </button>
-
-          </td>
-
-        </tr>
-
-
-        <!-- SEM RESULTADOS -->
-
-        <tr *ngIf="rows.length === 0">
-
-          <td
-            class="empty-state"
-            [attr.colspan]="columns.length + (canEditAny || permissions.isAdmin ? 1 : 0)"
-          >
-            Nenhuma ECO encontrada.
-          </td>
-
-        </tr>
-
-      </tbody>
-
-    </table>
-
-  </div>
-
-
-  <!-- ======================================== -->
-  <!-- PAGINAÇÃO -->
-  <!-- ======================================== -->
-
-  <div class="pager">
-
-    <button
-      class="btn btn-ghost"
-      type="button"
-      [disabled]="page <= 1"
-      (click)="previousPage()"
-    >
-      Anterior
-    </button>
-
-    <span>
-      Página
-      {{ page }}
-      de
-      {{ pages() }}
-    </span>
-
-    <button
-      class="btn btn-ghost"
-      type="button"
-      [disabled]="page >= pages()"
-      (click)="nextPage()"
-    >
-      Próxima
-    </button>
-
-  </div>
-
-
-  <!-- ======================================== -->
-  <!-- NOVA ECO / EDITAR ECO -->
-  <!-- ======================================== -->
-
-  <div
-    class="modal"
-    *ngIf="editing !== undefined"
-  >
-
-    <div class="eco-form-modal">
-
-      <!-- CABEÇALHO -->
-
-      <div class="eco-form-header">
-
-        <div>
-
-          <h2>
-            {{
-              editing?.id
-                ? 'Editar ECO'
-                : 'Nova ECO'
-            }}
-          </h2>
-
-          <p>
-            {{
-              editing?.id
-                ? 'Atualize os campos da ECO selecionada.'
-                : 'Preencha os dados para cadastrar uma nova ECO.'
-            }}
-          </p>
-
-        </div>
-
-
-        <button
-          class="modal-close"
-          type="button"
-          (click)="closeModal()"
-          aria-label="Fechar"
+        <input
+          class="eco-search-input"
+          type="text"
+          placeholder="Pesquisar ECO, owner, produto, comentário..."
+          [(ngModel)]="search"
+          (keyup.enter)="searchEcos()"
         >
-          ×
-        </button>
 
       </div>
 
 
-      <!-- FORMULÁRIO -->
+      <!-- FILTROS -->
 
-      <form
-        [formGroup]="form"
-        (ngSubmit)="save()"
+      <button
+        class="eco-toolbar-button"
+        type="button"
+        (click)="showFilters = !showFilters"
+      >
+        <span aria-hidden="true">
+          ▽
+        </span>
+
+        Filtros
+
+        <span
+          class="filter-active-dot"
+          *ngIf="hasActiveFilters"
+        ></span>
+      </button>
+
+    </div>
+
+
+    <div class="eco-toolbar-actions">
+
+      <!-- COLUNAS -->
+
+      <div class="column-picker">
+
+        <button
+          class="eco-toolbar-button"
+          type="button"
+          (click)="showColumns = !showColumns"
+        >
+          <span aria-hidden="true">
+            ◉
+          </span>
+
+          Colunas
+        </button>
+
+
+        <div
+          class="column-picker-menu"
+          *ngIf="showColumns"
+        >
+
+          <div class="column-picker-title">
+            Colunas visíveis
+          </div>
+
+          <label
+            class="column-picker-option"
+            *ngFor="
+              let column of columns;
+              trackBy: trackColumn
+            "
+          >
+
+            <input
+              type="checkbox"
+              [checked]="isColumnVisible(column)"
+              (change)="toggleColumn(column)"
+            >
+
+            <span>
+              {{ column.label }}
+            </span>
+
+          </label>
+
+        </div>
+
+      </div>
+
+
+      <!-- EXPORTAR -->
+
+      <button
+        class="eco-toolbar-button"
+        type="button"
+        [disabled]="exporting"
+        (click)="exportCsv()"
       >
 
-        <div class="eco-form-body">
+        <span aria-hidden="true">
+          ⇩
+        </span>
+
+        {{
+          exporting
+            ? 'Exportando...'
+            : 'Exportar CSV'
+        }}
+
+      </button>
+
+
+      <!-- ADICIONAR ABAIXO -->
+
+      <button
+        *ngIf="permissions.canCreateEco"
+        class="eco-add-button"
+        type="button"
+        [disabled]="!selectedRow || creatingBelow"
+        (click)="addBelowSelected()"
+      >
+
+        <span aria-hidden="true">
+          ＋
+        </span>
+
+        <ng-container *ngIf="creatingBelow">
+          Adicionando...
+        </ng-container>
+
+        <ng-container
+          *ngIf="!creatingBelow && selectedRow"
+        >
+          Adicionar abaixo do item {{ selectedItem }}
+        </ng-container>
+
+        <ng-container
+          *ngIf="!creatingBelow && !selectedRow"
+        >
+          Selecione uma ECO
+        </ng-container>
+
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- FILTROS -->
+  <!-- ================================================= -->
+
+  <div
+    class="eco-filter-panel"
+    *ngIf="showFilters"
+  >
+
+    <!-- STATUS -->
+
+    <label class="eco-filter-field">
+
+      <span>
+        Status
+      </span>
+
+      <select
+        class="select"
+        [(ngModel)]="status"
+        (change)="applyFilters()"
+      >
+
+        <option
+          *ngFor="let item of statuses"
+          [value]="item"
+        >
+          {{
+            item
+              ? item
+              : 'Todos'
+          }}
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <!-- GROUP -->
+
+    <label class="eco-filter-field">
+
+      <span>
+        Group
+      </span>
+
+      <select
+        class="select"
+        [(ngModel)]="filterGroup"
+        (change)="applyFilters()"
+      >
+
+        <option
+          *ngFor="let item of groups"
+          [value]="item"
+        >
+          {{
+            item
+              ? item
+              : 'Todos'
+          }}
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <!-- OBU -->
+
+    <label class="eco-filter-field">
+
+      <span>
+        OBU
+      </span>
+
+      <select
+        class="select"
+        [(ngModel)]="filterObu"
+        (change)="applyFilters()"
+      >
+
+        <option
+          *ngFor="let item of obus"
+          [value]="item"
+        >
+          {{
+            item
+              ? item
+              : 'Todos'
+          }}
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <!-- ITEM TYPE -->
+
+    <label class="eco-filter-field">
+
+      <span>
+        Item Type
+      </span>
+
+      <select
+        class="select"
+        [(ngModel)]="filterItemType"
+        (change)="applyFilters()"
+      >
+
+        <option
+          *ngFor="let item of itemTypes"
+          [value]="item"
+        >
+          {{
+            item
+              ? item
+              : 'Todos'
+          }}
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <!-- ECO TYPE -->
+
+    <label class="eco-filter-field">
+
+      <span>
+        ECO Type
+      </span>
+
+      <select
+        class="select"
+        [(ngModel)]="filterEcoType"
+        (change)="applyFilters()"
+      >
+
+        <option
+          *ngFor="let item of ecoTypes"
+          [value]="item"
+        >
+          {{
+            item
+              ? item
+              : 'Todos'
+          }}
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <!-- LIMPAR -->
+
+    <button
+      *ngIf="hasActiveFilters"
+      class="eco-filter-clear"
+      type="button"
+      (click)="clearFilters()"
+    >
+      Limpar filtros
+    </button>
+
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- LOADING / ERROS -->
+  <!-- ================================================= -->
+
+  <p
+    class="muted eco-state"
+    *ngIf="loading"
+  >
+    Carregando ECOs...
+  </p>
+
+
+  <div
+    class="danger eco-state"
+    *ngIf="loadError && !loading"
+  >
+
+    {{ loadError }}
+
+    <button
+      class="btn btn-ghost"
+      type="button"
+      (click)="load()"
+    >
+      Tentar novamente
+    </button>
+
+  </div>
+
+
+  <div
+    class="eco-inline-error"
+    *ngIf="cellError"
+  >
+    {{ cellError }}
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- TABELA -->
+  <!-- ================================================= -->
+
+  <ng-container
+    *ngIf="!loading && !loadError"
+  >
+
+    <div class="eco-table-wrapper">
+
+      <table class="eco-table">
+
+
+        <!-- ================================================= -->
+        <!-- CABEÇALHO -->
+        <!-- ================================================= -->
+
+        <thead>
 
           <!-- GRUPOS -->
 
-          <section
-            *ngFor="
-              let group of editableGroups;
-              trackBy: trackGroup
-            "
-            class="eco-form-section"
-          >
+          <tr class="group-row">
 
-            <div class="eco-form-section-title">
+            <th
+              class="row-tools-column row-tools-header"
+              rowspan="2"
+            ></th>
+
+            <th
+              *ngFor="
+                let group of visibleColumnGroups;
+                trackBy: trackGroup
+              "
+              class="group-header"
+              [attr.colspan]="group.columns.length"
+            >
               {{ group.label }}
-            </div>
+            </th>
+
+          </tr>
 
 
-            <div class="eco-form-grid">
+          <!-- NOMES DAS COLUNAS -->
 
-              <!-- CAMPOS -->
+          <tr class="column-row">
 
-              <div
+            <ng-container
+              *ngFor="
+                let group of visibleColumnGroups;
+                trackBy: trackGroup
+              "
+            >
+
+              <th
                 *ngFor="
                   let column of group.columns;
                   trackBy: trackColumn
                 "
-                class="eco-field"
-                [class.eco-field-wide]="
-                  column.type === fieldTypes.TEXTAREA
-                "
+                [title]="column.label"
               >
 
-                <label
-                  [for]="'eco-field-' + column.key"
-                >
+                <span class="column-title">
                   {{ column.label }}
-                </label>
+                </span>
+
+              </th>
+
+            </ng-container>
+
+          </tr>
+
+        </thead>
 
 
-                <!-- ================================= -->
-                <!-- TEXT -->
-                <!-- ================================= -->
+        <!-- ================================================= -->
+        <!-- CORPO -->
+        <!-- ================================================= -->
+
+        <tbody>
+
+          <tr
+            *ngFor="
+              let row of rows;
+              trackBy: trackRow
+            "
+            class="eco-row"
+            [class.row-selected]="isRowSelected(row)"
+            (click)="selectRow(row)"
+          >
+
+            <!-- ================================================= -->
+            <!-- CHECKBOX / OLHO / LIXEIRA -->
+            <!-- ================================================= -->
+
+            <td
+              class="row-tools-column"
+              (click)="$event.stopPropagation()"
+            >
+
+              <div class="row-tools">
 
                 <input
-                  *ngIf="
-                    column.type === fieldTypes.TEXT
+                  type="checkbox"
+                  class="row-checkbox"
+                  aria-label="Selecionar ECO"
+                  [checked]="isRowSelected(row)"
+                  (change)="
+                    toggleRow(
+                      row,
+                      $any($event.target).checked
+                    )
                   "
-                  class="input"
-                  [id]="'eco-field-' + column.key"
-                  type="text"
-                  [formControlName]="column.key"
                 >
 
 
-                <!-- ================================= -->
-                <!-- MONO -->
-                <!-- ================================= -->
-
-                <input
-                  *ngIf="
-                    column.type === fieldTypes.MONO
-                  "
-                  class="input mono"
-                  [id]="'eco-field-' + column.key"
-                  type="text"
-                  [formControlName]="column.key"
+                <button
+                  class="row-action-button view-action"
+                  type="button"
+                  title="Visualizar ECO"
+                  aria-label="Visualizar ECO"
+                  (click)="openDetails(row)"
                 >
+                  ◉
+                </button>
 
 
-                <!-- ================================= -->
-                <!-- DATE -->
-                <!-- ================================= -->
-
-                <input
-                  *ngIf="
-                    column.type === fieldTypes.DATE
-                  "
-                  class="input"
-                  [id]="'eco-field-' + column.key"
-                  type="date"
-                  [formControlName]="column.key"
+                <button
+                  *ngIf="permissions.isAdmin"
+                  class="row-action-button delete-action"
+                  type="button"
+                  title="Excluir ECO"
+                  aria-label="Excluir ECO"
+                  (click)="remove(row)"
                 >
+                  ♲
+                </button>
+
+              </div>
+
+            </td>
 
 
-                <!-- ================================= -->
-                <!-- TEXTAREA -->
-                <!-- ================================= -->
+            <!-- ================================================= -->
+            <!-- CÉLULAS -->
+            <!-- ================================================= -->
 
-                <textarea
-                  *ngIf="
-                    column.type === fieldTypes.TEXTAREA
-                  "
-                  class="input eco-textarea"
-                  [id]="'eco-field-' + column.key"
-                  rows="3"
-                  [formControlName]="column.key"
-                ></textarea>
+            <td
+              *ngFor="
+                let column of visibleColumns;
+                trackBy: trackColumn
+              "
+              class="eco-cell"
+              [class.mono]="isEcoColumn(column)"
+              [class.eco-code]="isEcoColumn(column)"
+              [class.boolean-cell]="isBooleanColumn(column)"
+              (click)="$event.stopPropagation(); selectRow(row)"
+            >
 
 
-                <!-- ================================= -->
-                <!-- SELECT -->
-                <!-- ================================= -->
+              <!-- ================================================= -->
+              <!-- STATUS SOMENTE LEITURA -->
+              <!-- ================================================= -->
+
+              <div
+                *ngIf="
+                  isStatusColumn(column)
+                  &&
+                  !isColumnEditable(column)
+                "
+                class="status-readonly"
+              >
+
+                <span
+                  class="status-badge"
+                  [ngClass]="statusClass(row[column.key])"
+                >
+                  {{
+                    displayValue(
+                      row,
+                      column
+                    )
+                  }}
+                </span>
+
+                <span
+                  class="lock-icon"
+                  title="Somente leitura"
+                  aria-label="Somente leitura"
+                ></span>
+
+              </div>
+
+
+              <!-- ================================================= -->
+              <!-- STATUS EDITÁVEL -->
+              <!-- ================================================= -->
+
+              <div
+                *ngIf="
+                  isStatusColumn(column)
+                  &&
+                  isColumnEditable(column)
+                "
+                class="status-select-wrapper"
+              >
 
                 <select
-                  *ngIf="
-                    column.type === fieldTypes.SELECT
+                  class="status-control"
+                  [ngClass]="statusClass(row[column.key])"
+                  [value]="row[column.key] ?? ''"
+                  [disabled]="isCellSaving(row, column)"
+                  (change)="
+                    updateCell(
+                      row,
+                      column,
+                      $event
+                    )
                   "
-                  class="select"
-                  [id]="'eco-field-' + column.key"
-                  [formControlName]="column.key"
                 >
 
-                  <option [ngValue]="null">
-                    Selecione
-                  </option>
-
-                  <option
-                    *ngFor="let option of column.options"
-                    [value]="option"
-                  >
-                    {{ option }}
-                  </option>
-
-                </select>
-
-
-                <!-- ================================= -->
-                <!-- YES / NO -->
-                <!-- ================================= -->
-
-                <select
-                  *ngIf="
-                    column.type === fieldTypes.BOOL_YN
-                  "
-                  class="select"
-                  [id]="'eco-field-' + column.key"
-                  [formControlName]="column.key"
-                >
-
-                  <option [ngValue]="null">
-                    Selecione
-                  </option>
-
-                  <option
-                    *ngFor="let option of column.options"
-                    [value]="option"
-                  >
-                    {{ option }}
-                  </option>
-
-                </select>
-
-
-                <!-- ================================= -->
-                <!-- STATUS -->
-                <!-- ================================= -->
-
-                <select
-                  *ngIf="
-                    column.type === fieldTypes.BADGE_STATUS
-                  "
-                  class="select"
-                  [id]="'eco-field-' + column.key"
-                  [formControlName]="column.key"
-                >
-
-                  <option [ngValue]="null">
-                    Selecione
+                  <option value="">
+                    -
                   </option>
 
                   <option
@@ -468,55 +623,367 @@
 
               </div>
 
-            </div>
 
-          </section>
+              <!-- ================================================= -->
+              <!-- SOMENTE LEITURA NORMAL -->
+              <!-- ================================================= -->
+
+              <div
+                class="readonly-cell"
+                *ngIf="
+                  !isStatusColumn(column)
+                  &&
+                  !isColumnEditable(column)
+                "
+              >
+
+                <span
+                  class="cell-value"
+                  [title]="displayValue(row, column)"
+                >
+                  {{
+                    displayValue(
+                      row,
+                      column
+                    )
+                  }}
+                </span>
+
+                <span
+                  class="lock-icon"
+                  title="Somente leitura"
+                  aria-label="Somente leitura"
+                ></span>
+
+              </div>
 
 
-          <!-- ERRO -->
+              <!-- ================================================= -->
+              <!-- SELECT EDITÁVEL -->
+              <!-- ================================================= -->
 
-          <div
-            *ngIf="saveError"
-            class="danger eco-save-error"
+              <select
+                *ngIf="
+                  !isStatusColumn(column)
+                  &&
+                  isColumnEditable(column)
+                  &&
+                  (
+                    column.type === fieldTypes.SELECT
+                    ||
+                    column.type === fieldTypes.BOOL_YN
+                  )
+                "
+                class="inline-control inline-select"
+                [value]="row[column.key] ?? ''"
+                [disabled]="isCellSaving(row, column)"
+                (change)="
+                  updateCell(
+                    row,
+                    column,
+                    $event
+                  )
+                "
+              >
+
+                <option value="">
+                  -
+                </option>
+
+                <option
+                  *ngFor="let option of column.options"
+                  [value]="option"
+                >
+                  {{ option }}
+                </option>
+
+              </select>
+
+
+              <!-- ================================================= -->
+              <!-- DATA EDITÁVEL -->
+              <!-- ================================================= -->
+
+              <input
+                *ngIf="
+                  isColumnEditable(column)
+                  &&
+                  column.type === fieldTypes.DATE
+                "
+                class="inline-control"
+                type="date"
+                [value]="row[column.key] ?? ''"
+                [disabled]="isCellSaving(row, column)"
+                (change)="
+                  updateCell(
+                    row,
+                    column,
+                    $event
+                  )
+                "
+              >
+
+
+              <!-- ================================================= -->
+              <!-- TEXTO EDITÁVEL -->
+              <!-- ================================================= -->
+
+              <input
+                *ngIf="
+                  isColumnEditable(column)
+                  &&
+                  (
+                    column.type === fieldTypes.TEXT
+                    ||
+                    column.type === fieldTypes.MONO
+                    ||
+                    column.type === fieldTypes.TEXTAREA
+                  )
+                "
+                class="inline-control"
+                [class.mono]="column.type === fieldTypes.MONO"
+                type="text"
+                [value]="row[column.key] ?? ''"
+                [disabled]="isCellSaving(row, column)"
+                (change)="
+                  updateCell(
+                    row,
+                    column,
+                    $event
+                  )
+                "
+              >
+
+            </td>
+
+          </tr>
+
+
+          <!-- ================================================= -->
+          <!-- ESTADO VAZIO -->
+          <!-- ================================================= -->
+
+          <tr
+            *ngIf="rows.length === 0"
           >
-            {{ saveError }}
+
+            <td
+              class="empty-state"
+              [attr.colspan]="visibleColumns.length + 1"
+            >
+              Nenhuma ECO encontrada.
+            </td>
+
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- PAGINAÇÃO -->
+    <!-- ================================================= -->
+
+    <div class="eco-pagination">
+
+      <span>
+        {{ total }}
+        {{
+          total === 1
+            ? 'registro'
+            : 'registros'
+        }}
+      </span>
+
+
+      <div>
+
+        <button
+          class="eco-toolbar-button"
+          type="button"
+          [disabled]="page <= 1"
+          (click)="previousPage()"
+        >
+          Anterior
+        </button>
+
+
+        <span class="page-indicator">
+          {{ page }} / {{ pages() }}
+        </span>
+
+
+        <button
+          class="eco-toolbar-button"
+          type="button"
+          [disabled]="page >= pages()"
+          (click)="nextPage()"
+        >
+          Próxima
+        </button>
+
+      </div>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================================= -->
+  <!-- DRAWER / DETALHES DA ECO -->
+  <!-- ================================================= -->
+
+  <div
+    class="details-overlay"
+    *ngIf="viewingRow"
+    (click)="closeDetails()"
+  >
+
+    <aside
+      class="details-drawer"
+      (click)="$event.stopPropagation()"
+    >
+
+      <!-- CABEÇALHO -->
+
+      <div class="details-header">
+
+        <div class="details-title-area">
+
+          <div class="details-title-line">
+
+            <h2>
+              ECO
+              {{
+                viewingRow.eco
+                  || '-'
+              }}
+            </h2>
+
+
+            <span
+              class="status-badge"
+              [ngClass]="statusClass(viewingRow.status)"
+            >
+              {{
+                viewingRow.status
+                  || '-'
+              }}
+            </span>
+
           </div>
 
         </div>
 
 
-        <!-- ======================================== -->
-        <!-- RODAPÉ DO MODAL -->
-        <!-- ======================================== -->
+        <button
+          class="details-close"
+          type="button"
+          aria-label="Fechar detalhes"
+          (click)="closeDetails()"
+        >
+          ×
+        </button>
 
-        <div class="eco-form-footer">
+      </div>
 
-          <button
-            type="button"
-            class="btn btn-ghost"
-            [disabled]="saving"
-            (click)="closeModal()"
-          >
-            Cancelar
-          </button>
 
-          <button
-            type="submit"
-            class="btn btn-primary"
-            [disabled]="saving"
-          >
-            {{
-              saving
-                ? 'Salvando...'
-                : 'Salvar'
-            }}
-          </button>
+      <!-- CONTEÚDO -->
 
-        </div>
+      <div class="details-body">
 
-      </form>
+        <section
+          class="details-section"
+          *ngFor="
+            let group of columnGroups;
+            trackBy: trackGroup
+          "
+        >
 
-    </div>
+          <h3>
+            {{ group.label }}
+          </h3>
+
+
+          <div class="details-grid">
+
+            <div
+              class="details-field"
+              *ngFor="
+                let column of group.columns;
+                trackBy: trackColumn
+              "
+            >
+
+              <span class="details-label">
+                {{ column.label }}
+              </span>
+
+
+              <span
+                *ngIf="!isStatusColumn(column)"
+                class="details-value"
+                [class.mono]="isEcoColumn(column)"
+              >
+                {{
+                  displayValue(
+                    viewingRow,
+                    column
+                  )
+                }}
+              </span>
+
+
+              <span
+                *ngIf="isStatusColumn(column)"
+                class="status-badge details-status"
+                [ngClass]="
+                  statusClass(
+                    viewingRow[column.key]
+                  )
+                "
+              >
+                {{
+                  displayValue(
+                    viewingRow,
+                    column
+                  )
+                }}
+              </span>
+
+            </div>
+
+          </div>
+
+        </section>
+
+      </div>
+
+
+      <!-- RODAPÉ -->
+
+      <div class="details-footer">
+
+        <span>
+          ITEM {{ viewingRow.item || '-' }}
+        </span>
+
+
+        <button
+          *ngIf="permissions.isAdmin"
+          class="details-delete-button"
+          type="button"
+          (click)="remove(viewingRow)"
+        >
+          Excluir ECO
+        </button>
+
+      </div>
+
+    </aside>
 
   </div>
 

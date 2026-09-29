@@ -45,6 +45,18 @@ def list_ecos(
         alias="status",
     ),
     month: str | None = None,
+
+    group_filter: str | None = Query(
+        default=None,
+        alias="group",
+    ),
+
+    obu: str | None = None,
+
+    item_type: str | None = None,
+
+    eco_type: str | None = None,
+
     db: Session = Depends(get_db),
     user=Depends(current_user),
 ):
@@ -59,6 +71,10 @@ def list_ecos(
         search=search,
         status=status_filter,
         month=month,
+        group=group_filter,
+        obu=obu,
+        item_type=item_type,
+        eco_type=eco_type,
     )
 
     return {
@@ -88,7 +104,24 @@ def create_eco(
         body
     )
 
+# =========================================================
+# CRIAR ECO ABAIXO DE OUTRA ECO
+# =========================================================
 
+@router.post("/{eco_id}/after")
+def create_eco_after(
+    eco_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(current_user),
+):
+    service = EcoService(
+        db,
+        user,
+    )
+
+    return service.create_after(
+        eco_id
+    )
 # =========================================================
 # ATUALIZAR ECO
 # =========================================================
