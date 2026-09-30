@@ -2,7 +2,6 @@
   class="page"
   (click)="openFilterKey = null"
 >
-
   <!-- ================================================= -->
   <!-- CABEÇALHO -->
   <!-- ================================================= -->
@@ -14,7 +13,6 @@
   <p class="eco-subtitle">
     {{ total }} ECOs · clique em uma linha para selecioná-la e edite as células diretamente.
   </p>
-
 
   <!-- ================================================= -->
   <!-- TOOLBAR -->
@@ -45,7 +43,6 @@
 
       </div>
 
-
       <!-- LIMPAR FILTROS -->
 
       <button
@@ -74,13 +71,11 @@
           type="button"
           (click)="showColumns = !showColumns"
         >
-
           <span aria-hidden="true">
             ◉
           </span>
 
           Colunas
-
         </button>
 
 
@@ -92,7 +87,6 @@
           <div class="column-picker-title">
             Colunas visíveis
           </div>
-
 
           <label
             class="column-picker-option"
@@ -155,11 +149,9 @@
           ＋
         </span>
 
-
         <ng-container *ngIf="creatingBelow">
           Adicionando...
         </ng-container>
-
 
         <ng-container
           *ngIf="
@@ -170,7 +162,6 @@
         >
           Adicionar abaixo do item {{ selectedItem }}
         </ng-container>
-
 
         <ng-container
           *ngIf="
@@ -702,6 +693,52 @@
 
 
               <!-- ================================================= -->
+              <!-- OWNER EDITÁVEL -->
+              <!-- ================================================= -->
+
+              <select
+                *ngIf="
+                  isOwnerColumn(column)
+                  &&
+                  isColumnEditable(column)
+                "
+                class="inline-control inline-select"
+                [value]="
+                  row[column.key] ?? ''
+                "
+                [disabled]="
+                  isCellSaving(
+                    row,
+                    column
+                  )
+                "
+                (change)="
+                  updateCell(
+                    row,
+                    column,
+                    $event
+                  )
+                "
+              >
+
+                <option value="">
+                  -
+                </option>
+
+                <option
+                  *ngFor="
+                    let owner
+                    of ownerOptions
+                  "
+                  [value]="owner"
+                >
+                  {{ owner }}
+                </option>
+
+              </select>
+
+
+              <!-- ================================================= -->
               <!-- SELECT EDITÁVEL -->
               <!-- ================================================= -->
 
@@ -795,6 +832,8 @@
               <input
                 *ngIf="
                   isColumnEditable(column)
+                  &&
+                  !isOwnerColumn(column)
                   &&
                   (
                     column.type
@@ -923,14 +962,13 @@
   <div
     class="details-overlay"
     *ngIf="viewingRow"
-    (click)="closeDetails()"
+    (click)="!drawerEditing && closeDetails()"
   >
 
     <aside
       class="details-drawer"
       (click)="$event.stopPropagation()"
     >
-
 
       <!-- ================================================= -->
       <!-- CABEÇALHO -->
@@ -943,14 +981,7 @@
           <div class="details-title-line">
 
             <h2>
-
-              ECO
-
-              {{
-                viewingRow.eco
-                  || '-'
-              }}
-
+              ECO {{ viewingRow.eco || '-' }}
             </h2>
 
 
@@ -962,10 +993,15 @@
                 )
               "
             >
-              {{
-                viewingRow.status
-                  || '-'
-              }}
+              {{ viewingRow.status || '-' }}
+            </span>
+
+
+            <span
+              *ngIf="drawerEditing"
+              class="details-editing-badge"
+            >
+              Editando
             </span>
 
           </div>
@@ -973,14 +1009,52 @@
         </div>
 
 
-        <button
-          class="details-close"
-          type="button"
-          aria-label="Fechar detalhes"
-          (click)="closeDetails()"
-        >
-          ×
-        </button>
+        <div class="details-header-actions">
+
+          <!-- EDITAR -->
+
+          <button
+            *ngIf="
+              canEditDrawer
+              &&
+              !drawerEditing
+            "
+            class="details-edit-button"
+            type="button"
+            title="Editar ECO"
+            aria-label="Editar ECO"
+            (click)="startDrawerEdit()"
+          >
+            <span aria-hidden="true">
+              ✎
+            </span>
+
+            Editar
+          </button>
+
+
+          <!-- FECHAR -->
+
+          <button
+            class="details-close"
+            type="button"
+            aria-label="Fechar detalhes"
+            [title]="
+              drawerEditing
+                ? 'Salve ou cancele a edição antes de fechar'
+                : 'Fechar'
+            "
+            [disabled]="
+              drawerEditing
+              ||
+              drawerSaving
+            "
+            (click)="closeDetails()"
+          >
+            ×
+          </button>
+
+        </div>
 
       </div>
 
@@ -990,6 +1064,31 @@
       <!-- ================================================= -->
 
       <div class="details-body">
+
+
+        <!-- ERRO -->
+
+        <div
+          *ngIf="drawerError"
+          class="drawer-message drawer-message-error"
+        >
+          {{ drawerError }}
+        </div>
+
+
+        <!-- SUCESSO -->
+
+        <div
+          *ngIf="drawerSuccess"
+          class="drawer-message drawer-message-success"
+        >
+          {{ drawerSuccess }}
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- GRUPOS -->
+        <!-- ================================================= -->
 
         <section
           class="details-section"
@@ -1007,56 +1106,336 @@
           <div class="details-grid">
 
             <div
-              class="details-field"
               *ngFor="
                 let column of group.columns;
                 trackBy: trackColumn
               "
+              class="details-field"
+              [class.details-field-editable]="
+                drawerEditing
+                &&
+                isColumnEditable(column)
+              "
+              [class.details-field-readonly]="
+                drawerEditing
+                &&
+                !isColumnEditable(column)
+              "
             >
 
-              <span class="details-label">
-                {{ column.label }}
-              </span>
+
+              <!-- LABEL -->
+
+              <div class="details-label-row">
+
+                <span class="details-label">
+                  {{ column.label }}
+                </span>
 
 
-              <span
+                <span
+                  *ngIf="
+                    drawerEditing
+                    &&
+                    !isColumnEditable(column)
+                  "
+                  class="details-field-lock"
+                  title="Somente leitura"
+                >
+                  🔒
+                </span>
+
+              </div>
+
+
+              <!-- ================================================= -->
+              <!-- VISUALIZAÇÃO / SOMENTE LEITURA -->
+              <!-- ================================================= -->
+
+              <ng-container
                 *ngIf="
-                  !isStatusColumn(column)
-                "
-                class="details-value"
-                [class.mono]="
-                  isEcoColumn(column)
+                  !drawerEditing
+                  ||
+                  !isColumnEditable(column)
                 "
               >
-                {{
-                  displayValue(
-                    viewingRow,
-                    column
-                  )
-                }}
-              </span>
+
+                <span
+                  *ngIf="
+                    !isStatusColumn(column)
+                  "
+                  class="details-value"
+                  [class.mono]="
+                    isEcoColumn(column)
+                  "
+                >
+                  {{
+                    displayValue(
+                      viewingRow,
+                      column
+                    )
+                  }}
+                </span>
 
 
-              <span
+                <span
+                  *ngIf="
+                    isStatusColumn(column)
+                  "
+                  class="status-badge details-status"
+                  [ngClass]="
+                    statusClass(
+                      viewingRow[
+                        column.key
+                      ]
+                    )
+                  "
+                >
+                  {{
+                    displayValue(
+                      viewingRow,
+                      column
+                    )
+                  }}
+                </span>
+
+              </ng-container>
+
+
+              <!-- ================================================= -->
+              <!-- MODO EDIÇÃO -->
+              <!-- ================================================= -->
+
+              <ng-container
                 *ngIf="
-                  isStatusColumn(column)
-                "
-                class="status-badge details-status"
-                [ngClass]="
-                  statusClass(
-                    viewingRow[
-                      column.key
-                    ]
-                  )
+                  drawerEditing
+                  &&
+                  isColumnEditable(column)
                 "
               >
-                {{
-                  displayValue(
-                    viewingRow,
-                    column
-                  )
-                }}
-              </span>
+
+
+                <!-- ================================================= -->
+                <!-- STATUS -->
+                <!-- ================================================= -->
+
+                <select
+                  *ngIf="
+                    isStatusColumn(column)
+                  "
+                  class="drawer-control drawer-select drawer-status-select"
+                  [ngClass]="
+                    statusClass(
+                      drawerValue(column)
+                    )
+                  "
+                  [ngModel]="
+                    drawerValue(column)
+                  "
+                  [ngModelOptions]="{
+                    standalone: true
+                  }"
+                  [disabled]="drawerSaving"
+                  (ngModelChange)="
+                    setDrawerValue(
+                      column,
+                      $event
+                    )
+                  "
+                >
+
+                  <option value="">
+                    -
+                  </option>
+
+
+                  <option
+                    *ngFor="
+                      let option
+                      of column.options
+                    "
+                    [value]="option"
+                  >
+                    {{ option }}
+                  </option>
+
+                </select>
+
+
+                <!-- ================================================= -->
+                <!-- OWNER -->
+                <!-- ================================================= -->
+
+                <select
+                  *ngIf="
+                    isOwnerColumn(column)
+                  "
+                  class="drawer-control drawer-select"
+                  [ngModel]="
+                    drawerValue(column)
+                  "
+                  [ngModelOptions]="{
+                    standalone: true
+                  }"
+                  [disabled]="drawerSaving"
+                  (ngModelChange)="
+                    setDrawerValue(
+                      column,
+                      $event
+                    )
+                  "
+                >
+
+                  <option value="">
+                    -
+                  </option>
+
+                  <option
+                    *ngFor="
+                      let owner
+                      of ownerOptions
+                    "
+                    [value]="owner"
+                  >
+                    {{ owner }}
+                  </option>
+
+                </select>
+
+
+                <!-- ================================================= -->
+                <!-- SELECT / YES-NO -->
+                <!-- ================================================= -->
+
+                <select
+                  *ngIf="
+                    !isStatusColumn(column)
+                    &&
+                    (
+                      column.type
+                      === fieldTypes.SELECT
+                      ||
+                      column.type
+                      === fieldTypes.BOOL_YN
+                    )
+                  "
+                  class="drawer-control drawer-select"
+                  [ngModel]="
+                    drawerValue(column)
+                  "
+                  [ngModelOptions]="{
+                    standalone: true
+                  }"
+                  [disabled]="drawerSaving"
+                  (ngModelChange)="
+                    setDrawerValue(
+                      column,
+                      $event
+                    )
+                  "
+                >
+
+                  <option value="">
+                    -
+                  </option>
+
+
+                  <option
+                    *ngFor="
+                      let option
+                      of column.options
+                    "
+                    [value]="option"
+                  >
+                    {{ option }}
+                  </option>
+
+                </select>
+
+
+                <!-- ================================================= -->
+                <!-- DATA -->
+                <!-- ================================================= -->
+
+                <input
+                  *ngIf="
+                    column.type
+                    === fieldTypes.DATE
+                  "
+                  class="drawer-control"
+                  type="date"
+                  [value]="
+                    drawerValue(column)
+                  "
+                  [disabled]="drawerSaving"
+                  (input)="
+                    setDrawerValue(
+                      column,
+                      $any($event.target).value
+                    )
+                  "
+                >
+
+
+                <!-- ================================================= -->
+                <!-- TEXTO CURTO -->
+                <!-- ================================================= -->
+
+                <input
+                  *ngIf="
+                    !isOwnerColumn(column)
+                    &&
+                    (
+                    column.type
+                    === fieldTypes.TEXT
+                    ||
+                    column.type
+                    === fieldTypes.MONO
+                    )
+                  "
+                  class="drawer-control"
+                  [class.mono]="
+                    column.type
+                    === fieldTypes.MONO
+                  "
+                  type="text"
+                  [value]="
+                    drawerValue(column)
+                  "
+                  [disabled]="drawerSaving"
+                  (input)="
+                    setDrawerValue(
+                      column,
+                      $any($event.target).value
+                    )
+                  "
+                >
+
+
+                <!-- ================================================= -->
+                <!-- TEXTO LONGO -->
+                <!-- ================================================= -->
+
+                <textarea
+                  *ngIf="
+                    column.type
+                    === fieldTypes.TEXTAREA
+                  "
+                  class="drawer-control drawer-textarea"
+                  rows="3"
+                  [value]="
+                    drawerValue(column)
+                  "
+                  [disabled]="drawerSaving"
+                  (input)="
+                    setDrawerValue(
+                      column,
+                      $any($event.target).value
+                    )
+                  "
+                ></textarea>
+
+              </ng-container>
 
             </div>
 
@@ -1073,23 +1452,74 @@
 
       <div class="details-footer">
 
-        <span>
-          ITEM
-          {{
-            viewingRow.item
-            || '-'
-          }}
+        <span class="details-footer-item">
+          ITEM {{ viewingRow.item || '-' }}
         </span>
 
 
-        <button
-          *ngIf="permissions.isAdmin"
-          class="details-delete-button"
-          type="button"
-          (click)="remove(viewingRow)"
+        <!-- VISUALIZAÇÃO -->
+
+        <div
+          *ngIf="!drawerEditing"
+          class="details-footer-actions"
         >
-          Excluir ECO
-        </button>
+
+          <button
+            *ngIf="permissions.isAdmin"
+            class="details-delete-button"
+            type="button"
+            (click)="remove(viewingRow)"
+          >
+            Excluir ECO
+          </button>
+
+        </div>
+
+
+        <!-- EDIÇÃO -->
+
+        <div
+          *ngIf="drawerEditing"
+          class="details-footer-actions"
+        >
+
+          <button
+            class="details-cancel-button"
+            type="button"
+            [disabled]="drawerSaving"
+            (click)="cancelDrawerEdit()"
+          >
+            Cancelar
+          </button>
+
+
+          <button
+            class="details-save-button"
+            type="button"
+            [disabled]="
+              drawerSaving
+              ||
+              !drawerHasChanges
+            "
+            (click)="saveDrawerChanges()"
+          >
+
+            <ng-container
+              *ngIf="!drawerSaving"
+            >
+              Salvar alterações
+            </ng-container>
+
+
+            <ng-container
+              *ngIf="drawerSaving"
+            >
+              Salvando...
+            </ng-container>
+
+          </button>
+
+        </div>
 
       </div>
 

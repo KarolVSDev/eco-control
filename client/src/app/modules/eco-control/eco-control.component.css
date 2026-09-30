@@ -1110,14 +1110,12 @@ tr.row-selected
   color: #bbb;
 }
 
-
 /* =====================================================
    OVERLAY DO DRAWER
    ===================================================== */
 
 .details-overlay {
   position: fixed;
-
   inset: 0;
 
   z-index: 600;
@@ -1130,7 +1128,9 @@ tr.row-selected
     0.16s ease;
 }
 
+
 @keyframes overlayFadeIn {
+
   from {
     opacity: 0;
   }
@@ -1146,7 +1146,7 @@ tr.row-selected
    ===================================================== */
 
 .details-drawer {
-  width: min(680px, 94vw);
+  width: min(720px, 94vw);
   height: 100vh;
 
   position: absolute;
@@ -1170,7 +1170,9 @@ tr.row-selected
     0.2s ease;
 }
 
+
 @keyframes drawerEnter {
+
   from {
     transform:
       translateX(100%);
@@ -1194,24 +1196,31 @@ tr.row-selected
 
   gap: 20px;
 
-  padding: 26px 28px 18px;
+  padding: 22px 24px 17px;
 
-  border-bottom: 1px solid #292929;
+  border-bottom:
+    1px solid #292929;
+
+  background: #181818;
 }
+
 
 .details-title-area {
   min-width: 0;
+
   flex: 1;
 }
+
 
 .details-title-line {
   display: flex;
   align-items: center;
 
-  gap: 12px;
+  gap: 10px;
 
   flex-wrap: wrap;
 }
+
 
 .details-title-line h2 {
   margin: 0;
@@ -1223,13 +1232,99 @@ tr.row-selected
     "Courier New",
     monospace;
 
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
 }
 
+
+/* =====================================================
+   BADGE EDITANDO
+   ===================================================== */
+
+.details-editing-badge {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 25px;
+
+  padding: 3px 8px;
+
+  border:
+    1px solid
+    rgba(237, 23, 76, 0.35);
+
+  border-radius: 6px;
+
+  background:
+    rgba(237, 23, 76, 0.10);
+
+  color: #ff5275;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.03em;
+
+  text-transform: uppercase;
+}
+
+
+/* =====================================================
+   AÇÕES DO CABEÇALHO
+   ===================================================== */
+
+.details-header-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  flex: 0 0 auto;
+}
+
+
+.details-edit-button {
+  height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  padding: 0 12px;
+
+  border: 1px solid #414141;
+  border-radius: 7px;
+
+  background: #222;
+
+  color: #ddd;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.details-edit-button:hover {
+  border-color: #5a5a5a;
+
+  background: #292929;
+
+  color: #fff;
+}
+
+
 .details-close {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
 
   display: grid;
   place-items: center;
@@ -1245,14 +1340,28 @@ tr.row-selected
 
   color: #aaa;
 
-  font-size: 25px;
+  font-size: 24px;
 
   cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
 
-.details-close:hover {
+
+.details-close:hover:not(:disabled) {
   background: #242424;
+
   color: #fff;
+}
+
+
+.details-close:disabled {
+  opacity: 0.35;
+
+  cursor: not-allowed;
 }
 
 
@@ -1267,15 +1376,84 @@ tr.row-selected
 
   overflow-y: auto;
 
-  padding: 22px 28px 30px;
+  padding: 20px 24px 28px;
 
   scrollbar-width: thin;
-  scrollbar-color: #555 #161616;
+  scrollbar-color:
+    #555
+    #161616;
 }
 
-.details-section {
-  margin-bottom: 26px;
+
+.details-body::-webkit-scrollbar {
+  width: 8px;
 }
+
+
+.details-body::-webkit-scrollbar-track {
+  background: #161616;
+}
+
+
+.details-body::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+
+  background: #555;
+}
+
+
+/* =====================================================
+   MENSAGENS DO DRAWER
+   ===================================================== */
+
+.drawer-message {
+  margin-bottom: 16px;
+
+  padding: 10px 12px;
+
+  border-radius: 7px;
+
+  font-size: 12px;
+}
+
+
+.drawer-message-error {
+  border:
+    1px solid
+    rgba(237, 23, 76, 0.35);
+
+  background:
+    rgba(237, 23, 76, 0.08);
+
+  color: #ff607f;
+}
+
+
+.drawer-message-success {
+  border:
+    1px solid
+    rgba(34, 197, 94, 0.35);
+
+  background:
+    rgba(34, 197, 94, 0.08);
+
+  color: #4ade80;
+}
+
+
+/* =====================================================
+   SEÇÕES
+   ===================================================== */
+
+.details-section {
+  margin-bottom: 25px;
+}
+
+
+.details-section:last-child {
+  margin-bottom: 0;
+}
+
 
 .details-section h3 {
   margin: 0 0 11px;
@@ -1290,6 +1468,11 @@ tr.row-selected
   text-transform: uppercase;
 }
 
+
+/* =====================================================
+   GRID
+   ===================================================== */
+
 .details-grid {
   display: grid;
 
@@ -1299,34 +1482,103 @@ tr.row-selected
       minmax(0, 1fr)
     );
 
-  gap: 10px;
+  gap: 9px;
 }
+
+
+/* =====================================================
+   CAMPO DO DRAWER
+   ===================================================== */
 
 .details-field {
   min-width: 0;
-  min-height: 57px;
+  min-height: 59px;
 
   display: flex;
   flex-direction: column;
   justify-content: center;
 
-  gap: 5px;
+  gap: 6px;
 
-  padding: 9px 12px;
+  padding: 9px 11px;
 
   border: 1px solid #353535;
   border-radius: 7px;
 
   background: #222;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
+
+/* editável */
+
+.details-field-editable {
+  border-color: #464646;
+
+  background: #202020;
+}
+
+
+/* somente leitura durante edição */
+
+.details-field-readonly {
+  border-color: #303030;
+
+  background: #1c1c1c;
+
+  opacity: 0.72;
+}
+
+
+/* =====================================================
+   LABEL
+   ===================================================== */
+
+.details-label-row {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+}
+
+
 .details-label {
+  min-width: 0;
+
+  overflow: hidden;
+
   color: #858585;
 
   font-size: 10px;
 
+  text-overflow: ellipsis;
+
   text-transform: uppercase;
+
+  white-space: nowrap;
 }
+
+
+.details-field-lock {
+  flex: 0 0 auto;
+
+  color: #666;
+
+  font-size: 9px;
+
+  opacity: 0.75;
+}
+
+
+/* =====================================================
+   VALOR
+   ===================================================== */
 
 .details-value {
   min-width: 0;
@@ -1339,13 +1591,173 @@ tr.row-selected
   font-weight: 600;
 }
 
+
 .details-status {
   width: fit-content;
 }
 
 
 /* =====================================================
-   RODAPÉ DO DRAWER
+   CONTROLES EDITÁVEIS DO DRAWER
+   ===================================================== */
+
+.drawer-control {
+  width: 100%;
+  min-width: 0;
+
+  min-height: 34px;
+
+  padding: 6px 8px;
+
+  border: 1px solid #494949;
+  border-radius: 6px;
+
+  outline: 0;
+
+  box-sizing: border-box;
+
+  background: #171717;
+
+  color: #f3f3f3;
+
+  font-size: 12px;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.drawer-control:hover:not(:disabled) {
+  border-color: #5c5c5c;
+}
+
+
+.drawer-control:focus {
+  border-color: #777;
+
+  background: #1a1a1a;
+
+  box-shadow:
+    0 0 0 2px
+    rgba(255, 255, 255, 0.04);
+}
+
+
+.drawer-control:disabled {
+  opacity: 0.55;
+
+  cursor: wait;
+}
+
+
+/* =====================================================
+   SELECT
+   ===================================================== */
+
+.drawer-select {
+  cursor: pointer;
+
+  color-scheme: dark;
+}
+
+
+.drawer-select option {
+  background: #181818;
+
+  color: #fff;
+}
+
+
+/* =====================================================
+   STATUS NO MODO EDIÇÃO
+   ===================================================== */
+
+.drawer-status-select {
+  font-weight: 700;
+}
+
+
+/*
+  As classes status-* já existentes
+  continuam responsáveis pelas cores.
+*/
+
+.drawer-status-select.status-released {
+  border-color: #087c43;
+
+  background:
+    rgba(0, 134, 72, 0.18);
+
+  color: #2bdd80;
+}
+
+
+.drawer-status-select.status-cancelled {
+  border-color: #494949;
+
+  background: #292929;
+
+  color: #bdbdbd;
+}
+
+
+.drawer-status-select.status-rejected {
+  border-color: #7b2238;
+
+  background:
+    rgba(164, 34, 64, 0.16);
+
+  color: #ff5479;
+}
+
+
+.drawer-status-select.status-working {
+  border-color: #27568e;
+
+  background:
+    rgba(38, 103, 182, 0.17);
+
+  color: #6bacff;
+}
+
+
+.drawer-status-select.status-hold {
+  border-color: #7b641d;
+
+  background:
+    rgba(172, 131, 25, 0.15);
+
+  color: #ffc64c;
+}
+
+
+.drawer-status-select.status-processing {
+  border-color: #6e4ca0;
+
+  background:
+    rgba(116, 70, 177, 0.18);
+
+  color: #c999ff;
+}
+
+
+/* =====================================================
+   TEXTAREA
+   ===================================================== */
+
+.drawer-textarea {
+  min-height: 74px;
+
+  resize: vertical;
+
+  line-height: 1.4;
+}
+
+
+/* =====================================================
+   RODAPÉ
    ===================================================== */
 
 .details-footer {
@@ -1355,9 +1767,12 @@ tr.row-selected
 
   gap: 15px;
 
-  padding: 14px 28px;
+  min-height: 66px;
 
-  border-top: 1px solid #303030;
+  padding: 13px 24px;
+
+  border-top:
+    1px solid #303030;
 
   background: #191919;
 
@@ -1365,6 +1780,33 @@ tr.row-selected
 
   font-size: 11px;
 }
+
+
+.details-footer-item {
+  flex: 0 0 auto;
+
+  color: #777;
+
+  font-size: 11px;
+}
+
+
+/* =====================================================
+   AÇÕES DO RODAPÉ
+   ===================================================== */
+
+.details-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 8px;
+}
+
+
+/* =====================================================
+   EXCLUIR
+   ===================================================== */
 
 .details-delete-button {
   height: 38px;
@@ -1386,11 +1828,97 @@ tr.row-selected
   font-weight: 600;
 
   cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
+
 
 .details-delete-button:hover {
   background:
     rgba(237, 23, 76, 0.18);
+}
+
+
+/* =====================================================
+   CANCELAR
+   ===================================================== */
+
+.details-cancel-button {
+  height: 38px;
+
+  padding: 0 14px;
+
+  border: 1px solid #3c3c3c;
+  border-radius: 7px;
+
+  background: #202020;
+
+  color: #ccc;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.details-cancel-button:hover:not(:disabled) {
+  border-color: #555;
+
+  background: #292929;
+
+  color: #fff;
+}
+
+
+/* =====================================================
+   SALVAR
+   ===================================================== */
+
+.details-save-button {
+  min-width: 130px;
+  height: 38px;
+
+  padding: 0 15px;
+
+  border: 1px solid #ed174c;
+  border-radius: 7px;
+
+  background: #ed174c;
+
+  color: #fff;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+
+.details-save-button:hover:not(:disabled) {
+  border-color: #d91445;
+
+  background: #d91445;
+}
+
+
+.details-save-button:disabled,
+.details-cancel-button:disabled {
+  opacity: 0.45;
+
+  cursor: default;
 }
 
 
@@ -1468,5 +1996,51 @@ tr.row-selected
   .details-footer {
     padding-left: 18px;
     padding-right: 18px;
+  }
+    .details-header {
+    align-items: center;
+  }
+
+
+  .details-header-actions {
+    gap: 4px;
+  }
+
+
+  .details-edit-button {
+    width: 34px;
+
+    padding: 0;
+
+    font-size: 0;
+  }
+
+
+  .details-edit-button span {
+    font-size: 15px;
+  }
+
+
+  .details-footer {
+    align-items: stretch;
+
+    flex-direction: column;
+  }
+
+
+  .details-footer-item {
+    width: 100%;
+  }
+
+
+  .details-footer-actions {
+    width: 100%;
+  }
+
+
+  .details-cancel-button,
+  .details-save-button,
+  .details-delete-button {
+    flex: 1;
   }
 }

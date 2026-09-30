@@ -475,7 +475,7 @@
    EXPORT
    ===================================================== */
 
-.settings-export-wrapper {
+/* .settings-export-wrapper {
   display: flex;
   justify-content: flex-end;
 
@@ -526,7 +526,7 @@
   box-shadow:
     0 10px 30px
     rgba(255, 113, 60, 0.32);
-}
+} */
 
 
 /* =====================================================

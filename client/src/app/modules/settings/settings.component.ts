@@ -650,123 +650,123 @@ export class SettingsComponent
   // EXPORTAR CONFIGURAÇÕES
   // =====================================================
 
-  exportSettings(): void {
+//   exportSettings(): void {
 
-    const lines: string[] = [];
-
-
-    lines.push(
-      'OBU;AU'
-    );
+//     const lines: string[] = [];
 
 
-    for (
-      const item
-      of this.data.obu_au
-    ) {
-
-      lines.push(
-        `${item.obu};${item.au}`
-      );
-    }
+//     lines.push(
+//       'OBU;AU'
+//     );
 
 
-    lines.push(
-      ''
-    );
+//     for (
+//       const item
+//       of this.data.obu_au
+//     ) {
 
-    lines.push(
-      'OWNER;GROUP'
-    );
-
-
-    for (
-      const item
-      of this.data.owner_group
-    ) {
-
-      lines.push(
-        `${item.owner};${item.group}`
-      );
-    }
+//       lines.push(
+//         `${item.obu};${item.au}`
+//       );
+//     }
 
 
-    lines.push(
-      ''
-    );
+//     lines.push(
+//       ''
+//     );
 
-    lines.push(
-      'MANAGER'
-    );
-
-
-    for (
-      const manager
-      of this.data.managers
-    ) {
-
-      lines.push(
-        manager.name
-      );
-    }
+//     lines.push(
+//       'OWNER;GROUP'
+//     );
 
 
-    const csv =
-      lines.join(
-        '\r\n'
-      );
+//     for (
+//       const item
+//       of this.data.owner_group
+//     ) {
+
+//       lines.push(
+//         `${item.owner};${item.group}`
+//       );
+//     }
 
 
-    const blob =
-      new Blob(
-        [
-          '\uFEFF',
-          csv,
-        ],
-        {
-          type:
-            'text/csv;charset=utf-8;',
-        },
-      );
+//     lines.push(
+//       ''
+//     );
+
+//     lines.push(
+//       'MANAGER'
+//     );
 
 
-    const url =
-      URL.createObjectURL(
-        blob
-      );
+//     for (
+//       const manager
+//       of this.data.managers
+//     ) {
+
+//       lines.push(
+//         manager.name
+//       );
+//     }
 
 
-    const link =
-      document.createElement(
-        'a'
-      );
+//     const csv =
+//       lines.join(
+//         '\r\n'
+//       );
 
 
-    link.href =
-      url;
+//     const blob =
+//       new Blob(
+//         [
+//           '\uFEFF',
+//           csv,
+//         ],
+//         {
+//           type:
+//             'text/csv;charset=utf-8;',
+//         },
+//       );
 
 
-    link.download =
-      'eco-control-configuracoes.csv';
+//     const url =
+//       URL.createObjectURL(
+//         blob
+//       );
 
 
-    document.body
-      .appendChild(
-        link
-      );
+//     const link =
+//       document.createElement(
+//         'a'
+//       );
 
 
-    link.click();
+//     link.href =
+//       url;
 
 
-    document.body
-      .removeChild(
-        link
-      );
+//     link.download =
+//       'eco-control-configuracoes.csv';
 
 
-    URL.revokeObjectURL(
-      url
-    );
-  }
+//     document.body
+//       .appendChild(
+//         link
+//       );
+
+
+//     link.click();
+
+
+//     document.body
+//       .removeChild(
+//         link
+//       );
+
+
+//     URL.revokeObjectURL(
+//       url
+//     );
+//   }
 }

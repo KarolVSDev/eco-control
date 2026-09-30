@@ -6,6 +6,9 @@ from fastapi import (
     Response,
     status,
 )
+from app.repository.settings_repository import (
+    SettingsRepository,
+)
 
 from sqlalchemy.orm import Session
 
@@ -23,6 +26,7 @@ from app.services.settings_service import (
 
 from app.utils.security import (
     admin_user,
+    current_user,
 )
 
 
@@ -31,6 +35,29 @@ router = APIRouter(
     tags=["Settings"],
 )
 
+# =========================================================
+# OPÇÕES DE OWNER PARA ECO CONTROL
+# =========================================================
+
+@router.get(
+    "/owner-options",
+)
+def owner_options(
+    db: Session = Depends(get_db),
+    _=Depends(current_user),
+):
+    repository = SettingsRepository(
+        db
+    )
+
+    return [
+        {
+            "owner": item.owner,
+            "group": item.group_name,
+        }
+        for item
+        in repository.all_owner_group()
+    ]
 
 # =========================================================
 # OBU → AU
