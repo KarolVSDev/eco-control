@@ -7,7 +7,10 @@ from app.models.entities import (
     AnalystPermission,
     FieldPermission,
 )
-from app.schemas.auth import LoginRequest
+from app.schemas.auth import (
+    LoginRequest,
+    ChangePasswordRequest,
+)
 from app.services.auth_service import AuthService
 from app.utils.security import current_user
 
@@ -38,6 +41,25 @@ def login(
             "role": user.role,
         },
     }
+# =========================================================
+# ALTERAR A PRÓPRIA SENHA
+# =========================================================
+
+@router.patch(
+    "/change-password",
+)
+def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    user=Depends(current_user),
+):
+    return AuthService(
+        db
+    ).change_password(
+        user,
+        body.current_password,
+        body.new_password,
+    )
 
 
 @router.get("/permissions")

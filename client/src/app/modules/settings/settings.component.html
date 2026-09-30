@@ -1,1 +1,467 @@
-<div class="page"><h1 class="title">Configurações</h1><p class="subtitle">Parametrizações utilizadas pelas regras do ECO CONTROL.</p><div class="grid grid-2" style="margin-top:20px"><section class="card"><h3>OBU → AU</h3><div *ngFor="let x of data.obu_au" style="padding:7px;border-bottom:1px solid #303030"><b>{{x.obu}}</b> → {{x.au}}</div></section><section class="card"><h3>Owner → Group</h3><div *ngFor="let x of data.owner_group" style="padding:7px;border-bottom:1px solid #303030"><b>{{x.owner}}</b> → {{x.group}}</div></section><section class="card"><h3>Managers</h3><div *ngFor="let x of data.managers">{{x.name}}</div><div *ngIf="!data.managers.length" class="muted">Nenhum manager cadastrado.</div></section></div></div>
+<div class="page">
+
+  <!-- ===================================================== -->
+  <!-- CABEÇALHO -->
+  <!-- ===================================================== -->
+
+  <div class="settings-header">
+
+    <div>
+      <h1 class="title">
+        Configurações
+      </h1>
+
+      <p class="subtitle">
+        Gerencie as listas usadas pelos dropdowns da tabela.
+      </p>
+    </div>
+
+  </div>
+
+
+  <!-- ===================================================== -->
+  <!-- MENSAGENS -->
+  <!-- ===================================================== -->
+
+  <div
+    *ngIf="error"
+    class="settings-message settings-message-error"
+  >
+    {{ error }}
+  </div>
+
+
+  <div
+    *ngIf="success"
+    class="settings-message settings-message-success"
+  >
+    {{ success }}
+  </div>
+
+
+  <!-- ===================================================== -->
+  <!-- LOADING -->
+  <!-- ===================================================== -->
+
+  <div
+    *ngIf="loading"
+    class="settings-loading"
+  >
+    Carregando configurações...
+  </div>
+
+
+  <!-- ===================================================== -->
+  <!-- CONTEÚDO -->
+  <!-- ===================================================== -->
+
+  <ng-container *ngIf="!loading">
+
+    <!-- ================================================= -->
+    <!-- OBU → AU -->
+    <!-- ================================================= -->
+
+    <section class="settings-card obu-card">
+
+      <div class="settings-card-header">
+
+        <h2>
+          OBU → AU
+          <span>
+            (relação editável)
+          </span>
+        </h2>
+
+      </div>
+
+
+      <!-- ADICIONAR NOVA RELAÇÃO -->
+
+      <div class="obu-add-row">
+
+        <select
+          class="settings-select"
+          [(ngModel)]="newObu"
+        >
+          <option value="">
+            OBU
+          </option>
+
+          <option
+            *ngFor="let obu of obuOptions"
+            [value]="obu"
+          >
+            {{ obu }}
+          </option>
+        </select>
+
+
+        <select
+          class="settings-select"
+          [(ngModel)]="newAu"
+        >
+          <option value="">
+            AU
+          </option>
+
+          <option
+            *ngFor="let au of auOptions"
+            [value]="au"
+          >
+            {{ au }}
+          </option>
+        </select>
+
+
+        <button
+          class="settings-add-button"
+          type="button"
+          title="Adicionar relação"
+          aria-label="Adicionar relação"
+          (click)="addObuAu()"
+        >
+          +
+        </button>
+
+      </div>
+
+
+      <!-- LISTA -->
+
+      <div class="obu-grid">
+
+        <div
+          *ngFor="let item of data.obu_au"
+          class="obu-item"
+        >
+
+          <!-- MODO NORMAL -->
+
+          <ng-container
+            *ngIf="
+              editingObuAu?.id !== item.id
+            "
+          >
+
+            <span class="obu-code">
+              {{ item.obu }}
+            </span>
+
+
+            <div class="obu-item-right">
+
+              <strong>
+                {{ item.au }}
+              </strong>
+
+
+              <button
+                class="settings-icon-button"
+                type="button"
+                title="Editar"
+                aria-label="Editar"
+                (click)="startEditObuAu(item)"
+              >
+                ✎
+              </button>
+
+
+              <button
+                class="settings-icon-button delete"
+                type="button"
+                title="Excluir"
+                aria-label="Excluir"
+                (click)="deleteObuAu(item)"
+              >
+                ♲
+              </button>
+
+            </div>
+
+          </ng-container>
+
+
+          <!-- MODO EDIÇÃO -->
+
+          <ng-container
+            *ngIf="
+              editingObuAu?.id === item.id
+            "
+          >
+
+            <div class="obu-edit-fields">
+
+              <select
+                class="settings-select compact"
+                [(ngModel)]="editObu"
+              >
+                <option
+                  *ngFor="let obu of obuOptions"
+                  [value]="obu"
+                >
+                  {{ obu }}
+                </option>
+              </select>
+
+
+              <select
+                class="settings-select compact"
+                [(ngModel)]="editAu"
+              >
+                <option
+                  *ngFor="let au of auOptions"
+                  [value]="au"
+                >
+                  {{ au }}
+                </option>
+              </select>
+
+            </div>
+
+
+            <div class="obu-item-right">
+
+              <button
+                class="settings-icon-button save"
+                type="button"
+                title="Salvar"
+                aria-label="Salvar"
+                (click)="saveObuAu()"
+              >
+                ✓
+              </button>
+
+
+              <button
+                class="settings-icon-button"
+                type="button"
+                title="Cancelar"
+                aria-label="Cancelar"
+                (click)="cancelEditObuAu()"
+              >
+                ×
+              </button>
+
+            </div>
+
+          </ng-container>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- GRID INFERIOR -->
+    <!-- ================================================= -->
+
+    <div class="settings-bottom-grid">
+
+
+      <!-- ================================================= -->
+      <!-- OWNER → GROUP -->
+      <!-- ================================================= -->
+
+      <section class="settings-card">
+
+        <div class="settings-card-header">
+
+          <h2>
+            Owner → Group
+          </h2>
+
+        </div>
+
+
+        <!-- ADICIONAR -->
+
+        <div class="owner-add-row">
+
+          <input
+            class="settings-input"
+            type="text"
+            placeholder="Nome do owner"
+            [(ngModel)]="newOwner"
+            (keyup.enter)="addOwnerGroup()"
+          >
+
+
+          <select
+            class="settings-select group-select"
+            [(ngModel)]="newGroup"
+          >
+
+            <option
+              *ngFor="let group of groupOptions"
+              [value]="group"
+            >
+              {{ group }}
+            </option>
+
+          </select>
+
+
+          <button
+            class="settings-add-button"
+            type="button"
+            title="Adicionar relação"
+            aria-label="Adicionar relação"
+            (click)="addOwnerGroup()"
+          >
+            +
+          </button>
+
+        </div>
+
+
+        <!-- LISTA -->
+
+        <div class="simple-list">
+
+          <div
+            *ngFor="let item of data.owner_group"
+            class="simple-list-item"
+          >
+
+            <span>
+              {{ item.owner }}
+              <strong>
+                → {{ item.group }}
+              </strong>
+            </span>
+
+
+            <button
+              class="settings-icon-button delete"
+              type="button"
+              title="Excluir"
+              aria-label="Excluir"
+              (click)="deleteOwnerGroup(item)"
+            >
+              ♲
+            </button>
+
+          </div>
+
+
+          <div
+            *ngIf="data.owner_group.length === 0"
+            class="settings-empty"
+          >
+            Nenhuma relação Owner → Group cadastrada.
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- ================================================= -->
+      <!-- GERENTES -->
+      <!-- ================================================= -->
+
+      <section class="settings-card">
+
+        <div class="settings-card-header">
+
+          <h2>
+            Gerentes de 2ST APROV R&amp;D
+          </h2>
+
+        </div>
+
+
+        <!-- ADICIONAR -->
+
+        <div class="manager-add-row">
+
+          <input
+            class="settings-input"
+            type="text"
+            placeholder="Nome do gerente"
+            [(ngModel)]="newManager"
+            (keyup.enter)="addManager()"
+          >
+
+
+          <button
+            class="settings-add-button"
+            type="button"
+            title="Adicionar gerente"
+            aria-label="Adicionar gerente"
+            (click)="addManager()"
+          >
+            +
+          </button>
+
+        </div>
+
+
+        <!-- LISTA -->
+
+        <div class="simple-list">
+
+          <div
+            *ngFor="let manager of data.managers"
+            class="simple-list-item"
+          >
+
+            <span>
+              {{ manager.name }}
+            </span>
+
+
+            <button
+              class="settings-icon-button delete"
+              type="button"
+              title="Excluir"
+              aria-label="Excluir"
+              (click)="deleteManager(manager)"
+            >
+              ♲
+            </button>
+
+          </div>
+
+
+          <div
+            *ngIf="data.managers.length === 0"
+            class="settings-empty"
+          >
+            Nenhum gerente cadastrado.
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- EXPORT -->
+    <!-- ================================================= -->
+
+    <div class="settings-export-wrapper">
+
+      <button
+        class="settings-export-button"
+        type="button"
+        (click)="exportSettings()"
+      >
+
+        <span aria-hidden="true">
+          ⇩
+        </span>
+
+        Export
+
+      </button>
+
+    </div>
+
+  </ng-container>
+
+</div>

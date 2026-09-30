@@ -1,12 +1,11 @@
 <div class="page">
-  <div
-    style="
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-    "
-  >
+
+  <!-- ===================================================== -->
+  <!-- CABEÇALHO -->
+  <!-- ===================================================== -->
+
+  <div class="users-header">
+
     <div>
       <h1 class="title">
         Usuários
@@ -17,89 +16,157 @@
       </p>
     </div>
 
+
     <button
       class="btn btn-primary"
       type="button"
       (click)="toggleForm()"
     >
-      {{ showForm ? 'Cancelar' : '+ Novo Usuário' }}
+      {{
+        showForm
+          ? 'Cancelar'
+          : '+ Novo Usuário'
+      }}
     </button>
+
   </div>
 
 
+  <!-- ===================================================== -->
+  <!-- NOVO USUÁRIO -->
+  <!-- ===================================================== -->
+
   <section
     *ngIf="showForm"
-    class="card"
-    style="
-      margin-top: 20px;
-      max-width: 700px;
-    "
+    class="card users-form-card"
   >
-    <h3 style="margin-top: 0">
-      Novo Usuário
-    </h3>
+
+    <div class="users-form-header">
+
+      <div>
+        <h3>
+          Novo Usuário
+        </h3>
+
+        <p>
+          Cadastre um novo administrador ou analista.
+        </p>
+      </div>
+
+    </div>
+
 
     <form
       [formGroup]="form"
       (ngSubmit)="submit()"
     >
-      <div
-        class="grid grid-2"
-      >
-        <div>
-          <label>
+
+      <div class="grid grid-2">
+
+        <!-- NOME -->
+
+        <div class="form-field">
+
+          <label for="full_name">
             Nome
           </label>
 
           <input
+            id="full_name"
             class="input"
-            style="width: 100%"
             formControlName="full_name"
             placeholder="Nome completo"
           >
+
+          <small
+            class="field-error"
+            *ngIf="
+              form.controls.full_name.touched
+              &&
+              form.controls.full_name.invalid
+            "
+          >
+            Informe um nome com pelo menos 2 caracteres.
+          </small>
+
         </div>
 
 
-        <div>
-          <label>
+        <!-- E-MAIL -->
+
+        <div class="form-field">
+
+          <label for="email">
             E-mail
           </label>
 
           <input
+            id="email"
             class="input"
-            style="width: 100%"
             type="email"
             formControlName="email"
             placeholder="analista@eco.com"
           >
+
+          <small
+            class="field-error"
+            *ngIf="
+              form.controls.email.touched
+              &&
+              form.controls.email.invalid
+            "
+          >
+            Informe um e-mail válido.
+          </small>
+
         </div>
 
 
-        <div>
-          <label>
+        <!-- SENHA -->
+
+        <div class="form-field">
+
+          <label for="password">
             Senha inicial
           </label>
 
           <input
+            id="password"
             class="input"
-            style="width: 100%"
             type="password"
             formControlName="password"
             placeholder="Mínimo 6 caracteres"
+            autocomplete="new-password"
           >
+
+          <small
+            class="field-error"
+            *ngIf="
+              form.controls.password.touched
+              &&
+              form.controls.password.invalid
+            "
+          >
+            A senha deve possuir pelo menos 6 caracteres.
+          </small>
+
         </div>
 
 
-        <div>
-          <label>
+        <!-- PERFIL -->
+
+        <div class="form-field">
+
+          <label for="role">
             Perfil
           </label>
 
           <select
+            id="role"
             class="select"
-            style="width: 100%"
             formControlName="role"
           >
+
             <option value="analyst">
               Analista
             </option>
@@ -107,18 +174,18 @@
             <option value="admin">
               Administrador
             </option>
+
           </select>
+
         </div>
+
       </div>
 
 
-      <div
-        style="
-          margin-top: 16px;
-          display: flex;
-          gap: 10px;
-        "
-      >
+      <!-- BOTÕES -->
+
+      <div class="users-form-actions">
+
         <button
           class="btn btn-primary"
           type="submit"
@@ -131,78 +198,423 @@
           }}
         </button>
 
+
         <button
           class="btn btn-ghost"
           type="button"
+          [disabled]="loading"
           (click)="toggleForm()"
         >
           Cancelar
         </button>
+
       </div>
+
     </form>
+
   </section>
 
 
+  <!-- ===================================================== -->
+  <!-- MENSAGENS -->
+  <!-- ===================================================== -->
+
   <div
     *ngIf="error"
-    class="danger"
-    style="margin-top: 14px"
+    class="users-message users-message-error"
   >
     {{ error }}
   </div>
 
+
   <div
     *ngIf="success"
-    class="success"
-    style="margin-top: 14px"
+    class="users-message users-message-success"
   >
     {{ success }}
   </div>
 
 
-  <div
-    class="table-wrap"
-    style="margin-top: 20px"
-  >
-    <table class="table">
+  <!-- ===================================================== -->
+  <!-- TABELA -->
+  <!-- ===================================================== -->
+
+  <div class="table-wrap users-table-wrap">
+
+    <table class="table users-table">
+
       <thead>
+
         <tr>
-          <th>Nome</th>
-          <th>E-mail</th>
-          <th>Perfil</th>
-          <th>Status</th>
+          <th>
+            Nome
+          </th>
+
+          <th>
+            E-mail
+          </th>
+
+          <th>
+            Perfil
+          </th>
+
+          <th>
+            Status
+          </th>
+
+          <th class="actions-column">
+            Ações
+          </th>
         </tr>
+
       </thead>
 
+
       <tbody>
+
         <tr
           *ngFor="let user of rows"
         >
+
+          <!-- NOME -->
+
           <td>
-            {{ user.full_name }}
+
+            <div class="user-name-cell">
+
+              <span class="user-name">
+                {{ user.full_name }}
+              </span>
+
+
+              <span
+                *ngIf="isCurrentUser(user)"
+                class="current-user-badge"
+              >
+                Você
+              </span>
+
+            </div>
+
           </td>
+
+
+          <!-- E-MAIL -->
 
           <td>
             {{ user.email }}
           </td>
 
-          <td>
-            {{
-              user.role === 'admin'
-                ? 'Administrador'
-                : 'Analista'
-            }}
-          </td>
+
+          <!-- PERFIL -->
 
           <td>
-            {{
-              user.active
-                ? 'Ativo'
-                : 'Inativo'
-            }}
+
+            <span
+              class="user-role"
+              [class.role-admin]="
+                user.role === 'admin'
+              "
+            >
+              {{
+                user.role === 'admin'
+                  ? 'Administrador'
+                  : 'Analista'
+              }}
+            </span>
+
           </td>
+
+
+          <!-- STATUS -->
+
+          <td>
+
+            <span
+              class="user-status"
+              [class.status-active]="
+                user.active
+              "
+              [class.status-inactive]="
+                !user.active
+              "
+            >
+              {{
+                user.active
+                  ? 'Ativo'
+                  : 'Inativo'
+              }}
+            </span>
+
+          </td>
+
+
+          <!-- AÇÕES -->
+
+          <td class="actions-column">
+
+            <div class="user-actions">
+
+              <!-- REDEFINIR SENHA -->
+
+              <button
+                class="user-action-button password-action"
+                type="button"
+                title="Redefinir senha"
+                aria-label="Redefinir senha"
+                (click)="openPasswordReset(user)"
+              >
+
+                <span aria-hidden="true">
+                  🔑
+                </span>
+
+                <span class="action-label">
+                  Senha
+                </span>
+
+              </button>
+
+
+              <!-- EXCLUIR -->
+
+              <button
+                *ngIf="!isCurrentUser(user)"
+                class="user-action-button delete-action"
+                type="button"
+                title="Excluir usuário"
+                aria-label="Excluir usuário"
+                [disabled]="isDeleting(user)"
+                (click)="deleteUser(user)"
+              >
+
+                <span aria-hidden="true">
+                  🗑
+                </span>
+
+                <span class="action-label">
+                  {{
+                    isDeleting(user)
+                      ? 'Excluindo...'
+                      : 'Excluir'
+                  }}
+                </span>
+
+              </button>
+
+
+              <!-- PRÓPRIA CONTA -->
+
+              <span
+                *ngIf="isCurrentUser(user)"
+                class="self-delete-hint"
+                title="Sua própria conta não pode ser excluída"
+              >
+                Sua conta
+              </span>
+
+            </div>
+
+          </td>
+
         </tr>
+
+
+        <!-- ================================================= -->
+        <!-- ESTADO VAZIO -->
+        <!-- ================================================= -->
+
+        <tr
+          *ngIf="rows.length === 0"
+        >
+
+          <td
+            class="users-empty"
+            colspan="5"
+          >
+            Nenhum usuário cadastrado.
+          </td>
+
+        </tr>
+
       </tbody>
+
     </table>
+
   </div>
+
+
+  <!-- ===================================================== -->
+  <!-- MODAL DE REDEFINIÇÃO DE SENHA -->
+  <!-- ===================================================== -->
+
+  <div
+    *ngIf="passwordUser"
+    class="user-modal-overlay"
+    (click)="closePasswordReset()"
+  >
+
+    <section
+      class="user-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reset-password-title"
+      (click)="$event.stopPropagation()"
+    >
+
+      <!-- CABEÇALHO -->
+
+      <div class="user-modal-header">
+
+        <div>
+
+          <h2 id="reset-password-title">
+            Redefinir senha
+          </h2>
+
+          <p>
+            Defina uma nova senha para
+            <strong>
+              {{ passwordUser.full_name }}
+            </strong>.
+          </p>
+
+        </div>
+
+
+        <button
+          class="user-modal-close"
+          type="button"
+          aria-label="Fechar"
+          [disabled]="resettingPassword"
+          (click)="closePasswordReset()"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <!-- CONTEÚDO -->
+
+      <form
+        [formGroup]="passwordForm"
+        (ngSubmit)="resetPassword()"
+      >
+
+        <div class="user-modal-body">
+
+          <!-- USUÁRIO -->
+
+          <div class="password-user-info">
+
+            <span class="password-user-label">
+              Usuário
+            </span>
+
+            <strong>
+              {{ passwordUser.email }}
+            </strong>
+
+          </div>
+
+
+          <!-- NOVA SENHA -->
+
+          <div class="form-field">
+
+            <label for="new_password">
+              Nova senha
+            </label>
+
+            <input
+              id="new_password"
+              class="input"
+              type="password"
+              formControlName="new_password"
+              placeholder="Mínimo 6 caracteres"
+              autocomplete="new-password"
+            >
+
+            <small
+              class="field-error"
+              *ngIf="
+                passwordForm.controls.new_password.touched
+                &&
+                passwordForm.controls.new_password.invalid
+              "
+            >
+              A nova senha deve possuir pelo menos 6 caracteres.
+            </small>
+
+          </div>
+
+
+          <!-- CONFIRMAR SENHA -->
+
+          <div class="form-field">
+
+            <label for="confirm_password">
+              Confirmar nova senha
+            </label>
+
+            <input
+              id="confirm_password"
+              class="input"
+              type="password"
+              formControlName="confirm_password"
+              placeholder="Digite novamente a nova senha"
+              autocomplete="new-password"
+            >
+
+            <small
+              class="field-error"
+              *ngIf="
+                passwordForm.controls.confirm_password.touched
+                &&
+                passwordForm.controls.confirm_password.invalid
+              "
+            >
+              Confirme a nova senha.
+            </small>
+
+          </div>
+
+        </div>
+
+
+        <!-- RODAPÉ -->
+
+        <div class="user-modal-footer">
+
+          <button
+            class="btn btn-ghost"
+            type="button"
+            [disabled]="resettingPassword"
+            (click)="closePasswordReset()"
+          >
+            Cancelar
+          </button>
+
+
+          <button
+            class="btn btn-primary"
+            type="submit"
+            [disabled]="resettingPassword"
+          >
+            {{
+              resettingPassword
+                ? 'Redefinindo...'
+                : 'Redefinir senha'
+            }}
+          </button>
+
+        </div>
+
+      </form>
+
+    </section>
+
+  </div>
+
 </div>
