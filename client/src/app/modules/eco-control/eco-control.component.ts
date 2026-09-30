@@ -69,6 +69,12 @@ export class EcoControlComponent
 
   pageSize = 25;
 
+  // =====================================================
+  // OWNERS CONFIGURADOS
+  // =====================================================
+
+  ownerOptions: string[] = [];
+
 
   // =====================================================
   // ESTADOS
@@ -106,6 +112,8 @@ export class EcoControlComponent
 
   filterEcoType = '';
 
+  openFilterKey:
+    string | null = null;
 
   showFilters = false;
 
@@ -117,20 +125,24 @@ export class EcoControlComponent
     ...STATUS_OPTIONS,
   ];
 
+
   readonly groups = [
     '',
     ...GROUP_OPTIONS,
   ];
+
 
   readonly obus = [
     '',
     ...OBU_OPTIONS,
   ];
 
+
   readonly itemTypes = [
     '',
     ...ITEM_TYPE_OPTIONS,
   ];
+
 
   readonly ecoTypes = [
     '',
@@ -146,10 +158,25 @@ export class EcoControlComponent
 
 
   // =====================================================
-  // DRAWER / VISUALIZAÇÃO
+  // DRAWER
   // =====================================================
 
   viewingRow: any = null;
+
+
+  // modo edição do drawer
+  drawerEditing = false;
+
+  drawerSaving = false;
+
+  drawerError = '';
+
+  drawerSuccess = '';
+
+
+  // valores temporários enquanto edita
+  drawerDraft:
+    Record<string, any> = {};
 
 
   // =====================================================
@@ -165,6 +192,8 @@ export class EcoControlComponent
   // =====================================================
 
   ngOnInit(): void {
+
+    this.loadOwnerOptions();
 
     this.permissions
       .load()
@@ -308,10 +337,7 @@ export class EcoControlComponent
             response.total;
 
 
-          /*
-           * Mantém a linha selecionada
-           * caso ela continue na página.
-           */
+          // mantém linha selecionada
 
           if (this.selectedRow) {
 
@@ -328,12 +354,14 @@ export class EcoControlComponent
           }
 
 
-          /*
-           * Atualiza também o drawer
-           * caso a ECO esteja aberta.
-           */
+          // mantém drawer atualizado
+          // desde que não esteja em edição
 
-          if (this.viewingRow) {
+          if (
+            this.viewingRow
+            &&
+            !this.drawerEditing
+          ) {
 
             const updated =
               this.rows.find(
@@ -415,6 +443,8 @@ export class EcoControlComponent
 
     this.filterEcoType = '';
 
+    this.openFilterKey = null;
+
     this.page = 1;
 
     this.load();
@@ -430,6 +460,130 @@ export class EcoControlComponent
       this.filterItemType ||
       this.filterEcoType
     );
+  }
+
+
+  // =====================================================
+  // FILTROS NO CABEÇALHO
+  // =====================================================
+
+  isFilterableColumn(
+    column: EcoColumn,
+  ): boolean {
+
+    return [
+      'obu',
+      'group',
+      'item_type',
+      'eco_type',
+      'status',
+    ].includes(
+      column.key
+    );
+  }
+
+
+  toggleColumnFilter(
+    columnKey: string,
+    event: Event,
+  ): void {
+
+    event.stopPropagation();
+
+
+    this.openFilterKey =
+      this.openFilterKey === columnKey
+        ? null
+        : columnKey;
+  }
+
+
+  getFilterOptions(
+    columnKey: string,
+  ): readonly string[] {
+
+    switch (columnKey) {
+
+      case 'obu':
+        return OBU_OPTIONS;
+
+      case 'group':
+        return GROUP_OPTIONS;
+
+      case 'item_type':
+        return ITEM_TYPE_OPTIONS;
+
+      case 'eco_type':
+        return ECO_TYPE_OPTIONS;
+
+      case 'status':
+        return STATUS_OPTIONS;
+
+      default:
+        return [];
+    }
+  }
+
+
+  getFilterValue(
+    columnKey: string,
+  ): string {
+
+    switch (columnKey) {
+
+      case 'obu':
+        return this.filterObu;
+
+      case 'group':
+        return this.filterGroup;
+
+      case 'item_type':
+        return this.filterItemType;
+
+      case 'eco_type':
+        return this.filterEcoType;
+
+      case 'status':
+        return this.status;
+
+      default:
+        return '';
+    }
+  }
+
+
+  setColumnFilter(
+    columnKey: string,
+    value: string,
+  ): void {
+
+    switch (columnKey) {
+
+      case 'obu':
+        this.filterObu = value;
+        break;
+
+      case 'group':
+        this.filterGroup = value;
+        break;
+
+      case 'item_type':
+        this.filterItemType = value;
+        break;
+
+      case 'eco_type':
+        this.filterEcoType = value;
+        break;
+
+      case 'status':
+        this.status = value;
+        break;
+    }
+
+
+    this.openFilterKey = null;
+
+    this.applyFilters();
   }
 
 
@@ -529,11 +683,6 @@ export class EcoControlComponent
     row: any,
   ): void {
 
-    /*
-     * Clicar novamente na mesma
-     * linha remove a seleção.
-     */
-
     if (
       this.selectedRow?.id ===
       row.id
@@ -620,16 +769,6 @@ export class EcoControlComponent
     this.cellError = '';
 
 
-    /*
-     * Este endpoint será criado no backend.
-     *
-     * Ele deverá:
-     * - gerar um novo ITEM permanente;
-     * - deslocar POSITION das ECOs abaixo;
-     * - inserir a nova ECO logo após
-     *   a linha selecionada.
-     */
-
     this.api
       .post<any>(
         `/ecos/${this.selectedRow.id}/after`,
@@ -641,22 +780,10 @@ export class EcoControlComponent
 
           this.creatingBelow = false;
 
-
-          /*
-           * Recarrega para receber
-           * a ordenação oficial.
-           */
-
-          this.load();
-
-
-          /*
-           * A nova linha já fica
-           * selecionada para edição.
-           */
-
           this.selectedRow =
             created;
+
+          this.load();
         },
 
 
@@ -676,11 +803,8 @@ export class EcoControlComponent
 
 
           this.cellError =
-            typeof detail ===
-              'string'
-
+            typeof detail === 'string'
               ? detail
-
               : 'Não foi possível adicionar a ECO.';
         },
       });
@@ -688,7 +812,7 @@ export class EcoControlComponent
 
 
   // =====================================================
-  // DRAWER LATERAL
+  // DRAWER
   // =====================================================
 
   openDetails(
@@ -697,13 +821,501 @@ export class EcoControlComponent
 
     this.viewingRow =
       row;
+
+    this.drawerEditing =
+      false;
+
+    this.drawerSaving =
+      false;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+    this.drawerDraft = {};
   }
 
 
   closeDetails(): void {
 
+    if (
+      this.drawerSaving
+    ) {
+
+      return;
+    }
+
+
     this.viewingRow =
       null;
+
+    this.drawerEditing =
+      false;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+    this.drawerDraft = {};
+  }
+
+
+  // =====================================================
+  // DRAWER - PERMISSÃO DE EDIÇÃO
+  // =====================================================
+
+  get canEditDrawer(): boolean {
+
+    return this.columns.some(
+      column =>
+        this.isColumnEditable(
+          column
+        )
+    );
+  }
+
+
+  // =====================================================
+  // DRAWER - INICIAR EDIÇÃO
+  // =====================================================
+
+  startDrawerEdit(): void {
+
+    if (
+      !this.viewingRow
+      ||
+      !this.canEditDrawer
+    ) {
+
+      return;
+    }
+
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+
+    this.drawerDraft =
+      this.buildDrawerDraft(
+        this.viewingRow
+      );
+
+
+    this.drawerEditing =
+      true;
+  }
+
+
+  // =====================================================
+  // DRAWER - CANCELAR EDIÇÃO
+  // =====================================================
+
+  cancelDrawerEdit(): void {
+
+    if (
+      this.drawerSaving
+    ) {
+
+      return;
+    }
+
+
+    this.drawerEditing =
+      false;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+    this.drawerDraft = {};
+  }
+
+
+  // =====================================================
+  // DRAWER - CRIAR RASCUNHO
+  // =====================================================
+
+  private buildDrawerDraft(
+    row: any,
+  ): Record<string, any> {
+
+    const draft:
+      Record<string, any> = {};
+
+
+    for (
+      const column
+      of this.columns
+    ) {
+
+      const value =
+        row?.[column.key];
+
+
+      draft[column.key] =
+        value === null ||
+        value === undefined
+          ? ''
+          : value;
+    }
+
+
+    return draft;
+  }
+
+
+  // =====================================================
+  // DRAWER - VALOR
+  // =====================================================
+
+  drawerValue(
+    column: EcoColumn,
+  ): any {
+
+    if (
+      this.drawerEditing
+    ) {
+
+      return (
+        this.drawerDraft[
+          column.key
+        ] ?? ''
+      );
+    }
+
+
+    return (
+      this.viewingRow?.[
+        column.key
+      ] ?? ''
+    );
+  }
+
+
+  // =====================================================
+  // DRAWER - ALTERAR VALOR
+  // =====================================================
+
+  setDrawerValue(
+    column: EcoColumn,
+    value: any,
+  ): void {
+
+    if (
+      !this.drawerEditing
+      ||
+      !this.isColumnEditable(
+        column
+      )
+    ) {
+
+      return;
+    }
+
+
+    this.drawerDraft[
+      column.key
+    ] = value;
+  }
+
+
+  // =====================================================
+  // DRAWER - DETECTAR ALTERAÇÕES
+  // =====================================================
+
+  get drawerHasChanges(): boolean {
+
+    if (
+      !this.drawerEditing
+      ||
+      !this.viewingRow
+    ) {
+
+      return false;
+    }
+
+
+    return this.columns.some(
+      column => {
+
+        if (
+          !this.isColumnEditable(
+            column
+          )
+        ) {
+
+          return false;
+        }
+
+
+        const oldValue =
+          this.viewingRow[
+            column.key
+          ] ?? '';
+
+
+        const newValue =
+          this.drawerDraft[
+            column.key
+          ] ?? '';
+
+
+        return (
+          String(oldValue)
+          !==
+          String(newValue)
+        );
+      }
+    );
+  }
+
+
+  // =====================================================
+  // DRAWER - SALVAR ALTERAÇÕES
+  // =====================================================
+
+  saveDrawerChanges(): void {
+
+    if (
+      !this.viewingRow
+      ||
+      !this.drawerEditing
+      ||
+      this.drawerSaving
+    ) {
+
+      return;
+    }
+
+
+    const changes:
+      Record<string, any> = {};
+
+
+    for (
+      const column
+      of this.columns
+    ) {
+
+      if (
+        !this.isColumnEditable(
+          column
+        )
+      ) {
+
+        continue;
+      }
+
+
+      const previousValue =
+        this.viewingRow[
+          column.key
+        ] ?? null;
+
+
+      let newValue =
+        this.drawerDraft[
+          column.key
+        ];
+
+
+      if (
+        newValue === ''
+      ) {
+
+        newValue = null;
+      }
+
+
+      if (
+        String(
+          previousValue ?? ''
+        )
+        ===
+        String(
+          newValue ?? ''
+        )
+      ) {
+
+        continue;
+      }
+
+
+      changes[
+        column.key
+      ] = newValue;
+    }
+
+
+    // nenhuma alteração
+
+    if (
+      Object.keys(
+        changes
+      ).length === 0
+    ) {
+
+      this.drawerEditing =
+        false;
+
+      this.drawerDraft = {};
+
+      this.drawerSuccess =
+        'Nenhuma alteração foi realizada.';
+
+      return;
+    }
+
+
+    const id =
+      this.viewingRow.id;
+
+
+    this.drawerSaving =
+      true;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+
+    this.api
+      .patch<any>(
+        `/ecos/${id}`,
+        changes,
+      )
+      .subscribe({
+
+        next: updated => {
+
+          this.drawerSaving =
+            false;
+
+
+          // atualiza drawer
+
+          this.viewingRow =
+            updated;
+
+
+          // atualiza tabela
+
+          const row =
+            this.rows.find(
+              item =>
+                item.id === id
+            );
+
+
+          if (row) {
+
+            Object.assign(
+              row,
+              updated
+            );
+          }
+
+
+          // atualiza linha selecionada
+
+          if (
+            this.selectedRow?.id
+            === id
+          ) {
+
+            this.selectedRow =
+              row || updated;
+          }
+
+
+          this.drawerEditing =
+            false;
+
+          this.drawerDraft = {};
+
+
+          this.drawerSuccess =
+            'Alterações salvas com sucesso.';
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao salvar alterações da ECO:',
+            error,
+          );
+
+
+          this.drawerSaving =
+            false;
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.drawerError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível salvar as alterações.';
+        },
+      });
+  }
+
+
+  // =====================================================
+  // OWNERS
+  // =====================================================
+
+  loadOwnerOptions(): void {
+
+    this.api
+      .get<
+        {
+          owner: string;
+          group: string;
+        }[]
+      >(
+        '/settings/owner-options'
+      )
+      .subscribe({
+
+        next: items => {
+
+          this.ownerOptions =
+            items
+              .map(
+                item =>
+                  item.owner
+              )
+              .filter(
+                owner =>
+                  !!owner
+              );
+        },
+
+        error: error => {
+
+          console.error(
+            'Erro ao carregar owners:',
+            error,
+          );
+
+          this.ownerOptions = [];
+        },
+      });
+  }
+
+  isOwnerColumn(
+    column: EcoColumn,
+  ): boolean {
+
+    return (
+      column.key ===
+      'owner'
+    );
   }
 
 
@@ -728,26 +1340,20 @@ export class EcoControlComponent
       case 'RELEASED':
         return 'status-released';
 
-
       case 'CANCELLED':
         return 'status-cancelled';
-
 
       case 'REJECTED':
         return 'status-rejected';
 
-
       case 'WORKING':
         return 'status-working';
-
 
       case 'ON HOLD':
         return 'status-hold';
 
-
       case 'PROCESSING':
         return 'status-processing';
-
 
       default:
         return 'status-default';
@@ -756,7 +1362,7 @@ export class EcoControlComponent
 
 
   // =====================================================
-  // EDITABILIDADE DAS CÉLULAS
+  // EDITABILIDADE
   // =====================================================
 
   isColumnEditable(
@@ -884,12 +1490,6 @@ export class EcoControlComponent
           );
 
 
-          /*
-           * Se a mesma ECO estiver
-           * aberta no drawer,
-           * atualiza os dados exibidos.
-           */
-
           if (
             this.viewingRow?.id ===
             row.id
@@ -934,20 +1534,15 @@ export class EcoControlComponent
 
 
           this.cellError =
-            typeof detail ===
-              'string'
-
+            typeof detail === 'string'
               ? detail
-
               : 'Não foi possível atualizar o campo.';
 
 
           element.value =
             previousValue === null ||
             previousValue === undefined
-
               ? ''
-
               : String(
                   previousValue
                 );
@@ -1015,6 +1610,11 @@ export class EcoControlComponent
 
             this.viewingRow =
               null;
+
+            this.drawerEditing =
+              false;
+
+            this.drawerDraft = {};
           }
 
 
@@ -1035,11 +1635,8 @@ export class EcoControlComponent
 
 
           this.cellError =
-            typeof detail ===
-              'string'
-
+            typeof detail === 'string'
               ? detail
-
               : 'Não foi possível excluir a ECO.';
         },
       });
@@ -1103,25 +1700,20 @@ export class EcoControlComponent
 
           const header =
             exportColumns
-
               .map(
                 column =>
                   this.csvValue(
                     column.label
                   )
               )
-
               .join(';');
 
 
           const lines =
             response.items
-
               .map(
                 (row: any) =>
-
                   exportColumns
-
                     .map(
                       column =>
                         this.csvValue(
@@ -1131,7 +1723,6 @@ export class EcoControlComponent
                           )
                         )
                     )
-
                     .join(';')
               );
 
@@ -1174,6 +1765,7 @@ export class EcoControlComponent
           link.href =
             url;
 
+
           link.download =
             'eco-control.csv';
 
@@ -1198,7 +1790,8 @@ export class EcoControlComponent
           );
 
 
-          this.exporting = false;
+          this.exporting =
+            false;
         },
 
 
@@ -1210,7 +1803,8 @@ export class EcoControlComponent
           );
 
 
-          this.exporting = false;
+          this.exporting =
+            false;
 
 
           this.cellError =
@@ -1261,10 +1855,8 @@ export class EcoControlComponent
 
     this.page--;
 
-
     this.selectedRow =
       null;
-
 
     this.load();
   }
@@ -1283,10 +1875,8 @@ export class EcoControlComponent
 
     this.page++;
 
-
     this.selectedRow =
       null;
-
 
     this.load();
   }
@@ -1296,7 +1886,6 @@ export class EcoControlComponent
 
     return Math.max(
       1,
-
       Math.ceil(
         this.total /
         this.pageSize
@@ -1376,13 +1965,9 @@ export class EcoControlComponent
   ): boolean {
 
     return (
-      column.key ===
-        'eco'
-
+      column.key === 'eco'
       ||
-
-      column.key ===
-        'az_eco_no'
+      column.key === 'az_eco_no'
     );
   }
 

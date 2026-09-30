@@ -5,11 +5,22 @@ from sqlalchemy.orm import Session
 from app.config.database import get_db
 from app.models.entities import AnalystPermission, FieldPermission
 from app.repository.settings_repository import SettingsRepository
-from app.schemas.user import UserCreate
+from app.schemas.user import (
+    UserCreate,
+    UserPasswordReset,
+)
 from app.services.user_service import UserService
 from app.utils.security import admin_user
 from app.schemas.permission import PermissionUpdate
 from app.services.permission_service import PermissionService
+from uuid import UUID
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    Response,
+    status,
+)
 
 
 router = APIRouter(tags=["Admin"])
@@ -34,6 +45,52 @@ def create_user(
 ):
     return UserService(db).create_user(body)
 
+# =========================================================
+# REDEFINIR SENHA DE USUÁRIO
+# =========================================================
+
+@router.patch(
+    "/users/{user_id}/password",
+)
+def reset_user_password(
+    user_id: UUID,
+    body: UserPasswordReset,
+    db: Session = Depends(get_db),
+    _=Depends(admin_user),
+):
+    return UserService(
+        db
+    ).reset_password(
+        user_id,
+        body.new_password,
+    )
+
+
+# =========================================================
+# EXCLUIR USUÁRIO
+# =========================================================
+
+@router.delete(
+    "/users/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    admin=Depends(admin_user),
+):
+    UserService(
+        db
+    ).delete_user(
+        user_id,
+        admin,
+    )
+
+    return Response(
+        status_code=(
+            status.HTTP_204_NO_CONTENT
+        )
+    )
 
 @router.get("/settings")
 def settings(

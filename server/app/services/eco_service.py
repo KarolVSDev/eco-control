@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.models.entities import (
     Eco,
@@ -645,28 +645,28 @@ class EcoService:
         eco_id,
     ):
         """
-        Cria uma ECO vazia imediatamente abaixo
+        Cria uma nova ECO imediatamente abaixo
         da ECO selecionada.
 
-        ITEM:
-            novo identificador permanente.
-
-        POSITION:
-            responsável pela posição visual.
+        ITEM agora representa a sequência
+        lógica das linhas.
 
         Exemplo:
 
         Antes:
-            ITEM 90 -> position 100
-            ITEM 88 -> position 99
-            ITEM 72 -> position 98
+            ITEM 7
+            ITEM 8
+            ITEM 9
 
-        Criando abaixo do ITEM 88:
+        Criando abaixo do ITEM 7:
 
-            ITEM 90 -> position 101
-            ITEM 88 -> position 100
-            NOVO    -> position 99
-            ITEM 72 -> position 98
+            ITEM 7
+            ITEM 8  <- nova ECO
+            ITEM 9  <- antiga ITEM 8
+            ITEM 10 <- antiga ITEM 9
+
+        POSITION continua sendo responsável
+        pela ordem visual da tabela.
         """
 
         # -----------------------------------------------------
@@ -706,6 +706,28 @@ class EcoService:
             )
 
 
+        # -----------------------------------------------------
+        # VALIDAR ITEM
+        # -----------------------------------------------------
+
+        if (
+            reference_eco.item
+            is None
+        ):
+
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A ECO selecionada não possui "
+                    "ITEM válido para inserção."
+                ),
+            )
+
+
+        # -----------------------------------------------------
+        # VALIDAR POSITION
+        # -----------------------------------------------------
+
         if (
             reference_eco.position
             is None
@@ -720,8 +742,19 @@ class EcoService:
             )
 
 
-        # Guarda a posição ANTES de deslocar
-        # as outras ECOs.
+        # -----------------------------------------------------
+        # NOVO ITEM
+        # -----------------------------------------------------
+
+        new_item = (
+            reference_eco.item
+            + 1
+        )
+
+
+        # -----------------------------------------------------
+        # NOVA POSITION
+        # -----------------------------------------------------
 
         insertion_position = (
             reference_eco.position
@@ -729,10 +762,25 @@ class EcoService:
 
 
         # -----------------------------------------------------
-        # HISTÓRICO DAS POSIÇÕES DESLOCADAS
+        # ECOs QUE TERÃO ITEM ALTERADO
         # -----------------------------------------------------
 
-        shifted_ecos = (
+        shifted_item_ecos = (
+            self.db.scalars(
+                select(Eco).where(
+                    Eco.item
+                    >= new_item
+                )
+            )
+            .all()
+        )
+
+
+        # -----------------------------------------------------
+        # ECOs QUE TERÃO POSITION ALTERADA
+        # -----------------------------------------------------
+
+        shifted_position_ecos = (
             self.db.scalars(
                 select(Eco).where(
                     Eco.position
@@ -743,7 +791,38 @@ class EcoService:
         )
 
 
-        for shifted_eco in shifted_ecos:
+        # -----------------------------------------------------
+        # HISTÓRICO DOS ITEMS DESLOCADOS
+        # -----------------------------------------------------
+
+        for shifted_eco in shifted_item_ecos:
+
+            old_item = (
+                shifted_eco.item
+            )
+
+
+            if old_item is None:
+                continue
+
+
+            self._record_history_fields(
+                shifted_eco,
+                "updated",
+                {
+                    "item": (
+                        old_item,
+                        old_item + 1,
+                    )
+                },
+            )
+
+
+        # -----------------------------------------------------
+        # HISTÓRICO DAS POSIÇÕES DESLOCADAS
+        # -----------------------------------------------------
+
+        for shifted_eco in shifted_position_ecos:
 
             old_position = (
                 shifted_eco.position
@@ -766,96 +845,97 @@ class EcoService:
             )
 
 
-        # -----------------------------------------------------
-        # ABRIR ESPAÇO NA ORDENAÇÃO
-        # -----------------------------------------------------
-
-        self.repo.make_space_at_position(
-            insertion_position
-        )
-
-
-        # -----------------------------------------------------
-        # NOVO ITEM
-        # -----------------------------------------------------
-
-        next_item = (
-            self.repo.next_item()
-        )
-
-
-        # -----------------------------------------------------
-        # CRIAR NOVA ECO
-        # -----------------------------------------------------
-
-        new_eco = Eco(
-
-            item=next_item,
-
-            position=(
-                insertion_position
-            ),
-
-            month=MONTHS[
-                datetime.now().month - 1
-            ],
-
-            item_type="MEC",
-
-            eco_type="REGULAR",
-
-            status="WORKING",
-        )
-
-
-        self.repo.create(
-            new_eco
-        )
-
-
-        # -----------------------------------------------------
-        # HISTÓRICO DA CRIAÇÃO
-        # -----------------------------------------------------
-
-        self._record_history_fields(
-            new_eco,
-            "created",
-            {
-                "item": (
-                    None,
-                    new_eco.item,
-                ),
-                "position": (
-                    None,
-                    new_eco.position,
-                ),
-                "month": (
-                    None,
-                    new_eco.month,
-                ),
-                "item_type": (
-                    None,
-                    new_eco.item_type,
-                ),
-                "eco_type": (
-                    None,
-                    new_eco.eco_type,
-                ),
-                "status": (
-                    None,
-                    new_eco.status,
-                ),
-            },
-        )
-
-
-        # -----------------------------------------------------
-        # COMMIT
-        # -----------------------------------------------------
-
         try:
 
+            # -------------------------------------------------
+            # ABRIR ESPAÇO NA SEQUÊNCIA DOS ITEMS
+            # -------------------------------------------------
+
+            self.repo.shift_items_up_from(
+                new_item
+            )
+
+
+            # -------------------------------------------------
+            # ABRIR ESPAÇO NA ORDENAÇÃO VISUAL
+            # -------------------------------------------------
+
+            self.repo.make_space_at_position(
+                insertion_position
+            )
+
+
+            # -------------------------------------------------
+            # CRIAR NOVA ECO
+            # -------------------------------------------------
+
+            new_eco = Eco(
+
+                item=new_item,
+
+                position=(
+                    insertion_position
+                ),
+
+                month=MONTHS[
+                    datetime.now().month - 1
+                ],
+
+                item_type="MEC",
+
+                eco_type="REGULAR",
+
+                status="WORKING",
+            )
+
+
+            self.repo.create(
+                new_eco
+            )
+
+
+            # -------------------------------------------------
+            # HISTÓRICO DA NOVA ECO
+            # -------------------------------------------------
+
+            self._record_history_fields(
+                new_eco,
+                "created",
+                {
+                    "item": (
+                        None,
+                        new_eco.item,
+                    ),
+                    "position": (
+                        None,
+                        new_eco.position,
+                    ),
+                    "month": (
+                        None,
+                        new_eco.month,
+                    ),
+                    "item_type": (
+                        None,
+                        new_eco.item_type,
+                    ),
+                    "eco_type": (
+                        None,
+                        new_eco.eco_type,
+                    ),
+                    "status": (
+                        None,
+                        new_eco.status,
+                    ),
+                },
+            )
+
+
+            # -------------------------------------------------
+            # COMMIT
+            # -------------------------------------------------
+
             self.db.commit()
+
 
         except Exception:
 
@@ -1067,6 +1147,10 @@ class EcoService:
             )
 
 
+        # -----------------------------------------------------
+        # BUSCAR ECO
+        # -----------------------------------------------------
+
         eco = self.repo.get(
             id
         )
@@ -1080,6 +1164,11 @@ class EcoService:
                     "ECO não encontrada"
                 ),
             )
+
+
+        deleted_item = (
+            eco.item
+        )
 
 
         deleted_position = (
@@ -1131,15 +1220,41 @@ class EcoService:
 
 
         # -----------------------------------------------------
-        # REGISTRAR MUDANÇA DAS POSIÇÕES
+        # ECOs QUE TERÃO ITEM ALTERADO
         # -----------------------------------------------------
+
+        shifted_item_ecos = []
+
+
+        if (
+            deleted_item
+            is not None
+        ):
+
+            shifted_item_ecos = (
+                self.db.scalars(
+                    select(Eco).where(
+                        Eco.item
+                        > deleted_item
+                    )
+                )
+                .all()
+            )
+
+
+        # -----------------------------------------------------
+        # ECOs QUE TERÃO POSITION ALTERADA
+        # -----------------------------------------------------
+
+        shifted_position_ecos = []
+
 
         if (
             deleted_position
             is not None
         ):
 
-            shifted_ecos = (
+            shifted_position_ecos = (
                 self.db.scalars(
                     select(Eco).where(
                         Eco.position
@@ -1150,60 +1265,114 @@ class EcoService:
             )
 
 
-            for shifted_eco in shifted_ecos:
-
-                if (
-                    shifted_eco.position
-                    is None
-                ):
-                    continue
-
-
-                self._record_history_fields(
-                    shifted_eco,
-                    "updated",
-                    {
-                        "position": (
-                            shifted_eco.position,
-                            shifted_eco.position - 1,
-                        )
-                    },
-                )
-
-
         # -----------------------------------------------------
-        # DELETE
+        # HISTÓRICO DOS ITEMS RENUMERADOS
         # -----------------------------------------------------
 
-        self.repo.delete(
-            eco
-        )
+        for shifted_eco in shifted_item_ecos:
 
-
-        self.db.flush()
-
-
-        # -----------------------------------------------------
-        # REORGANIZAR POSITION
-        # -----------------------------------------------------
-
-        if (
-            deleted_position
-            is not None
-        ):
-
-            self.db.execute(
-                update(Eco)
-                .where(
-                    Eco.position
-                    > deleted_position
-                )
-                .values(
-                    position=(
-                        Eco.position - 1
-                    )
-                )
+            old_item = (
+                shifted_eco.item
             )
 
 
-        self.db.commit()
+            if old_item is None:
+                continue
+
+
+            self._record_history_fields(
+                shifted_eco,
+                "updated",
+                {
+                    "item": (
+                        old_item,
+                        old_item - 1,
+                    )
+                },
+            )
+
+
+        # -----------------------------------------------------
+        # HISTÓRICO DAS POSIÇÕES RENUMERADAS
+        # -----------------------------------------------------
+
+        for shifted_eco in shifted_position_ecos:
+
+            old_position = (
+                shifted_eco.position
+            )
+
+
+            if old_position is None:
+                continue
+
+
+            self._record_history_fields(
+                shifted_eco,
+                "updated",
+                {
+                    "position": (
+                        old_position,
+                        old_position - 1,
+                    )
+                },
+            )
+
+
+        try:
+
+            # -------------------------------------------------
+            # EXCLUIR ECO
+            # -------------------------------------------------
+
+            self.repo.delete(
+                eco
+            )
+
+
+            # Necessário para liberar o ITEM
+            # excluído antes da renumeração.
+
+            self.db.flush()
+
+
+            # -------------------------------------------------
+            # FECHAR ESPAÇO NA SEQUÊNCIA DE ITEMS
+            # -------------------------------------------------
+
+            if (
+                deleted_item
+                is not None
+            ):
+
+                self.repo.shift_items_down_after(
+                    deleted_item
+                )
+
+
+            # -------------------------------------------------
+            # FECHAR ESPAÇO NA ORDENAÇÃO VISUAL
+            # -------------------------------------------------
+
+            if (
+                deleted_position
+                is not None
+            ):
+
+                self.repo.close_space_after_position(
+                    deleted_position
+                )
+
+
+            # -------------------------------------------------
+            # COMMIT
+            # -------------------------------------------------
+
+            self.db.commit()
+
+
+        except Exception:
+
+            self.db.rollback()
+
+            raise

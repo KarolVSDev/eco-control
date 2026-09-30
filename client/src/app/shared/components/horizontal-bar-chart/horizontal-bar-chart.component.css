@@ -1,1 +1,153 @@
-.bars{height:100%;overflow:auto;padding:8px 6px}.row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;margin:7px 0}.row label{font-size:11px;color:#c8c8c8;text-align:right;white-space:normal;line-height:1.1}.track{height:17px;border-left:1px solid #333;background:repeating-linear-gradient(90deg,transparent,transparent 24%,#252525 25%)}.bar{height:100%;background:#e7194a;border-radius:0 4px 4px 0;min-width:3px}.axis{margin-left:160px;display:flex;justify-content:space-between;color:#8b8b8b;font-size:10px}.empty{display:grid;place-items:center;height:100%;color:#666}@media(max-width:700px){.row{grid-template-columns:95px 1fr}.axis{margin-left:105px}}
+.bars {
+  height: 100%;
+
+  overflow: auto;
+
+  padding: 8px 6px;
+}
+
+
+.row {
+  display: grid;
+
+  grid-template-columns:
+    150px
+    1fr;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin: 7px 0;
+
+  cursor: crosshair;
+}
+
+
+.row label {
+  color: #c8c8c8;
+
+  font-size: 11px;
+
+  line-height: 1.1;
+
+  text-align: right;
+
+  white-space: normal;
+}
+
+
+.track {
+  height: 17px;
+
+  border-left:
+    1px solid #333;
+
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 24%,
+      #252525 25%
+    );
+}
+
+
+.bar {
+  height: 100%;
+
+  min-width: 3px;
+
+  border-radius:
+    0 4px 4px 0;
+
+  background: #e7194a;
+
+  transition:
+    filter 0.12s ease;
+}
+
+
+.row:hover .bar {
+  filter:
+    brightness(1.2);
+}
+
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+
+  margin-left: 160px;
+
+  color: #8b8b8b;
+
+  font-size: 10px;
+}
+
+
+.chart-tooltip {
+  min-width: 130px;
+
+  position: fixed;
+
+  z-index: 2000;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  padding: 10px 12px;
+
+  border: 1px solid #383838;
+  border-radius: 8px;
+
+  background: #1c1c1c;
+
+  box-shadow:
+    0 10px 30px
+    rgba(0, 0, 0, 0.55);
+
+  color: #fff;
+
+  pointer-events: none;
+}
+
+
+.chart-tooltip strong {
+  font-size: 12px;
+}
+
+
+.chart-tooltip span {
+  color: #ccc;
+
+  font-size: 11px;
+}
+
+
+.empty {
+  height: 100%;
+
+  display: grid;
+  place-items: center;
+
+  color: #666;
+}
+
+
+@media (
+  max-width: 700px
+) {
+
+  .row {
+    grid-template-columns:
+      95px
+      1fr;
+  }
+
+  .axis {
+    margin-left: 105px;
+  }
+}
