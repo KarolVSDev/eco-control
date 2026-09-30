@@ -5,7 +5,6 @@ from app.utils.eco_calculations import (
     compute_eco_fields,
 )
 
-
 def row(gap):
     base = date(
         2026,

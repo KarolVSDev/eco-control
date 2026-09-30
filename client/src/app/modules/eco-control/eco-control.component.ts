@@ -107,6 +107,12 @@ export class EcoControlComponent
   filterEcoType = '';
 
 
+  // filtro aberto no cabeçalho
+  openFilterKey: string | null = null;
+
+
+  // pode ser mantido por compatibilidade,
+  // mesmo não sendo mais usado pelo HTML novo
   showFilters = false;
 
   showColumns = false;
@@ -117,20 +123,24 @@ export class EcoControlComponent
     ...STATUS_OPTIONS,
   ];
 
+
   readonly groups = [
     '',
     ...GROUP_OPTIONS,
   ];
+
 
   readonly obus = [
     '',
     ...OBU_OPTIONS,
   ];
 
+
   readonly itemTypes = [
     '',
     ...ITEM_TYPE_OPTIONS,
   ];
+
 
   readonly ecoTypes = [
     '',
@@ -308,10 +318,8 @@ export class EcoControlComponent
             response.total;
 
 
-          /*
-           * Mantém a linha selecionada
-           * caso ela continue na página.
-           */
+          // mantém a ECO selecionada
+          // se ela ainda existir na página atual
 
           if (this.selectedRow) {
 
@@ -328,10 +336,8 @@ export class EcoControlComponent
           }
 
 
-          /*
-           * Atualiza também o drawer
-           * caso a ECO esteja aberta.
-           */
+          // atualiza o drawer caso a ECO
+          // aberta continue na página atual
 
           if (this.viewingRow) {
 
@@ -415,6 +421,8 @@ export class EcoControlComponent
 
     this.filterEcoType = '';
 
+    this.openFilterKey = null;
+
     this.page = 1;
 
     this.load();
@@ -430,6 +438,166 @@ export class EcoControlComponent
       this.filterItemType ||
       this.filterEcoType
     );
+  }
+
+
+  // =====================================================
+  // FILTROS NO CABEÇALHO
+  // =====================================================
+
+  isFilterableColumn(
+    column: EcoColumn,
+  ): boolean {
+
+    return [
+      'obu',
+      'group',
+      'item_type',
+      'eco_type',
+      'status',
+    ].includes(
+      column.key
+    );
+  }
+
+
+  toggleColumnFilter(
+    columnKey: string,
+    event: Event,
+  ): void {
+
+    event.stopPropagation();
+
+
+    this.openFilterKey =
+      this.openFilterKey === columnKey
+        ? null
+        : columnKey;
+  }
+
+
+  getFilterOptions(
+    columnKey: string,
+  ): readonly string[] {
+
+    switch (columnKey) {
+
+      case 'obu':
+
+        return OBU_OPTIONS;
+
+
+      case 'group':
+
+        return GROUP_OPTIONS;
+
+
+      case 'item_type':
+
+        return ITEM_TYPE_OPTIONS;
+
+
+      case 'eco_type':
+
+        return ECO_TYPE_OPTIONS;
+
+
+      case 'status':
+
+        return STATUS_OPTIONS;
+
+
+      default:
+
+        return [];
+    }
+  }
+
+
+  getFilterValue(
+    columnKey: string,
+  ): string {
+
+    switch (columnKey) {
+
+      case 'obu':
+
+        return this.filterObu;
+
+
+      case 'group':
+
+        return this.filterGroup;
+
+
+      case 'item_type':
+
+        return this.filterItemType;
+
+
+      case 'eco_type':
+
+        return this.filterEcoType;
+
+
+      case 'status':
+
+        return this.status;
+
+
+      default:
+
+        return '';
+    }
+  }
+
+
+  setColumnFilter(
+    columnKey: string,
+    value: string,
+  ): void {
+
+    switch (columnKey) {
+
+      case 'obu':
+
+        this.filterObu = value;
+
+        break;
+
+
+      case 'group':
+
+        this.filterGroup = value;
+
+        break;
+
+
+      case 'item_type':
+
+        this.filterItemType = value;
+
+        break;
+
+
+      case 'eco_type':
+
+        this.filterEcoType = value;
+
+        break;
+
+
+      case 'status':
+
+        this.status = value;
+
+        break;
+    }
+
+
+    this.openFilterKey = null;
+
+    this.applyFilters();
   }
 
 
@@ -529,10 +697,8 @@ export class EcoControlComponent
     row: any,
   ): void {
 
-    /*
-     * Clicar novamente na mesma
-     * linha remove a seleção.
-     */
+    // clicar novamente na mesma
+    // linha remove a seleção
 
     if (
       this.selectedRow?.id ===
@@ -620,16 +786,6 @@ export class EcoControlComponent
     this.cellError = '';
 
 
-    /*
-     * Este endpoint será criado no backend.
-     *
-     * Ele deverá:
-     * - gerar um novo ITEM permanente;
-     * - deslocar POSITION das ECOs abaixo;
-     * - inserir a nova ECO logo após
-     *   a linha selecionada.
-     */
-
     this.api
       .post<any>(
         `/ecos/${this.selectedRow.id}/after`,
@@ -642,21 +798,11 @@ export class EcoControlComponent
           this.creatingBelow = false;
 
 
-          /*
-           * Recarrega para receber
-           * a ordenação oficial.
-           */
-
-          this.load();
-
-
-          /*
-           * A nova linha já fica
-           * selecionada para edição.
-           */
-
           this.selectedRow =
             created;
+
+
+          this.load();
         },
 
 
@@ -726,30 +872,37 @@ export class EcoControlComponent
     switch (normalized) {
 
       case 'RELEASED':
+
         return 'status-released';
 
 
       case 'CANCELLED':
+
         return 'status-cancelled';
 
 
       case 'REJECTED':
+
         return 'status-rejected';
 
 
       case 'WORKING':
+
         return 'status-working';
 
 
       case 'ON HOLD':
+
         return 'status-hold';
 
 
       case 'PROCESSING':
+
         return 'status-processing';
 
 
       default:
+
         return 'status-default';
     }
   }
@@ -883,12 +1036,6 @@ export class EcoControlComponent
             updated
           );
 
-
-          /*
-           * Se a mesma ECO estiver
-           * aberta no drawer,
-           * atualiza os dados exibidos.
-           */
 
           if (
             this.viewingRow?.id ===
@@ -1173,6 +1320,7 @@ export class EcoControlComponent
 
           link.href =
             url;
+
 
           link.download =
             'eco-control.csv';

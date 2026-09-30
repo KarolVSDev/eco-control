@@ -6,10 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from app.models.entities import (
-    Eco,
-    EcoHistory,
-)
+from app.models.entities import Eco
 
 
 class EcoRepository:
@@ -196,14 +193,14 @@ class EcoRepository:
 
 
     # =========================================================
-    # PRÓXIMO ITEM
+    # MAIOR ITEM ATUAL
     # =========================================================
 
-    def next_item(
+    def max_item(
         self,
-    ):
+    ) -> int:
 
-        current_max = (
+        return (
             self.db.scalar(
                 select(
                     func.max(
@@ -215,24 +212,248 @@ class EcoRepository:
         )
 
 
-        history_max = (
-            self.db.scalar(
-                select(
-                    func.max(
-                        EcoHistory.item
-                    )
-                )
-            )
-            or 0
+    # =========================================================
+    # PRÓXIMO ITEM
+    # =========================================================
+
+    def next_item(
+        self,
+    ) -> int:
+
+        """
+        Retorna o próximo ITEM considerando
+        apenas as ECOs existentes atualmente.
+
+        O histórico não participa mais desse
+        cálculo porque ITEM agora representa
+        uma sequência renumerável.
+        """
+
+        return (
+            self.max_item()
+            + 1
         )
 
 
-        return (
-            max(
-                current_max,
-                history_max,
+    # =========================================================
+    # DESLOCAR ITEMS PARA CIMA
+    # =========================================================
+
+    def shift_items_up_from(
+        self,
+        start_item: int,
+    ) -> None:
+
+        """
+        Abre espaço para um novo ITEM.
+
+        Exemplo:
+
+        Antes:
+            7
+            8
+            9
+
+        shift_items_up_from(8)
+
+        Depois:
+            7
+            9
+            10
+
+        Assim o ITEM 8 fica livre para
+        receber a nova ECO.
+
+        A atualização é feita em duas etapas
+        porque Eco.item possui UNIQUE.
+        """
+
+        current_max = (
+            self.max_item()
+        )
+
+
+        if (
+            current_max
+            < start_item
+        ):
+
+            return
+
+
+        # Offset temporário maior que qualquer
+        # ITEM atualmente existente.
+        #
+        # Exemplo:
+        # max = 10
+        # offset = 11
+        #
+        # 8  -> 19
+        # 9  -> 20
+        # 10 -> 21
+
+        offset = (
+            current_max + 1
+        )
+
+
+        # -----------------------------------------------------
+        # ETAPA 1
+        # mover para uma faixa temporária
+        # -----------------------------------------------------
+
+        self.db.execute(
+            update(Eco)
+            .where(
+                Eco.item
+                >= start_item
             )
-            + 1
+            .values(
+                item=(
+                    Eco.item
+                    + offset
+                )
+            )
+        )
+
+
+        # -----------------------------------------------------
+        # ETAPA 2
+        # trazer de volta acrescentando 1
+        #
+        # 19 -> 9
+        # 20 -> 10
+        # 21 -> 11
+        # -----------------------------------------------------
+
+        temporary_start = (
+            start_item
+            + offset
+        )
+
+
+        self.db.execute(
+            update(Eco)
+            .where(
+                Eco.item
+                >= temporary_start
+            )
+            .values(
+                item=(
+                    Eco.item
+                    - offset
+                    + 1
+                )
+            )
+        )
+
+
+    # =========================================================
+    # DESLOCAR ITEMS PARA BAIXO
+    # =========================================================
+
+    def shift_items_down_after(
+        self,
+        deleted_item: int,
+    ) -> None:
+
+        """
+        Fecha o espaço deixado após uma exclusão.
+
+        Exemplo:
+
+        Antes da exclusão:
+            7
+            8
+            9
+            10
+
+        ITEM 8 é excluído.
+
+        Depois:
+            7
+            8  <- antigo 9
+            9  <- antigo 10
+
+        IMPORTANTE:
+        o registro excluído precisa ter sido
+        removido e feito flush antes deste método.
+        """
+
+        current_max = (
+            self.max_item()
+        )
+
+
+        if (
+            current_max
+            <= deleted_item
+        ):
+
+            return
+
+
+        offset = (
+            current_max + 1
+        )
+
+
+        first_item_to_shift = (
+            deleted_item + 1
+        )
+
+
+        # -----------------------------------------------------
+        # ETAPA 1
+        # mover os ITEMs posteriores para
+        # uma faixa temporária
+        #
+        # 9  -> 20
+        # 10 -> 21
+        # -----------------------------------------------------
+
+        self.db.execute(
+            update(Eco)
+            .where(
+                Eco.item
+                > deleted_item
+            )
+            .values(
+                item=(
+                    Eco.item
+                    + offset
+                )
+            )
+        )
+
+
+        # -----------------------------------------------------
+        # ETAPA 2
+        # trazer de volta diminuindo 1
+        #
+        # 20 -> 8
+        # 21 -> 9
+        # -----------------------------------------------------
+
+        temporary_start = (
+            first_item_to_shift
+            + offset
+        )
+
+
+        self.db.execute(
+            update(Eco)
+            .where(
+                Eco.item
+                >= temporary_start
+            )
+            .values(
+                item=(
+                    Eco.item
+                    - offset
+                    - 1
+                )
+            )
         )
 
 
@@ -242,7 +463,7 @@ class EcoRepository:
 
     def next_position(
         self,
-    ):
+    ) -> int:
 
         current_max = (
             self.db.scalar(
@@ -268,7 +489,7 @@ class EcoRepository:
     def make_space_at_position(
         self,
         position: int,
-    ):
+    ) -> None:
 
         self.db.execute(
             update(Eco)
@@ -279,6 +500,29 @@ class EcoRepository:
             .values(
                 position=(
                     Eco.position + 1
+                )
+            )
+        )
+
+
+    # =========================================================
+    # FECHAR ESPAÇO NA ORDENAÇÃO
+    # =========================================================
+
+    def close_space_after_position(
+        self,
+        deleted_position: int,
+    ) -> None:
+
+        self.db.execute(
+            update(Eco)
+            .where(
+                Eco.position
+                > deleted_position
+            )
+            .values(
+                position=(
+                    Eco.position - 1
                 )
             )
         )
@@ -309,7 +553,7 @@ class EcoRepository:
     def delete(
         self,
         eco,
-    ):
+    ) -> None:
 
         self.db.delete(
             eco
