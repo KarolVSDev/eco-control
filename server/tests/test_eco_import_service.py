@@ -551,6 +551,142 @@ def test_preview_uses_internal_month_and_sheet_release_month():
     assert derived["release_month"] == "FEV"
 
 
+def test_record_import_history_serializes_populated_fields():
+
+    service = create_service()
+    history_records = []
+    service.history.add = history_records.append
+    eco = SimpleNamespace(
+        id="eco-id",
+        eco="ECO-HISTORY",
+        item=7,
+        position=3,
+        month="FEB",
+        au="GLZ",
+        group_name="BOM",
+    )
+
+    service._record_import_history(
+        eco,
+        {
+            "product": "AAA",
+            "az_eco_register_date": date(2026, 2, 10),
+            "empty_value": None,
+        },
+    )
+
+    records_by_field = {
+        record.field_key: record
+        for record in history_records
+    }
+
+    assert records_by_field["az_eco_register_date"].new_value == "2026-02-10"
+    assert records_by_field["group_name"].field_label == "GROUP"
+    assert records_by_field["product"].new_value == "AAA"
+    assert "empty_value" not in records_by_field
+    assert all(record.action == "created" for record in history_records)
+
+
+def test_import_file_persists_only_new_rows_and_commits_once():
+
+    existing_row = {
+        "item": 1,
+        "product": "AAA",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "YES",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-IMPORT",
+        "change_reason": "Alteração teste",
+        "hq_eco_release_date": date(2026, 1, 2),
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+    baseline = create_service().preview(
+        create_workbook(rows=[existing_row]),
+        "controle.xlsx",
+    )
+    existing_record = SimpleNamespace(
+        **baseline["rows"][0]["data"],
+        id="existing-id",
+        item=1,
+    )
+    new_row = {
+        **existing_row,
+        "item": 2,
+        "product": "BBB",
+    }
+    service = create_service(
+        existing={
+            "ECO-IMPORT": [existing_record],
+        }
+    )
+    persisted = []
+    histories = []
+    commits = []
+    rollbacks = []
+    service.db = SimpleNamespace(
+        add=persisted.append,
+        flush=lambda: None,
+        commit=lambda: commits.append(True),
+        rollback=lambda: rollbacks.append(True),
+    )
+    service.ecos.next_item = lambda: 10
+    service.ecos.next_position = lambda: 20
+    service.history.add = histories.append
+    service.MAX_PREVIEW_ROWS = 1
+
+    result = service.import_file(
+        create_workbook(
+            rows=[existing_row, new_row]
+        ),
+        "controle.xlsx",
+    )
+
+    assert result["imported_rows"] == 1
+    assert result["duplicate_rows"] == 1
+    assert result["imported"][0]["item"] == 10
+    assert len(persisted) == 1
+    assert persisted[0].product == "BBB"
+    assert persisted[0].position == 20
+    assert persisted[0].month == "JAN"
+    assert histories
+    assert commits == [True]
+    assert rollbacks == []
+
+
+def test_import_file_rolls_back_when_persistence_fails():
+
+    service = create_service()
+    persisted = []
+    commits = []
+    rollbacks = []
+
+    def fail_flush():
+        raise RuntimeError("flush failed")
+
+    service.db = SimpleNamespace(
+        add=persisted.append,
+        flush=fail_flush,
+        commit=lambda: commits.append(True),
+        rollback=lambda: rollbacks.append(True),
+    )
+    service.ecos.next_item = lambda: 10
+    service.ecos.next_position = lambda: 20
+
+    with pytest.raises(RuntimeError, match="flush failed"):
+        service.import_file(
+            create_workbook(),
+            "controle.xlsx",
+        )
+
+    assert len(persisted) == 1
+    assert commits == []
+    assert rollbacks == [True]
+
+
 def test_preview_exact_existing_row_is_duplicate():
 
     baseline = create_service().preview(

@@ -31,6 +31,15 @@ from sqlalchemy import (
 from app.models.entities import (
     AnalystPermission,
     Eco,
+    EcoHistory,
+)
+
+from app.repository.eco_repository import (
+    EcoRepository,
+)
+
+from app.repository.history_repository import (
+    HistoryRepository,
 )
 
 from app.repository.settings_repository import (
@@ -511,6 +520,18 @@ class EcoImportService:
 
         self.settings = (
             SettingsRepository(
+                db
+            )
+        )
+
+        self.ecos = (
+            EcoRepository(
+                db
+            )
+        )
+
+        self.history = (
+            HistoryRepository(
                 db
             )
         )
@@ -2051,10 +2072,140 @@ class EcoImportService:
         )
 
 
+    # =========================================================
+    # HISTÓRICO
+    # =========================================================
+
+    @staticmethod
+    def _history_value(
+        value,
+    ):
+        if value is None:
+            return None
+
+
+        if hasattr(
+            value,
+            "isoformat",
+        ):
+
+            return value.isoformat()
+
+
+        return str(
+            value
+        )
+
+
+    @staticmethod
+    def _history_label(
+        field,
+    ):
+        if field == "group_name":
+            return "GROUP"
+
+
+        return (
+            field
+            .replace(
+                "_",
+                " ",
+            )
+            .upper()
+        )
+
+
+    def _record_import_history(
+        self,
+        eco,
+        data,
+    ):
+        """
+        Registra no histórico todos os campos
+        efetivamente preenchidos durante a importação.
+        """
+
+        fields = {
+            "item":
+                eco.item,
+
+            "position":
+                eco.position,
+
+            "month":
+                eco.month,
+
+            "au":
+                eco.au,
+
+            "group_name":
+                eco.group_name,
+        }
+
+
+        for (
+            key,
+            value,
+        ) in data.items():
+
+            if value is not None:
+
+                fields[
+                    key
+                ] = value
+
+
+        for (
+            field,
+            value,
+        ) in fields.items():
+
+            if value is None:
+                continue
+
+
+            self.history.add(
+                EcoHistory(
+                    eco_id=eco.id,
+
+                    eco_code=eco.eco,
+
+                    item=eco.item,
+
+                    field_key=field,
+
+                    field_label=(
+                        self._history_label(
+                            field
+                        )
+                    ),
+
+                    old_value=None,
+
+                    new_value=(
+                        self._history_value(
+                            value
+                        )
+                    ),
+
+                    user_email=(
+                        self.user.email
+                    ),
+
+                    user_name=(
+                        self.user.full_name
+                    ),
+
+                    action="created",
+                )
+            )
+
+
     def preview(
         self,
         file_bytes,
         filename,
+        _include_all_rows=False,
     ):
         """
         Analisa a planilha sem alterar o banco.
@@ -2495,7 +2646,9 @@ class EcoImportService:
 
 
             preview_rows = (
-                parsed_rows[
+                parsed_rows
+                if _include_all_rows
+                else parsed_rows[
                     :
                     self.MAX_PREVIEW_ROWS
                 ]
@@ -2584,3 +2737,120 @@ class EcoImportService:
         finally:
 
             workbook.close()
+
+
+    # =========================================================
+    # IMPORTAÇÃO
+    # =========================================================
+
+    def import_file(
+        self,
+        file_bytes,
+        filename,
+    ):
+        """
+        Importa somente linhas classificadas como NEW.
+
+        Erros cancelam toda a importação; duplicatas são
+        ignoradas e qualquer falha no banco provoca rollback.
+        """
+        self._ensure_permission()
+
+        preview = self.preview(
+            file_bytes,
+            filename,
+            _include_all_rows=True,
+        )
+
+        if preview["error_rows"] > 0:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": (
+                        "A importação foi cancelada "
+                        "porque existem linhas com erro."
+                    ),
+                    "error_rows": preview["error_rows"],
+                },
+            )
+
+        new_rows = [
+            row
+            for row in preview["rows"]
+            if row["action"] == "NEW"
+        ]
+
+        if not new_rows:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": (
+                        "Nenhuma linha nova foi "
+                        "encontrada para importação."
+                    ),
+                    "duplicate_rows": preview.get(
+                        "duplicate_rows",
+                        0,
+                    ),
+                },
+            )
+
+        imported = []
+
+        try:
+            next_item = self.ecos.next_item()
+            next_position = self.ecos.next_position()
+
+            for row in new_rows:
+                data = dict(row["data"])
+                derived = row["derived"]
+
+                data["au"] = derived.get("au")
+                data["group_name"] = derived.get("group")
+                data["month"] = derived.get("month")
+
+                eco = Eco(
+                    **data,
+                    item=next_item,
+                    position=next_position,
+                )
+
+                self.db.add(eco)
+                self.db.flush()
+
+                self._record_import_history(
+                    eco,
+                    data,
+                )
+
+                imported.append(
+                    {
+                        "id": str(eco.id),
+                        "item": eco.item,
+                        "excel_row": row["excel_row"],
+                        "eco": eco.eco,
+                    }
+                )
+
+                next_item += 1
+                next_position += 1
+
+            self.db.commit()
+
+        except HTTPException:
+            self.db.rollback()
+            raise
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return {
+            "file_name": filename,
+            "total_rows": preview["total_rows"],
+            "imported_rows": len(imported),
+            "duplicate_rows": preview.get("duplicate_rows", 0),
+            "warning_rows": preview["warning_rows"],
+            "error_rows": 0,
+            "imported": imported,
+        }
