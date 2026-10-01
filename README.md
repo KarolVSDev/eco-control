@@ -52,7 +52,7 @@ O serviço do PostgreSQL deve aparecer como `healthy`.
 ### Configuração local do banco
 
 - **Host:** `localhost`
-- **Porta:** `5432`
+- **Porta:** `5433`
 - **Banco:** `eco_control`
 - **Usuário:** `eco_user`
 - **Senha:** `eco_pass`
@@ -118,6 +118,25 @@ Execute o seed inicial:
 ```bash
 python -m app.seed
 ```
+
+### Verificar o bootstrap do banco
+
+O `alembic upgrade head` deve concluir até a revisão `0002`. Confira a revisão aplicada:
+
+```bash
+alembic current
+```
+
+Confira o usuário administrador e as 30 ECOs sintéticas criadas pelo seed:
+
+```powershell
+docker compose exec db psql -U eco_user -d eco_control -c "SELECT email, role, active FROM users WHERE email = 'admin@eco.com';"
+docker compose exec db psql -U eco_user -d eco_control -c "SELECT count(*) AS synthetic_ecos FROM ecos WHERE eco LIKE 'DEMO%';"
+```
+
+O administrador local inicial usa `admin@eco.com` / `admin123`. O seed pode ser executado novamente sem duplicar o usuário, os mapeamentos ou os dados sintéticos.
+
+Para testar uma instalação limpa, use somente um banco/volume descartável. `docker compose down -v` apaga todos os dados do volume local e não deve ser usado em um banco que precise ser preservado.
 
 O seed cria:
 

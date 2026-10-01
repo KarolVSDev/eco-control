@@ -17,8 +17,7 @@ MONTH_ABBR = [
 ]
 
 
-# Mantido exatamente conforme a regra existente
-# no ecoCalc.js exportado do Base44.
+# Statuses tratados atualmente como abertos para `gap_agreement`.
 OPEN_STATUSES = [
     "WORKING",
     "ON HOLD",
@@ -92,7 +91,8 @@ def sum_ignoring_none(values):
     return sum(valid)
 
 
-def compute_eco_fields(row):
+def compute_eco_fields(row, *, today: date | None = None):
+    reference_date = today or date.today()
     # -------------------------------------------------
     # GAP
     # -------------------------------------------------
@@ -108,7 +108,7 @@ def compute_eco_fields(row):
     elif row.az_eco_register_date:
         gap = days_between(
             row.az_eco_register_date,
-            date.today(),
+            reference_date,
         )
 
     else:
@@ -167,7 +167,7 @@ def compute_eco_fields(row):
     ):
         gap_agreement = days_between(
             row.agreement_start_1,
-            date.today(),
+            reference_date,
         )
 
     # -------------------------------------------------
