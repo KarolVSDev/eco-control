@@ -4,7 +4,11 @@ from datetime import (
 )
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import (
+    delete,
+    func,
+    select,
+)
 
 from app.models.entities import (
     Eco,
@@ -1840,3 +1844,49 @@ class EcoService:
             self.db.rollback()
 
             raise
+
+
+    # =========================================================
+    # DELETE ALL
+    # =========================================================
+
+    def delete_all(
+        self,
+    ):
+        if (
+            self.user.role
+            != "admin"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Somente administradores "
+                    "podem excluir todas as ECOs."
+                ),
+            )
+
+        try:
+            total = (
+                self.db.scalar(
+                    select(
+                        func.count()
+                    ).select_from(
+                        Eco
+                    )
+                )
+                or 0
+            )
+
+            self.db.execute(
+                delete(Eco)
+            )
+
+            self.db.commit()
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return {
+            "deleted_rows": total,
+        }

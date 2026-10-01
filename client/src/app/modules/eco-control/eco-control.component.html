@@ -115,6 +115,49 @@
       </div>
 
 
+      <!-- IMPORTAR XLSX -->
+
+      <button
+        *ngIf="permissions.canBulkEdit"
+        class="eco-toolbar-button"
+        type="button"
+        (click)="
+          openImportModal();
+          $event.stopPropagation()
+        "
+      >
+        <span aria-hidden="true">
+          ⇧
+        </span>
+
+        Importar XLSX
+      </button>
+
+
+      <!-- EXCLUIR TODAS -->
+
+      <button
+        *ngIf="permissions.isAdmin"
+        class="eco-delete-all-button"
+        type="button"
+        [disabled]="deletingAll || total === 0"
+        (click)="
+          deleteAllEcos();
+          $event.stopPropagation()
+        "
+      >
+        <span aria-hidden="true">
+          🗑
+        </span>
+
+        {{
+          deletingAll
+            ? 'Excluindo...'
+            : 'Excluir todas'
+        }}
+      </button>
+
+
       <!-- EXPORTAR -->
 
       <button
@@ -670,7 +713,14 @@
                   aria-label="Excluir ECO"
                   (click)="remove(row)"
                 >
-                  ♲
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h10l-1 11H8L7 9Zm3 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"
+                    />
+                  </svg>
                 </button>
 
               </div>
@@ -1677,6 +1727,221 @@
 
     </aside>
 
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- IMPORTAÇÃO XLSX -->
+  <!-- ================================================= -->
+
+  <div
+    *ngIf="importModalOpen"
+    class="import-overlay"
+    (click)="closeImportModal()"
+  >
+
+    <div
+      class="import-modal"
+      (click)="$event.stopPropagation()"
+    >
+
+      <div class="import-header">
+        <div>
+          <h2>Importar planilha XLSX</h2>
+          <p>
+            A planilha deve possuir a aba
+            <strong>CTRL GERAL</strong>.
+          </p>
+        </div>
+
+        <button
+          class="import-close"
+          type="button"
+          [disabled]="previewingImport || importingFile"
+          aria-label="Fechar importação"
+          (click)="closeImportModal()"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="import-body">
+        <div
+          *ngIf="importError"
+          class="import-message import-message-error"
+        >
+          {{ importError }}
+        </div>
+
+        <div
+          *ngIf="importSuccess"
+          class="import-message import-message-success"
+        >
+          {{ importSuccess }}
+        </div>
+
+        <label class="import-file-box">
+          <span class="import-file-title">
+            Selecionar planilha
+          </span>
+          <input
+            type="file"
+            accept=".xlsx"
+            [disabled]="previewingImport || importingFile"
+            (change)="onImportFileSelected($event)"
+          >
+        </label>
+
+        <div
+          *ngIf="importFile"
+          class="import-selected-file"
+        >
+          {{ importFile.name }}
+        </div>
+
+        <button
+          *ngIf="importFile && !importPreview"
+          class="import-preview-button"
+          type="button"
+          [disabled]="previewingImport"
+          (click)="previewImport()"
+        >
+          {{
+            previewingImport
+              ? 'Analisando planilha...'
+              : 'Analisar planilha'
+          }}
+        </button>
+
+        <ng-container *ngIf="importPreview">
+          <div class="import-preview-title">
+            Resultado da análise
+          </div>
+
+          <div class="import-summary">
+            <div class="import-summary-card">
+              <span>Total</span>
+              <strong>{{ importPreview.total_rows }}</strong>
+            </div>
+
+            <div class="import-summary-card import-summary-new">
+              <span>Novas</span>
+              <strong>{{ importPreview.new_rows }}</strong>
+            </div>
+
+            <div class="import-summary-card">
+              <span>Duplicadas</span>
+              <strong>{{ importPreview.duplicate_rows }}</strong>
+            </div>
+
+            <div class="import-summary-card import-summary-warning">
+              <span>Avisos</span>
+              <strong>{{ importPreview.warning_rows }}</strong>
+            </div>
+
+            <div class="import-summary-card import-summary-error">
+              <span>Erros</span>
+              <strong>{{ importPreview.error_rows }}</strong>
+            </div>
+          </div>
+
+          <div class="import-preview-table-wrapper">
+            <table class="import-preview-table">
+              <thead>
+                <tr>
+                  <th>Linha</th>
+                  <th>ECO</th>
+                  <th>Ação</th>
+                  <th>Avisos / erros</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr *ngFor="let row of importPreview.rows">
+                  <td>{{ row.excel_row }}</td>
+                  <td>{{ row.eco || '-' }}</td>
+                  <td>
+                    <span
+                      class="import-action"
+                      [class.import-action-new]="row.action === 'NEW'"
+                      [class.import-action-duplicate]="row.action === 'DUPLICATE'"
+                      [class.import-action-error]="row.action === 'ERROR'"
+                    >
+                      {{ row.action }}
+                    </span>
+                  </td>
+                  <td>
+                    <div
+                      *ngFor="let warning of row.warnings"
+                      class="import-warning-text"
+                    >
+                      ⚠ {{ warning }}
+                    </div>
+
+                    <div
+                      *ngFor="let error of row.errors"
+                      class="import-error-text"
+                    >
+                      ✕ {{ error }}
+                    </div>
+
+                    <span
+                      *ngIf="!row.warnings?.length && !row.errors?.length"
+                      class="muted"
+                    >
+                      -
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            *ngIf="
+              !importPreview.can_import
+              && importPreview.error_rows === 0
+              && importPreview.new_rows === 0
+            "
+            class="import-message import-message-info"
+          >
+            Nenhuma ECO nova foi encontrada. Todas as linhas já existem no sistema.
+          </div>
+
+          <div
+            *ngIf="importPreview.error_rows > 0"
+            class="import-message import-message-error"
+          >
+            A importação está bloqueada. Corrija os erros da planilha antes de continuar.
+          </div>
+        </ng-container>
+      </div>
+
+      <div class="import-footer">
+        <button
+          class="details-cancel-button"
+          type="button"
+          [disabled]="importingFile"
+          (click)="closeImportModal()"
+        >
+          Fechar
+        </button>
+
+        <button
+          *ngIf="importPreview"
+          class="details-save-button"
+          type="button"
+          [disabled]="!importPreview.can_import || importingFile"
+          (click)="confirmImport()"
+        >
+          {{
+            importingFile
+              ? 'Importando...'
+              : 'Importar ' + importPreview.new_rows + ' ECO(s)'
+          }}
+        </button>
+      </div>
+    </div>
   </div>
 
 </div>

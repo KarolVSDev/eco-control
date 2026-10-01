@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.config.database import get_db
 from app.services.eco_import_service import EcoImportService
+from app.services.eco_service import EcoService
 from app.utils.security import current_user
 from main import app
 
@@ -67,3 +68,32 @@ def test_import_route_delegates_xlsx_to_service(monkeypatch):
         "content": b"xlsx-content",
         "filename": "controle.xlsx",
     }
+
+
+def test_bulk_delete_route_delegates_to_service(monkeypatch):
+    overrides_before = app.dependency_overrides.copy()
+    database = object()
+    app.dependency_overrides[get_db] = lambda: database
+    app.dependency_overrides[current_user] = lambda: object()
+    captured = {}
+
+    def fake_delete_all(service):
+        captured["db"] = service.db
+        return {"deleted_rows": 12}
+
+    monkeypatch.setattr(
+        EcoService,
+        "delete_all",
+        fake_delete_all,
+    )
+
+    try:
+        response = TestClient(app).delete(
+            "/api/v1/ecos/bulk/all"
+        )
+    finally:
+        app.dependency_overrides = overrides_before
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted_rows": 12}
+    assert captured["db"] is database

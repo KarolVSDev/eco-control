@@ -1,6 +1,10 @@
 import uuid
 from types import SimpleNamespace
 
+import pytest
+
+from fastapi import HTTPException
+
 from app.models.entities import Eco, EcoHistory
 from app.repository.eco_repository import EcoRepository
 from app.services.eco_service import EcoService
@@ -786,3 +790,42 @@ def test_next_position_uses_current_position_sequence():
         repository.next_position()
         == 8
     )
+
+
+def test_delete_all_executes_one_bulk_delete_and_commits():
+
+    statements = []
+    commits = []
+    rollbacks = []
+    database = SimpleNamespace(
+        scalar=lambda query: 12,
+        execute=statements.append,
+        commit=lambda: commits.append(True),
+        rollback=lambda: rollbacks.append(True),
+    )
+    service = make_service(
+        repo=None,
+        db=database,
+    )
+
+    result = service.delete_all()
+
+    assert result == {"deleted_rows": 12}
+    assert len(statements) == 1
+    assert str(statements[0]).lower() == "delete from ecos"
+    assert commits == [True]
+    assert rollbacks == []
+
+
+def test_delete_all_rejects_non_admin():
+
+    service = make_service(
+        repo=None,
+        db=SimpleNamespace(),
+    )
+    service.user.role = "analyst"
+
+    with pytest.raises(HTTPException) as error:
+        service.delete_all()
+
+    assert error.value.status_code == 403

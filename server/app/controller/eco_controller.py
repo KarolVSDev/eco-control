@@ -1585,6 +1585,26 @@ def update_eco(
 # =========================================================
 
 @router.delete(
+    "/bulk/all",
+)
+def delete_all_ecos(
+    db: Session = Depends(
+        get_db
+    ),
+
+    user=Depends(
+        current_user
+    ),
+):
+    service = EcoService(
+        db,
+        user,
+    )
+
+    return service.delete_all()
+
+
+@router.delete(
     "/{eco_id}",
     status_code=(
         status.HTTP_204_NO_CONTENT

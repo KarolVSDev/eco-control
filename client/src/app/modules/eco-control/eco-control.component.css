@@ -513,20 +513,19 @@
 
   cursor: pointer;
 
-  opacity: 0;
+  opacity: 1;
 
   transition:
-    opacity 0.12s ease,
     color 0.12s ease,
     background 0.12s ease;
 }
 
 
-.eco-row:hover
-.row-action-button,
-.row-selected
-.row-action-button {
-  opacity: 1;
+.row-action-button svg {
+  width: 15px;
+  height: 15px;
+
+  fill: currentColor;
 }
 
 
@@ -2309,4 +2308,354 @@ tr.row-selected
   .details-delete-button {
     flex: 1;
   }
+}
+
+
+/* =====================================================
+   MODAL DE IMPORTAÇÃO XLSX
+   ===================================================== */
+
+.import-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+
+.import-modal {
+  width: min(900px, 96vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #353535;
+  border-radius: 10px;
+  background: #181818;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+
+.import-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px;
+  border-bottom: 1px solid #303030;
+}
+
+
+.import-header h2 {
+  margin: 0 0 5px;
+  color: #fff;
+  font-size: 18px;
+}
+
+
+.import-header p {
+  margin: 0;
+  color: #888;
+  font-size: 12px;
+}
+
+
+.import-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #aaa;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+
+.import-close:hover:not(:disabled) {
+  background: #242424;
+  color: #fff;
+}
+
+
+.import-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+.import-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 22px;
+}
+
+
+.import-file-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  border: 1px dashed #454545;
+  border-radius: 8px;
+  background: #202020;
+}
+
+
+.import-file-title {
+  color: #ddd;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+.import-preview-title {
+  margin-top: 24px;
+  margin-bottom: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+
+.import-file-box input {
+  max-width: 100%;
+  color: #aaa;
+}
+
+
+.import-selected-file {
+  margin-top: 9px;
+  color: #aaa;
+  font-size: 12px;
+}
+
+
+.import-preview-button {
+  height: 38px;
+  margin-top: 14px;
+  padding: 0 15px;
+  border: 1px solid #555;
+  border-radius: 7px;
+  background: #242424;
+  color: #fff;
+  cursor: pointer;
+}
+
+
+.import-preview-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+
+.import-summary-card {
+  padding: 12px;
+  border: 1px solid #353535;
+  border-radius: 7px;
+  background: #202020;
+}
+
+
+.import-summary-card span {
+  display: block;
+  margin-bottom: 5px;
+  color: #888;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+
+.import-summary-card strong {
+  color: #fff;
+  font-size: 18px;
+}
+
+
+.import-summary-new strong {
+  color: #4ade80;
+}
+
+
+.import-summary-warning strong {
+  color: #facc15;
+}
+
+
+.import-summary-error strong {
+  color: #fb7185;
+}
+
+
+.import-preview-table-wrapper {
+  max-height: 330px;
+  overflow: auto;
+  border: 1px solid #303030;
+  border-radius: 7px;
+}
+
+
+.import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+
+.import-preview-table th,
+.import-preview-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #2d2d2d;
+  text-align: left;
+}
+
+
+.import-preview-table th {
+  position: sticky;
+  top: 0;
+  background: #222;
+  color: #aaa;
+}
+
+
+.import-preview-table td {
+  color: #ddd;
+}
+
+
+.import-action {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+.import-action-new {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+
+.import-action-duplicate {
+  background: #292929;
+  color: #aaa;
+}
+
+
+.import-action-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fb7185;
+}
+
+
+.import-warning-text {
+  color: #facc15;
+}
+
+
+.import-error-text {
+  color: #fb7185;
+}
+
+
+.import-message {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+
+.import-message-error {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fb7185;
+}
+
+
+.import-message-success {
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+  color: #4ade80;
+}
+
+
+.import-message-info {
+  margin-top: 14px;
+  border: 1px solid #3d3d3d;
+  background: #222;
+  color: #aaa;
+}
+
+
+.import-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px;
+  border-top: 1px solid #303030;
+  background: #191919;
+}
+
+
+@media (max-width: 760px) {
+  .import-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .import-overlay {
+    padding: 0;
+  }
+
+  .import-modal {
+    width: 100vw;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+  }
+}
+
+
+.eco-delete-all-button {
+  height: 38px;
+  padding: 0 13px;
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.10);
+  color: #fb7185;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.eco-delete-all-button:hover:not(:disabled) {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+}
+
+
+.eco-delete-all-button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
