@@ -16,12 +16,8 @@ import {
   COLUMN_GROUPS,
   EcoColumn,
   EcoColumnGroup,
-  ECO_TYPE_OPTIONS,
   FIELD_TYPES,
-  GROUP_OPTIONS,
-  ITEM_TYPE_OPTIONS,
-  OBU_OPTIONS,
-  STATUS_OPTIONS,
+  YES_NO_OPTIONS,
   isCalculatedField,
 } from './eco-fields';
 
@@ -69,6 +65,7 @@ export class EcoControlComponent
 
   pageSize = 25;
 
+
   // =====================================================
   // OWNERS CONFIGURADOS
   // =====================================================
@@ -102,51 +99,30 @@ export class EcoControlComponent
   // FILTROS
   // =====================================================
 
-  status = '';
+  columnFilters:
+    Record<string, string> = {};
 
-  filterGroup = '';
-
-  filterObu = '';
-
-  filterItemType = '';
-
-  filterEcoType = '';
+  filterDrafts:
+    Record<string, string> = {};
 
   openFilterKey:
     string | null = null;
 
-  showFilters = false;
-
   showColumns = false;
 
-
-  readonly statuses = [
-    '',
-    ...STATUS_OPTIONS,
-  ];
-
-
-  readonly groups = [
-    '',
-    ...GROUP_OPTIONS,
-  ];
-
-
-  readonly obus = [
-    '',
-    ...OBU_OPTIONS,
-  ];
-
-
-  readonly itemTypes = [
-    '',
-    ...ITEM_TYPE_OPTIONS,
-  ];
-
-
-  readonly ecoTypes = [
-    '',
-    ...ECO_TYPE_OPTIONS,
+  readonly monthFilterOptions = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
   ];
 
 
@@ -163,8 +139,6 @@ export class EcoControlComponent
 
   viewingRow: any = null;
 
-
-  // modo edição do drawer
   drawerEditing = false;
 
   drawerSaving = false;
@@ -173,8 +147,6 @@ export class EcoControlComponent
 
   drawerSuccess = '';
 
-
-  // valores temporários enquanto edita
   drawerDraft:
     Record<string, any> = {};
 
@@ -280,6 +252,55 @@ export class EcoControlComponent
           );
       }
     }
+
+
+    const allowedKeys =
+      new Set(
+        this.columns.map(
+          column =>
+            column.key
+        )
+      );
+
+
+    for (
+      const key
+      of Object.keys(
+        this.columnFilters
+      )
+    ) {
+
+      if (
+        !allowedKeys.has(
+          key
+        )
+      ) {
+
+        delete this.columnFilters[
+          key
+        ];
+      }
+    }
+
+
+    for (
+      const key
+      of Object.keys(
+        this.filterDrafts
+      )
+    ) {
+
+      if (
+        !allowedKeys.has(
+          key
+        )
+      ) {
+
+        delete this.filterDrafts[
+          key
+        ];
+      }
+    }
   }
 
 
@@ -300,7 +321,6 @@ export class EcoControlComponent
       .get<any>(
         '/ecos',
         {
-
           page:
             this.page,
 
@@ -310,20 +330,8 @@ export class EcoControlComponent
           search:
             this.search,
 
-          status:
-            this.status,
-
-          group:
-            this.filterGroup,
-
-          obu:
-            this.filterObu,
-
-          item_type:
-            this.filterItemType,
-
-          eco_type:
-            this.filterEcoType,
+          column_filters:
+            this.columnFiltersParam(),
         },
       )
       .subscribe({
@@ -336,8 +344,6 @@ export class EcoControlComponent
           this.total =
             response.total;
 
-
-          // mantém linha selecionada
 
           if (this.selectedRow) {
 
@@ -353,9 +359,6 @@ export class EcoControlComponent
               selected || null;
           }
 
-
-          // mantém drawer atualizado
-          // desde que não esteja em edição
 
           if (
             this.viewingRow
@@ -409,6 +412,8 @@ export class EcoControlComponent
 
     this.page = 1;
 
+    this.selectedRow = null;
+
     this.load();
   }
 
@@ -421,44 +426,35 @@ export class EcoControlComponent
 
     this.page = 1;
 
+    this.selectedRow = null;
+
     this.load();
-  }
-
-
-  changeStatus(): void {
-
-    this.applyFilters();
   }
 
 
   clearFilters(): void {
 
-    this.status = '';
+    this.columnFilters = {};
 
-    this.filterGroup = '';
-
-    this.filterObu = '';
-
-    this.filterItemType = '';
-
-    this.filterEcoType = '';
+    this.filterDrafts = {};
 
     this.openFilterKey = null;
 
     this.page = 1;
 
+    this.selectedRow = null;
+
     this.load();
   }
 
 
-  get hasActiveFilters(): boolean {
+  get hasActiveFilters():
+    boolean {
 
-    return !!(
-      this.status ||
-      this.filterGroup ||
-      this.filterObu ||
-      this.filterItemType ||
-      this.filterEcoType
+    return (
+      Object.keys(
+        this.columnFilters
+      ).length > 0
     );
   }
 
@@ -468,18 +464,10 @@ export class EcoControlComponent
   // =====================================================
 
   isFilterableColumn(
-    column: EcoColumn,
+    _column: EcoColumn,
   ): boolean {
 
-    return [
-      'obu',
-      'group',
-      'item_type',
-      'eco_type',
-      'status',
-    ].includes(
-      column.key
-    );
+    return true;
   }
 
 
@@ -491,37 +479,27 @@ export class EcoControlComponent
     event.stopPropagation();
 
 
-    this.openFilterKey =
-      this.openFilterKey === columnKey
-        ? null
-        : columnKey;
-  }
+    if (
+      this.openFilterKey ===
+      columnKey
+    ) {
 
+      this.openFilterKey = null;
 
-  getFilterOptions(
-    columnKey: string,
-  ): readonly string[] {
-
-    switch (columnKey) {
-
-      case 'obu':
-        return OBU_OPTIONS;
-
-      case 'group':
-        return GROUP_OPTIONS;
-
-      case 'item_type':
-        return ITEM_TYPE_OPTIONS;
-
-      case 'eco_type':
-        return ECO_TYPE_OPTIONS;
-
-      case 'status':
-        return STATUS_OPTIONS;
-
-      default:
-        return [];
+      return;
     }
+
+
+    this.filterDrafts[
+      columnKey
+    ] =
+      this.columnFilters[
+        columnKey
+      ] ?? '';
+
+
+    this.openFilterKey =
+      columnKey;
   }
 
 
@@ -529,26 +507,157 @@ export class EcoControlComponent
     columnKey: string,
   ): string {
 
-    switch (columnKey) {
+    return (
+      this.columnFilters[
+        columnKey
+      ]
+      ??
+      ''
+    );
+  }
 
-      case 'obu':
-        return this.filterObu;
 
-      case 'group':
-        return this.filterGroup;
+  getFilterOptions(
+    columnKey: string,
+  ): readonly string[] {
 
-      case 'item_type':
-        return this.filterItemType;
+    const column =
+      this.columns.find(
+        item =>
+          item.key ===
+          columnKey
+      );
 
-      case 'eco_type':
-        return this.filterEcoType;
 
-      case 'status':
-        return this.status;
+    if (!column) {
 
-      default:
-        return '';
+      return [];
     }
+
+
+    if (
+      column.key ===
+      'month'
+    ) {
+
+      return (
+        this.monthFilterOptions
+      );
+    }
+
+
+    if (
+      column.key ===
+      'owner'
+      &&
+      this.ownerOptions.length > 0
+    ) {
+
+      return (
+        this.ownerOptions
+      );
+    }
+
+
+    if (
+      column.type ===
+      FIELD_TYPES.BOOL_YN
+      ||
+      column.type ===
+      FIELD_TYPES.CALC_BOOL
+    ) {
+
+      return (
+        YES_NO_OPTIONS
+      );
+    }
+
+
+    if (
+      column.options
+      &&
+      column.options.length > 0
+    ) {
+
+      return (
+        column.options
+      );
+    }
+
+
+    return [];
+  }
+
+
+  hasFilterOptions(
+    columnKey: string,
+  ): boolean {
+
+    return (
+      this.getFilterOptions(
+        columnKey
+      ).length > 0
+    );
+  }
+
+
+  getFilterInputType(
+    column: EcoColumn,
+  ): 'text' | 'date' | 'number' {
+
+    if (
+      column.type ===
+      FIELD_TYPES.DATE
+    ) {
+
+      return 'date';
+    }
+
+
+    if (
+      column.type ===
+      FIELD_TYPES.CALC_NUMBER
+      ||
+      column.key ===
+      'item'
+    ) {
+
+      return 'number';
+    }
+
+
+    return 'text';
+  }
+
+
+  getFilterPlaceholder(
+    column: EcoColumn,
+  ): string {
+
+    if (
+      column.type ===
+      FIELD_TYPES.DATE
+    ) {
+
+      return '';
+    }
+
+
+    if (
+      column.type ===
+      FIELD_TYPES.CALC_NUMBER
+      ||
+      column.key ===
+      'item'
+    ) {
+
+      return 'Digite o valor';
+    }
+
+
+    return (
+      `Buscar em ${column.label}`
+    );
   }
 
 
@@ -557,33 +666,140 @@ export class EcoControlComponent
     value: string,
   ): void {
 
-    switch (columnKey) {
+    const normalized =
+      String(
+        value ?? ''
+      ).trim();
 
-      case 'obu':
-        this.filterObu = value;
-        break;
 
-      case 'group':
-        this.filterGroup = value;
-        break;
+    if (normalized) {
 
-      case 'item_type':
-        this.filterItemType = value;
-        break;
+      this.columnFilters[
+        columnKey
+      ] = normalized;
 
-      case 'eco_type':
-        this.filterEcoType = value;
-        break;
+    } else {
 
-      case 'status':
-        this.status = value;
-        break;
+      delete this.columnFilters[
+        columnKey
+      ];
     }
+
+
+    this.filterDrafts[
+      columnKey
+    ] = normalized;
 
 
     this.openFilterKey = null;
 
     this.applyFilters();
+  }
+
+
+  applyColumnFilter(
+    columnKey: string,
+  ): void {
+
+    const value =
+      this.filterDrafts[
+        columnKey
+      ] ?? '';
+
+
+    this.setColumnFilter(
+      columnKey,
+      value,
+    );
+  }
+
+
+  clearColumnFilter(
+    columnKey: string,
+  ): void {
+
+    delete this.columnFilters[
+      columnKey
+    ];
+
+    delete this.filterDrafts[
+      columnKey
+    ];
+
+
+    this.openFilterKey = null;
+
+    this.applyFilters();
+  }
+
+
+  filterEmpty(
+    columnKey: string,
+  ): void {
+
+    this.setColumnFilter(
+      columnKey,
+      '__empty__',
+    );
+  }
+
+
+  filterNotEmpty(
+    columnKey: string,
+  ): void {
+
+    this.setColumnFilter(
+      columnKey,
+      '__not_empty__',
+    );
+  }
+
+
+  private columnFiltersParam():
+    string | undefined {
+
+    const activeFilters =
+      Object.fromEntries(
+
+        Object.entries(
+          this.columnFilters
+        )
+
+          .filter(
+            ([
+              key,
+              value,
+            ]) => {
+
+              return (
+                !!key
+                &&
+                value !== null
+                &&
+                value !== undefined
+                &&
+                String(
+                  value
+                ).trim() !== ''
+              );
+            }
+          )
+      );
+
+
+    if (
+      Object.keys(
+        activeFilters
+      ).length === 0
+    ) {
+
+      return undefined;
+    }
+
+
+    return JSON.stringify(
+      activeFilters
+    );
   }
 
 
@@ -1148,8 +1364,6 @@ export class EcoControlComponent
     }
 
 
-    // nenhuma alteração
-
     if (
       Object.keys(
         changes
@@ -1193,13 +1407,9 @@ export class EcoControlComponent
             false;
 
 
-          // atualiza drawer
-
           this.viewingRow =
             updated;
 
-
-          // atualiza tabela
 
           const row =
             this.rows.find(
@@ -1217,8 +1427,6 @@ export class EcoControlComponent
           }
 
 
-          // atualiza linha selecionada
-
           if (
             this.selectedRow?.id
             === id
@@ -1233,7 +1441,6 @@ export class EcoControlComponent
             false;
 
           this.drawerDraft = {};
-
 
           this.drawerSuccess =
             'Alterações salvas com sucesso.';
@@ -1286,15 +1493,18 @@ export class EcoControlComponent
 
           this.ownerOptions =
             items
+
               .map(
                 item =>
                   item.owner
               )
+
               .filter(
                 owner =>
                   !!owner
               );
         },
+
 
         error: error => {
 
@@ -1307,6 +1517,7 @@ export class EcoControlComponent
         },
       });
   }
+
 
   isOwnerColumn(
     column: EcoColumn,
@@ -1644,10 +1855,10 @@ export class EcoControlComponent
 
 
   // =====================================================
-  // EXPORTAÇÃO CSV
+  // EXPORTAÇÃO EXCEL
   // =====================================================
 
-  exportCsv(): void {
+  exportExcel(): void {
 
     if (
       this.exporting
@@ -1663,92 +1874,19 @@ export class EcoControlComponent
 
 
     this.api
-      .get<any>(
-        '/ecos',
+      .getBlob(
+        '/ecos/export',
         {
-
-          page: 1,
-
-          page_size: 500,
-
           search:
             this.search,
 
-          status:
-            this.status,
-
-          group:
-            this.filterGroup,
-
-          obu:
-            this.filterObu,
-
-          item_type:
-            this.filterItemType,
-
-          eco_type:
-            this.filterEcoType,
+          column_filters:
+            this.columnFiltersParam(),
         },
       )
       .subscribe({
 
-        next: response => {
-
-          const exportColumns =
-            this.visibleColumns;
-
-
-          const header =
-            exportColumns
-              .map(
-                column =>
-                  this.csvValue(
-                    column.label
-                  )
-              )
-              .join(';');
-
-
-          const lines =
-            response.items
-              .map(
-                (row: any) =>
-                  exportColumns
-                    .map(
-                      column =>
-                        this.csvValue(
-                          this.displayValue(
-                            row,
-                            column
-                          )
-                        )
-                    )
-                    .join(';')
-              );
-
-
-          const csv =
-            [
-              header,
-              ...lines,
-            ]
-              .join(
-                '\r\n'
-              );
-
-
-          const blob =
-            new Blob(
-              [
-                '\uFEFF',
-                csv,
-              ],
-              {
-                type:
-                  'text/csv;charset=utf-8;',
-              },
-            );
-
+        next: blob => {
 
           const url =
             URL.createObjectURL(
@@ -1762,12 +1900,38 @@ export class EcoControlComponent
             );
 
 
+          const now =
+            new Date();
+
+
+          const year =
+            now.getFullYear();
+
+
+          const month =
+            String(
+              now.getMonth() + 1
+            ).padStart(
+              2,
+              '0'
+            );
+
+
+          const day =
+            String(
+              now.getDate()
+            ).padStart(
+              2,
+              '0'
+            );
+
+
           link.href =
             url;
 
 
           link.download =
-            'eco-control.csv';
+            `ECO_CONTROL_${year}-${month}-${day}.xlsx`;
 
 
           document.body
@@ -1798,7 +1962,7 @@ export class EcoControlComponent
         error: error => {
 
           console.error(
-            'Erro ao exportar ECOs:',
+            'Erro ao exportar Excel:',
             error,
           );
 
@@ -1807,35 +1971,17 @@ export class EcoControlComponent
             false;
 
 
+          const detail =
+            error.error?.detail;
+
+
           this.cellError =
-            'Não foi possível exportar as ECOs.';
+            typeof detail ===
+            'string'
+              ? detail
+              : 'Não foi possível exportar as ECOs para Excel.';
         },
       });
-  }
-
-
-  private csvValue(
-    value: unknown,
-  ): string {
-
-    if (
-      value === null ||
-      value === undefined
-    ) {
-
-      return '""';
-    }
-
-
-    const text =
-      String(value)
-        .replace(
-          /"/g,
-          '""'
-        );
-
-
-    return `"${text}"`;
   }
 
 
@@ -1847,6 +1993,8 @@ export class EcoControlComponent
 
     if (
       this.page <= 1
+      ||
+      this.loading
     ) {
 
       return;
@@ -1855,8 +2003,7 @@ export class EcoControlComponent
 
     this.page--;
 
-    this.selectedRow =
-      null;
+    this.selectedRow = null;
 
     this.load();
   }
@@ -1867,6 +2014,8 @@ export class EcoControlComponent
     if (
       this.page >=
       this.pages()
+      ||
+      this.loading
     ) {
 
       return;
@@ -1875,8 +2024,7 @@ export class EcoControlComponent
 
     this.page++;
 
-    this.selectedRow =
-      null;
+    this.selectedRow = null;
 
     this.load();
   }
@@ -1889,7 +2037,7 @@ export class EcoControlComponent
       Math.ceil(
         this.total /
         this.pageSize
-      ),
+      )
     );
   }
 

@@ -43,6 +43,7 @@
 
       </div>
 
+
       <!-- LIMPAR FILTROS -->
 
       <button
@@ -88,6 +89,7 @@
             Colunas visíveis
           </div>
 
+
           <label
             class="column-picker-option"
             *ngFor="
@@ -119,7 +121,7 @@
         class="eco-toolbar-button"
         type="button"
         [disabled]="exporting"
-        (click)="exportCsv(); $event.stopPropagation()"
+        (click)="exportExcel(); $event.stopPropagation()"
       >
 
         <span aria-hidden="true">
@@ -129,7 +131,7 @@
         {{
           exporting
             ? 'Exportando...'
-            : 'Exportar CSV'
+            : 'Exportar Excel'
         }}
 
       </button>
@@ -149,9 +151,11 @@
           ＋
         </span>
 
+
         <ng-container *ngIf="creatingBelow">
           Adicionando...
         </ng-container>
+
 
         <ng-container
           *ngIf="
@@ -162,6 +166,7 @@
         >
           Adicionar abaixo do item {{ selectedItem }}
         </ng-container>
+
 
         <ng-container
           *ngIf="
@@ -368,30 +373,151 @@
                     </div>
 
 
-                    <!-- TODOS -->
+                    <!-- =============================================== -->
+                    <!-- CAMPO DE BUSCA PARA TEXTO / NÚMERO / DATA -->
+                    <!-- =============================================== -->
+
+                    <div
+                      *ngIf="
+                        !hasFilterOptions(
+                          column.key
+                        )
+                      "
+                      class="column-filter-input-wrapper"
+                    >
+
+                      <input
+                        class="column-filter-input"
+                        [type]="
+                          getFilterInputType(
+                            column
+                          )
+                        "
+                        [placeholder]="
+                          getFilterPlaceholder(
+                            column
+                          )
+                        "
+                        [(ngModel)]="
+                          filterDrafts[
+                            column.key
+                          ]
+                        "
+                        (keyup.enter)="
+                          applyColumnFilter(
+                            column.key
+                          )
+                        "
+                      >
+
+
+                      <button
+                        class="column-filter-apply-button"
+                        type="button"
+                        (click)="
+                          applyColumnFilter(
+                            column.key
+                          )
+                        "
+                      >
+                        Aplicar
+                      </button>
+
+                    </div>
+
+
+                    <!-- =============================================== -->
+                    <!-- OPÇÕES PRÉ-DEFINIDAS -->
+                    <!-- =============================================== -->
+
+                    <ng-container
+                      *ngIf="
+                        hasFilterOptions(
+                          column.key
+                        )
+                      "
+                    >
+
+                      <button
+                        *ngFor="
+                          let option
+                          of getFilterOptions(
+                            column.key
+                          )
+                        "
+                        class="column-filter-option"
+                        [class.selected]="
+                          getFilterValue(
+                            column.key
+                          )
+                          === option
+                        "
+                        type="button"
+                        (click)="
+                          setColumnFilter(
+                            column.key,
+                            option
+                          )
+                        "
+                      >
+
+                        <span>
+                          {{ option }}
+                        </span>
+
+
+                        <span
+                          class="filter-check"
+                          *ngIf="
+                            getFilterValue(
+                              column.key
+                            )
+                            === option
+                          "
+                        >
+                          ✓
+                        </span>
+
+                      </button>
+
+                    </ng-container>
+
+
+                    <!-- =============================================== -->
+                    <!-- VAZIOS / PREENCHIDOS -->
+                    <!-- =============================================== -->
+
+                    <div class="column-filter-separator"></div>
+
 
                     <button
                       class="column-filter-option"
                       [class.selected]="
-                        getFilterValue(column.key) === ''
+                        getFilterValue(
+                          column.key
+                        )
+                        === '__empty__'
                       "
                       type="button"
                       (click)="
-                        setColumnFilter(
-                          column.key,
-                          ''
+                        filterEmpty(
+                          column.key
                         )
                       "
                     >
 
                       <span>
-                        Todos
+                        Vazios
                       </span>
+
 
                       <span
                         class="filter-check"
                         *ngIf="
-                          getFilterValue(column.key) === ''
+                          getFilterValue(
+                            column.key
+                          )
+                          === '__empty__'
                         "
                       >
                         ✓
@@ -400,40 +526,63 @@
                     </button>
 
 
-                    <!-- OPÇÕES -->
-
                     <button
-                      *ngFor="
-                        let option of getFilterOptions(
-                          column.key
-                        )
-                      "
                       class="column-filter-option"
                       [class.selected]="
-                        getFilterValue(column.key)
-                        === option
+                        getFilterValue(
+                          column.key
+                        )
+                        === '__not_empty__'
                       "
                       type="button"
                       (click)="
-                        setColumnFilter(
-                          column.key,
-                          option
+                        filterNotEmpty(
+                          column.key
                         )
                       "
                     >
 
                       <span>
-                        {{ option }}
+                        Preenchidos
                       </span>
+
 
                       <span
                         class="filter-check"
                         *ngIf="
-                          getFilterValue(column.key)
-                          === option
+                          getFilterValue(
+                            column.key
+                          )
+                          === '__not_empty__'
                         "
                       >
                         ✓
+                      </span>
+
+                    </button>
+
+
+                    <!-- =============================================== -->
+                    <!-- LIMPAR -->
+                    <!-- =============================================== -->
+
+                    <button
+                      *ngIf="
+                        getFilterValue(
+                          column.key
+                        ) !== ''
+                      "
+                      class="column-filter-option column-filter-clear-option"
+                      type="button"
+                      (click)="
+                        clearColumnFilter(
+                          column.key
+                        )
+                      "
+                    >
+
+                      <span>
+                        Limpar filtro
                       </span>
 
                     </button>
@@ -725,6 +874,7 @@
                   -
                 </option>
 
+
                 <option
                   *ngFor="
                     let owner
@@ -970,6 +1120,7 @@
       (click)="$event.stopPropagation()"
     >
 
+
       <!-- ================================================= -->
       <!-- CABEÇALHO -->
       <!-- ================================================= -->
@@ -1011,6 +1162,7 @@
 
         <div class="details-header-actions">
 
+
           <!-- EDITAR -->
 
           <button
@@ -1025,11 +1177,13 @@
             aria-label="Editar ECO"
             (click)="startDrawerEdit()"
           >
+
             <span aria-hidden="true">
               ✎
             </span>
 
             Editar
+
           </button>
 
 
@@ -1290,6 +1444,7 @@
                     -
                   </option>
 
+
                   <option
                     *ngFor="
                       let owner
@@ -1386,11 +1541,11 @@
                     !isOwnerColumn(column)
                     &&
                     (
-                    column.type
-                    === fieldTypes.TEXT
-                    ||
-                    column.type
-                    === fieldTypes.MONO
+                      column.type
+                      === fieldTypes.TEXT
+                      ||
+                      column.type
+                      === fieldTypes.MONO
                     )
                   "
                   class="drawer-control"

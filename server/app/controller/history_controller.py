@@ -17,20 +17,23 @@ from app.utils.security import current_user
 router = APIRouter(prefix="/history", tags=["History"])
 
 CSV_COLUMNS = (
-    "id",
-    "eco_id",
-    "eco_code",
-    "item",
-    "field_key",
-    "field_label",
-    "old_value",
-    "new_value",
-    "user_email",
-    "user_name",
-    "action",
-    "created_at",
+    "DATA/HORA",
+    "USUÁRIO",
+    "E-MAIL",
+    "ECO",
+    "ITEM",
+    "AÇÃO",
+    "CAMPO ALTERADO",
+    "VALOR ANTERIOR",
+    "VALOR NOVO",
 )
 
+
+ACTION_LABELS = {
+    "created": "Criada",
+    "updated": "Alterada",
+    "deleted": "Excluída",
+}
 
 def _authorize_history(db: Session, user):
     if user.role == "admin":
@@ -94,6 +97,98 @@ def _serialize_history(item, hidden_fields):
     if record["created_at"]:
         record["created_at"] = record["created_at"].isoformat()
     return _filtered_snapshot(record, hidden_fields)
+
+def _format_csv_datetime(value):
+    if not value:
+        return ""
+
+    try:
+        parsed = datetime.fromisoformat(
+            value
+        )
+
+        return parsed.strftime(
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return str(value)
+
+
+def _safe_csv_value(value):
+    """
+    Evita que valores do histórico sejam interpretados
+    pelo Excel como fórmulas.
+    """
+
+    if value is None:
+        return ""
+
+    text = str(value)
+
+    if (
+        text.startswith("=")
+        or text.startswith("+")
+        or text.startswith("@")
+    ):
+        return "'" + text
+
+    return text
+
+
+def _history_csv_row(record):
+    return [
+        _format_csv_datetime(
+            record.get("created_at")
+        ),
+
+        _safe_csv_value(
+            record.get("user_name")
+            or record.get("user_email")
+            or ""
+        ),
+
+        _safe_csv_value(
+            record.get("user_email")
+            or ""
+        ),
+
+        _safe_csv_value(
+            record.get("eco_code")
+            or ""
+        ),
+
+        _safe_csv_value(
+            record.get("item")
+            if record.get("item") is not None
+            else ""
+        ),
+
+        ACTION_LABELS.get(
+            record.get("action"),
+            record.get("action")
+            or "",
+        ),
+
+        _safe_csv_value(
+            record.get("field_label")
+            or record.get("field_key")
+            or ""
+        ),
+
+        _safe_csv_value(
+            record.get("old_value")
+            or ""
+        ),
+
+        _safe_csv_value(
+            record.get("new_value")
+            or ""
+        ),
+    ]
 
 
 def _validated_pagination(page: int, page_size: int):
@@ -215,22 +310,64 @@ def export_history(
     repository = HistoryRepository(db)
 
     def csv_rows():
-        buffer = io.StringIO(newline="")
-        writer = csv.writer(buffer)
-        writer.writerow(CSV_COLUMNS)
-        yield "\ufeff" + buffer.getvalue()
+        buffer = io.StringIO(
+            newline=""
+        )
 
-        for item in repository.iter_filtered(**filters):
-            record = _serialize_history(item, hidden_fields)
+        writer = csv.writer(
+            buffer,
+            delimiter=";",
+            quotechar='"',
+            quoting=csv.QUOTE_MINIMAL,
+            lineterminator="\r\n",
+        )
+
+
+        # Cabeçalho
+        writer.writerow(
+            CSV_COLUMNS
+        )
+
+
+        # BOM UTF-8 para Excel reconhecer
+        # corretamente acentos.
+        yield (
+            "\ufeff"
+            +
+            buffer.getvalue()
+        )
+
+
+        for item in repository.iter_filtered(
+            **filters
+        ):
+
+            record = (
+                _serialize_history(
+                    item,
+                    hidden_fields,
+                )
+            )
+
+
             buffer.seek(0)
+
             buffer.truncate(0)
-            writer.writerow([record.get(column) for column in CSV_COLUMNS])
+
+
+            writer.writerow(
+                _history_csv_row(
+                    record
+                )
+            )
+
+
             yield buffer.getvalue()
 
     return StreamingResponse(
         csv_rows(),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": 'attachment; filename="eco-history.csv"'
+            "Content-Disposition": 'attachment; filename="historico-eco-control.csv"'
         },
     )

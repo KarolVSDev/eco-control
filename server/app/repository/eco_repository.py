@@ -22,10 +22,12 @@ class EcoRepository:
     # LISTAGEM
     # =========================================================
 
-    def list(
+        # =========================================================
+    # CONSULTA BASE
+    # =========================================================
+
+    def _build_query(
         self,
-        page=1,
-        page_size=50,
         search=None,
         status=None,
         month=None,
@@ -34,13 +36,22 @@ class EcoRepository:
         item_type=None,
         eco_type=None,
     ):
+        """
+        Monta a consulta base de ECOs.
+
+        Essa consulta é reutilizada por:
+
+        - listagem paginada;
+        - filtros;
+        - exportação XLSX.
+
+        Os filtros calculados, como GAP e AZ Gap,
+        serão tratados posteriormente no EcoService,
+        porque não existem como colunas físicas
+        no PostgreSQL.
+        """
 
         query = select(Eco)
-
-        count_query = (
-            select(func.count())
-            .select_from(Eco)
-        )
 
         filters = []
 
@@ -55,17 +66,21 @@ class EcoRepository:
                 f"%{search.strip()}%"
             )
 
+
             filters.append(
                 or_(
                     Eco.eco.ilike(
                         search_text
                     ),
+
                     Eco.owner.ilike(
                         search_text
                     ),
+
                     Eco.product.ilike(
                         search_text
                     ),
+
                     Eco.comments.ilike(
                         search_text
                     ),
@@ -74,48 +89,60 @@ class EcoRepository:
 
 
         # -----------------------------------------------------
-        # FILTROS
+        # FILTROS EXISTENTES
         # -----------------------------------------------------
 
         if status:
 
             filters.append(
-                Eco.status == status
+                Eco.status
+                ==
+                status.strip()
             )
 
 
         if month:
 
             filters.append(
-                Eco.month == month
+                Eco.month
+                ==
+                month.strip()
             )
 
 
         if group:
 
             filters.append(
-                Eco.group_name == group
+                Eco.group_name
+                ==
+                group.strip()
             )
 
 
         if obu:
 
             filters.append(
-                Eco.obu == obu
+                Eco.obu
+                ==
+                obu.strip()
             )
 
 
         if item_type:
 
             filters.append(
-                Eco.item_type == item_type
+                Eco.item_type
+                ==
+                item_type.strip()
             )
 
 
         if eco_type:
 
             filters.append(
-                Eco.eco_type == eco_type
+                Eco.eco_type
+                ==
+                eco_type.strip()
             )
 
 
@@ -129,16 +156,55 @@ class EcoRepository:
                 *filters
             )
 
-            count_query = (
-                count_query.where(
-                    *filters
-                )
+
+        return query
+
+
+    # =========================================================
+    # LISTAGEM PAGINADA
+    # =========================================================
+
+    def list(
+        self,
+        page=1,
+        page_size=50,
+        search=None,
+        status=None,
+        month=None,
+        group=None,
+        obu=None,
+        item_type=None,
+        eco_type=None,
+    ):
+
+        query = (
+            self._build_query(
+                search=search,
+                status=status,
+                month=month,
+                group=group,
+                obu=obu,
+                item_type=item_type,
+                eco_type=eco_type,
             )
+        )
 
 
         # -----------------------------------------------------
         # TOTAL
         # -----------------------------------------------------
+
+        count_query = (
+            select(
+                func.count()
+            )
+            .select_from(
+                query
+                .order_by(None)
+                .subquery()
+            )
+        )
+
 
         total = (
             self.db.scalar(
@@ -160,8 +226,11 @@ class EcoRepository:
                     Eco.item.desc(),
                 )
                 .offset(
-                    (page - 1)
-                    * page_size
+                    (
+                        page - 1
+                    )
+                    *
+                    page_size
                 )
                 .limit(
                     page_size
@@ -174,6 +243,58 @@ class EcoRepository:
         return (
             items,
             total,
+        )
+
+
+    # =========================================================
+    # LISTAGEM COMPLETA
+    # =========================================================
+
+    def list_all(
+        self,
+        search=None,
+        status=None,
+        month=None,
+        group=None,
+        obu=None,
+        item_type=None,
+        eco_type=None,
+    ):
+        """
+        Retorna todos os registros correspondentes
+        aos filtros, sem paginação.
+
+        Será utilizado para:
+
+        - filtros de campos calculados;
+        - exportação XLSX;
+        - geração de relatórios completos.
+
+        Não deve ser utilizado diretamente pelo
+        Angular para carregar toda a tabela.
+        """
+
+        query = (
+            self._build_query(
+                search=search,
+                status=status,
+                month=month,
+                group=group,
+                obu=obu,
+                item_type=item_type,
+                eco_type=eco_type,
+            )
+        )
+
+
+        return (
+            self.db.scalars(
+                query.order_by(
+                    Eco.position.desc(),
+                    Eco.item.desc(),
+                )
+            )
+            .all()
         )
 
 

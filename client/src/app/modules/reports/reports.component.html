@@ -1,70 +1,699 @@
 <div class="page">
-  <h1 class="title">Relatórios</h1>
-  <p class="subtitle">Auditoria completa das alterações realizadas nas ECOs.</p>
 
-  <div class="toolbar">
-    <input class="input" type="date" aria-label="Data inicial" [(ngModel)]="dateStart">
-    <input class="input" type="date" aria-label="Data final" [(ngModel)]="dateEnd">
-    <input class="input" placeholder="Usuário ou e-mail" [(ngModel)]="user">
-    <input class="input" placeholder="Campo" [(ngModel)]="field">
-    <select class="select" aria-label="Tipo de ação" [(ngModel)]="action">
-      <option value="">Todas as ações</option>
-      <option value="created">Criada</option>
-      <option value="updated">Alterada</option>
-      <option value="deleted">Excluída</option>
-    </select>
-    <input class="input" placeholder="ECO" [(ngModel)]="eco">
-    <input class="input" placeholder="Buscar no histórico" [(ngModel)]="search">
-    <button class="btn btn-primary" (click)="page=1;load()" [disabled]="loading">Filtrar</button>
-    <button class="btn btn-ghost" (click)="clear()" [disabled]="loading">Limpar</button>
-    <button class="btn btn-ghost" (click)="exportCsv()" [disabled]="exporting">
-      {{exporting ? 'Exportando...' : 'Exportar CSV'}}
+  <!-- =====================================================
+       CABEÇALHO
+       ===================================================== -->
+
+  <div class="reports-header">
+
+    <div>
+      <h1 class="title">
+        Relatórios
+      </h1>
+
+      <p class="subtitle">
+        Auditoria completa das alterações realizadas nas ECOs.
+      </p>
+    </div>
+
+
+    <div class="history-total">
+      <span>Registros encontrados</span>
+
+      <strong>
+        {{ total }}
+      </strong>
+    </div>
+
+  </div>
+
+
+  <!-- =====================================================
+       FILTROS
+       ===================================================== -->
+
+  <section class="card filters-card">
+
+    <div class="filters-header">
+
+      <div>
+        <h2>
+          Filtros
+        </h2>
+
+        <p>
+          Refine os registros exibidos no histórico.
+        </p>
+      </div>
+
+    </div>
+
+
+    <div class="filters-grid">
+
+      <!-- Data inicial -->
+
+      <div class="filter-field">
+
+        <label for="dateStart">
+          Data inicial
+        </label>
+
+        <input
+          id="dateStart"
+          class="input"
+          type="date"
+          [(ngModel)]="dateStart"
+          (keyup.enter)="applyFilters()"
+        >
+
+      </div>
+
+
+      <!-- Data final -->
+
+      <div class="filter-field">
+
+        <label for="dateEnd">
+          Data final
+        </label>
+
+        <input
+          id="dateEnd"
+          class="input"
+          type="date"
+          [(ngModel)]="dateEnd"
+          (keyup.enter)="applyFilters()"
+        >
+
+      </div>
+
+
+      <!-- Usuário -->
+
+      <div class="filter-field">
+
+        <label for="historyUser">
+          Usuário
+        </label>
+
+        <input
+          id="historyUser"
+          class="input"
+          type="text"
+          placeholder="Nome ou e-mail"
+          [(ngModel)]="user"
+          (keyup.enter)="applyFilters()"
+        >
+
+      </div>
+
+
+      <!-- Campo alterado -->
+
+      <div class="filter-field">
+
+        <label for="historyField">
+          Campo alterado
+        </label>
+
+        <input
+          id="historyField"
+          class="input"
+          type="text"
+          placeholder="Ex.: STATUS"
+          [(ngModel)]="field"
+          (keyup.enter)="applyFilters()"
+        >
+
+      </div>
+
+
+      <!-- Tipo de ação -->
+
+      <div class="filter-field">
+
+        <label for="historyAction">
+          Tipo de ação
+        </label>
+
+        <select
+          id="historyAction"
+          class="select"
+          [(ngModel)]="action"
+        >
+
+          <option value="">
+            Todas as ações
+          </option>
+
+          <option value="created">
+            Criada
+          </option>
+
+          <option value="updated">
+            Alterada
+          </option>
+
+          <option value="deleted">
+            Excluída
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <!-- ECO -->
+
+      <div class="filter-field">
+
+        <label for="historyEco">
+          ECO
+        </label>
+
+        <input
+          id="historyEco"
+          class="input"
+          type="text"
+          placeholder="Código da ECO"
+          [(ngModel)]="eco"
+          (keyup.enter)="applyFilters()"
+        >
+
+      </div>
+
+
+      <!-- Busca textual -->
+
+      <div class="filter-field filter-search">
+
+        <label for="historySearch">
+          Busca textual
+        </label>
+
+        <input
+          id="historySearch"
+          class="input"
+          type="search"
+          placeholder="Buscar usuário, campo, valor, ECO..."
+          [(ngModel)]="search"
+          (keyup.enter)="applyFilters()"
+        >
+
+      </div>
+
+    </div>
+
+
+    <!-- Erro de validação -->
+
+    <div
+      class="validation-message"
+      *ngIf="validationError"
+      role="alert"
+    >
+      {{ validationError }}
+    </div>
+
+
+    <!-- Ações dos filtros -->
+
+    <div class="filter-actions">
+
+      <button
+        class="btn btn-primary"
+        type="button"
+        [disabled]="loading"
+        (click)="applyFilters()"
+      >
+
+        <span *ngIf="!loading">
+          Filtrar
+        </span>
+
+        <span *ngIf="loading">
+          Carregando...
+        </span>
+
+      </button>
+
+
+      <button
+        class="btn btn-ghost"
+        type="button"
+        [disabled]="loading"
+        (click)="clear()"
+      >
+        Limpar
+      </button>
+
+
+      <button
+        class="btn btn-ghost export-button"
+        type="button"
+        [disabled]="
+          exporting ||
+          loading
+        "
+        (click)="exportCsv()"
+      >
+
+        {{
+          exporting
+            ? 'Exportando...'
+            : 'Exportar CSV'
+        }}
+
+      </button>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       ERRO DA API
+       ===================================================== -->
+
+  <div
+    class="history-error"
+    *ngIf="
+      error &&
+      !loading
+    "
+    role="alert"
+  >
+
+    <div class="history-error-text">
+
+      <strong>
+        Não foi possível concluir a operação
+      </strong>
+
+      <span>
+        {{ error }}
+      </span>
+
+    </div>
+
+
+    <button
+      class="btn btn-ghost"
+      type="button"
+      (click)="retry()"
+    >
+      Tentar novamente
     </button>
+
   </div>
 
-  <p *ngIf="error" role="alert">{{error}}</p>
 
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Data/Hora</th>
-          <th>Usuário</th>
-          <th>ECO</th>
-          <th>Ação</th>
-          <th>Campo</th>
-          <th>Anterior</th>
-          <th>Novo</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let row of rows">
-          <td class="mono">{{row.created_at|date:'dd/MM/yyyy, HH:mm:ss'}}</td>
-          <td>{{row.user_name||row.user_email}}</td>
-          <td class="mono danger">{{row.eco_code||('#'+row.item)}}</td>
-          <td>{{actionLabel(row.action)}}</td>
-          <td><b>{{row.field_label}}</b></td>
-          <td class="muted">{{row.old_value||'—'}}</td>
-          <td class="danger">{{row.new_value||'—'}}</td>
-        </tr>
-        <tr *ngIf="!loading && rows.length === 0">
-          <td colspan="7">Nenhum registro encontrado.</td>
-        </tr>
-        <tr *ngIf="loading">
-          <td colspan="7">Carregando histórico...</td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- =====================================================
+       TABELA / HISTÓRICO
+       ===================================================== -->
+
+  <section class="card history-card">
+
+    <div class="history-card-header">
+
+      <div>
+
+        <h2>
+          Histórico de alterações
+        </h2>
+
+        <p>
+          Registro das alterações realizadas nas ECOs.
+        </p>
+
+      </div>
+
+
+      <span class="history-count">
+        {{ total }}
+        {{
+          total === 1
+            ? 'registro'
+            : 'registros'
+        }}
+      </span>
+
+    </div>
+
+
+    <!-- Loading -->
+
+    <div
+      class="history-loading"
+      *ngIf="loading"
+    >
+
+      <div class="history-spinner"></div>
+
+      <span>
+        Carregando histórico...
+      </span>
+
+    </div>
+
+
+    <!-- Tabela -->
+
+    <div
+      class="table-wrap history-table-wrap"
+      *ngIf="!loading"
+    >
+
+      <table class="table history-table">
+
+        <thead>
+
+          <tr>
+
+            <th>
+              Data/Hora
+            </th>
+
+            <th>
+              Usuário
+            </th>
+
+            <th>
+              ECO
+            </th>
+
+            <th>
+              ITEM
+            </th>
+
+            <th>
+              Ação
+            </th>
+
+            <th>
+              Campo alterado
+            </th>
+
+            <th>
+              Valor anterior
+            </th>
+
+            <th>
+              Valor novo
+            </th>
+
+          </tr>
+
+        </thead>
+
+
+        <tbody>
+
+          <tr
+            *ngFor="let row of rows"
+          >
+
+            <!-- Data/Hora -->
+
+            <td class="mono date-cell">
+
+              {{
+                row.created_at
+                  | date:
+                    'dd/MM/yyyy, HH:mm:ss'
+              }}
+
+            </td>
+
+
+            <!-- Usuário -->
+
+            <td class="user-cell">
+
+              <strong>
+                {{ userLabel(row) }}
+              </strong>
+
+
+              <small
+                *ngIf="
+                  row.user_name &&
+                  row.user_email
+                "
+              >
+                {{ row.user_email }}
+              </small>
+
+            </td>
+
+
+            <!-- ECO -->
+
+            <td class="mono eco-cell">
+
+              {{ ecoLabel(row) }}
+
+            </td>
+
+
+            <!-- ITEM -->
+
+            <td class="mono item-cell">
+
+              {{ itemLabel(row) }}
+
+            </td>
+
+
+            <!-- Ação -->
+
+            <td>
+
+              <span
+                class="action-badge"
+                [class.action-created]="
+                  row.action === 'created'
+                "
+                [class.action-updated]="
+                  row.action === 'updated'
+                "
+                [class.action-deleted]="
+                  row.action === 'deleted'
+                "
+              >
+
+                {{ actionLabel(row.action) }}
+
+              </span>
+
+            </td>
+
+
+            <!-- Campo -->
+
+            <td class="field-cell">
+
+              <strong
+                [title]="
+                  row.field_label ||
+                  row.field_key
+                "
+              >
+
+                {{
+                  row.field_label ||
+                  row.field_key ||
+                  '—'
+                }}
+
+              </strong>
+
+            </td>
+
+
+            <!-- Valor anterior -->
+
+            <td
+              class="value-cell old-value"
+              [title]="
+                historyValue(
+                  row.old_value
+                )
+              "
+            >
+
+              {{
+                historyValue(
+                  row.old_value
+                )
+              }}
+
+            </td>
+
+
+            <!-- Valor novo -->
+
+            <td
+              class="value-cell new-value"
+              [title]="
+                historyValue(
+                  row.new_value
+                )
+              "
+            >
+
+              {{
+                historyValue(
+                  row.new_value
+                )
+              }}
+
+            </td>
+
+          </tr>
+
+
+          <!-- Nenhum resultado -->
+
+          <tr
+            *ngIf="
+              rows.length === 0
+            "
+          >
+
+            <td
+              colspan="8"
+              class="history-empty-cell"
+            >
+
+              <div class="history-empty">
+
+                <strong>
+                  Nenhum registro encontrado
+                </strong>
+
+                <span>
+                  Altere os filtros e tente novamente.
+                </span>
+
+              </div>
+
+            </td>
+
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       PAGINAÇÃO
+       ===================================================== -->
+
+  <div
+    class="pagination"
+    *ngIf="
+      !loading
+    "
+  >
+
+    <div class="pagination-info">
+
+      <span>
+        Página
+        <strong>{{ page }}</strong>
+        de
+        <strong>{{ pages() }}</strong>
+      </span>
+
+
+      <span class="pagination-separator">
+        ·
+      </span>
+
+
+      <span>
+        {{ total }}
+        {{
+          total === 1
+            ? 'registro'
+            : 'registros'
+        }}
+      </span>
+
+    </div>
+
+
+    <div class="pagination-actions">
+
+      <button
+        class="btn btn-ghost"
+        type="button"
+        [disabled]="
+          page <= 1 ||
+          loading
+        "
+        (click)="previousPage()"
+      >
+        Anterior
+      </button>
+
+
+      <label
+        class="page-size"
+        for="pageSize"
+      >
+
+        <span>
+          Exibir
+        </span>
+
+
+        <select
+          id="pageSize"
+          class="select"
+          [(ngModel)]="pageSize"
+          [disabled]="loading"
+          (change)="changePageSize()"
+        >
+
+          <option [ngValue]="20">
+            20
+          </option>
+
+          <option [ngValue]="50">
+            50
+          </option>
+
+          <option [ngValue]="100">
+            100
+          </option>
+
+        </select>
+
+      </label>
+
+
+      <button
+        class="btn btn-ghost"
+        type="button"
+        [disabled]="
+          page >= pages() ||
+          loading
+        "
+        (click)="nextPage()"
+      >
+        Próxima
+      </button>
+
+    </div>
+
   </div>
 
-  <div class="toolbar" style="justify-content:center">
-    <button class="btn btn-ghost" [disabled]="page<=1 || loading" (click)="page=page-1;load()">Anterior</button>
-    <span>Página {{page}} de {{pages()}} · {{total}} registros</span>
-    <select class="select" aria-label="Registros por página" [(ngModel)]="pageSize" (change)="page=1;load()">
-      <option [ngValue]="20">20</option>
-      <option [ngValue]="50">50</option>
-      <option [ngValue]="100">100</option>
-    </select>
-    <button class="btn btn-ghost" [disabled]="page>=pages() || loading" (click)="page=page+1;load()">Próxima</button>
-  </div>
 </div>
