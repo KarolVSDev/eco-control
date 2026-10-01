@@ -338,6 +338,7 @@ export class EcoControlComponent
 
         next: response => {
 
+
           this.rows =
             response.items;
 

@@ -763,9 +763,8 @@
                       row[column.key]
                     )
                   "
-                  [value]="
-                    row[column.key] ?? ''
-                  "
+                  [ngModel]="row[column.key] ?? ''"
+                  [ngModelOptions]="{ standalone: true }"
                   [disabled]="
                     isCellSaving(
                       row,
@@ -852,9 +851,8 @@
                   isColumnEditable(column)
                 "
                 class="inline-control inline-select"
-                [value]="
-                  row[column.key] ?? ''
-                "
+                [ngModel]="row[column.key] ?? ''"
+                [ngModelOptions]="{ standalone: true }"
                 [disabled]="
                   isCellSaving(
                     row,
@@ -907,9 +905,8 @@
                   )
                 "
                 class="inline-control inline-select"
-                [value]="
-                  row[column.key] ?? ''
-                "
+                [ngModel]="row[column.key] ?? ''"
+                [ngModelOptions]="{ standalone: true }"
                 [disabled]="
                   isCellSaving(
                     row,
