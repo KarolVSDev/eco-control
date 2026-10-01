@@ -13,9 +13,11 @@ import xlsxwriter
 from fastapi import (
     APIRouter,
     Depends,
+    File,
     HTTPException,
     Query,
     Response,
+    UploadFile,
     status,
 )
 
@@ -34,6 +36,9 @@ from app.schemas.eco import (
 
 from app.services.eco_service import (
     EcoService,
+)
+from app.services.eco_import_service import (
+    EcoImportService,
 )
 
 from app.utils.security import (
@@ -1105,6 +1110,288 @@ def list_ecos(
         "page_size": page_size,
     }
 
+# =========================================================
+# PREVIEW DE IMPORTAÇÃO XLSX
+# =========================================================
+
+@router.post(
+    "/import/preview",
+)
+async def preview_eco_import(
+    file: UploadFile = File(
+        ...
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    user=Depends(
+        current_user
+    ),
+):
+    """
+    Analisa uma planilha XLSX antes da importação.
+
+    IMPORTANTE:
+
+    - nenhuma ECO é criada;
+    - nenhuma ECO é atualizada;
+    - nenhuma alteração é persistida no banco.
+
+    A planilha precisa possuir a aba CTRL GERAL.
+    """
+
+    filename = (
+        file.filename
+        or ""
+    )
+
+
+    # -----------------------------------------------------
+    # EXTENSÃO
+    # -----------------------------------------------------
+
+    if not (
+        filename
+        .lower()
+        .endswith(
+            ".xlsx"
+        )
+    ):
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Formato inválido. "
+                "Envie um arquivo .xlsx."
+            ),
+        )
+
+
+    # -----------------------------------------------------
+    # LEITURA
+    # -----------------------------------------------------
+
+    try:
+
+        content = (
+            await file.read()
+        )
+
+
+    except Exception:
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Não foi possível ler "
+                "o arquivo enviado."
+            ),
+        )
+
+
+    finally:
+
+        await file.close()
+
+
+    # -----------------------------------------------------
+    # ARQUIVO VAZIO
+    # -----------------------------------------------------
+
+    if not content:
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "O arquivo enviado está vazio."
+            ),
+        )
+
+
+    # -----------------------------------------------------
+    # LIMITE DE TAMANHO
+    #
+    # 25 MB é mais que suficiente para a
+    # CTRL GERAL atual e evita uploads
+    # excessivamente grandes.
+    # -----------------------------------------------------
+
+    max_size = (
+        25
+        * 1024
+        * 1024
+    )
+
+
+    if len(content) > max_size:
+
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "O arquivo excede o limite "
+                "máximo de 25 MB."
+            ),
+        )
+
+
+    # -----------------------------------------------------
+    # PREVIEW
+    # -----------------------------------------------------
+
+    service = (
+        EcoImportService(
+            db,
+            user,
+        )
+    )
+
+
+    return service.preview(
+        content,
+        filename,
+    )
+
+
+# =========================================================
+# IMPORTAR XLSX
+# =========================================================
+
+@router.post(
+    "/import",
+)
+async def import_ecos(
+    file: UploadFile = File(
+        ...
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    user=Depends(
+        current_user
+    ),
+):
+    """
+    Importa novas ECOs de uma planilha XLSX.
+
+    A operação é transacional:
+
+    - ERROR cancela todo o lote;
+    - DUPLICATE é ignorado;
+    - somente NEW é gravado.
+    """
+
+    filename = (
+        file.filename
+        or ""
+    )
+
+
+    # -----------------------------------------------------
+    # EXTENSÃO
+    # -----------------------------------------------------
+
+    if not (
+        filename
+        .lower()
+        .endswith(
+            ".xlsx"
+        )
+    ):
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Formato inválido. "
+                "Envie um arquivo .xlsx."
+            ),
+        )
+
+
+    # -----------------------------------------------------
+    # LEITURA
+    # -----------------------------------------------------
+
+    try:
+
+        content = (
+            await file.read()
+        )
+
+
+    except Exception:
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Não foi possível ler "
+                "o arquivo enviado."
+            ),
+        )
+
+
+    finally:
+
+        await file.close()
+
+
+    # -----------------------------------------------------
+    # ARQUIVO VAZIO
+    # -----------------------------------------------------
+
+    if not content:
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "O arquivo enviado está vazio."
+            ),
+        )
+
+
+    # -----------------------------------------------------
+    # LIMITE
+    # -----------------------------------------------------
+
+    max_size = (
+        25
+        * 1024
+        * 1024
+    )
+
+
+    if len(
+        content
+    ) > max_size:
+
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "O arquivo excede o limite "
+                "máximo de 25 MB."
+            ),
+        )
+
+
+    # -----------------------------------------------------
+    # IMPORTAÇÃO
+    # -----------------------------------------------------
+
+    service = (
+        EcoImportService(
+            db,
+            user,
+        )
+    )
+
+
+    return service.import_file(
+        content,
+        filename,
+    )
 
 # =========================================================
 # EXPORTAR XLSX
@@ -1296,6 +1583,26 @@ def update_eco(
 # =========================================================
 # EXCLUIR ECO
 # =========================================================
+
+@router.delete(
+    "/bulk/all",
+)
+def delete_all_ecos(
+    db: Session = Depends(
+        get_db
+    ),
+
+    user=Depends(
+        current_user
+    ),
+):
+    service = EcoService(
+        db,
+        user,
+    )
+
+    return service.delete_all()
+
 
 @router.delete(
     "/{eco_id}",

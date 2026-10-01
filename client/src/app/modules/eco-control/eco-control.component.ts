@@ -72,6 +72,9 @@ export class EcoControlComponent
 
   ownerOptions: string[] = [];
 
+  ownerGroupMap:
+    Record<string, string> = {};
+
 
   // =====================================================
   // ESTADOS
@@ -86,6 +89,29 @@ export class EcoControlComponent
   exporting = false;
 
   creatingBelow = false;
+
+  deletingAll = false;
+
+
+  // =====================================================
+  // IMPORTAÇÃO XLSX
+  // =====================================================
+
+  importModalOpen = false;
+
+  importFile: File | null = null;
+
+  importPreview: any = null;
+
+  importResult: any = null;
+
+  previewingImport = false;
+
+  importingFile = false;
+
+  importError = '';
+
+  importSuccess = '';
 
 
   // =====================================================
@@ -337,6 +363,7 @@ export class EcoControlComponent
       .subscribe({
 
         next: response => {
+
 
           this.rows =
             response.items;
@@ -1233,6 +1260,28 @@ export class EcoControlComponent
     this.drawerDraft[
       column.key
     ] = value;
+
+
+    if (
+      column.key === 'owner'
+    ) {
+
+      const owner = String(
+        value ?? ''
+      ).trim();
+
+      const mappedGroup =
+        this.ownerGroupMap[
+          owner
+        ];
+
+      if (mappedGroup) {
+
+        this.drawerDraft[
+          'group'
+        ] = mappedGroup;
+      }
+    }
   }
 
 
@@ -1503,6 +1552,24 @@ export class EcoControlComponent
                 owner =>
                   !!owner
               );
+
+
+          this.ownerGroupMap =
+            Object.fromEntries(
+              items
+                .filter(
+                  item =>
+                    !!item.owner
+                    &&
+                    !!item.group
+                )
+                .map(
+                  item => [
+                    item.owner,
+                    item.group,
+                  ]
+                )
+            );
         },
 
 
@@ -1514,6 +1581,8 @@ export class EcoControlComponent
           );
 
           this.ownerOptions = [];
+
+          this.ownerGroupMap = {};
         },
       });
   }
@@ -1851,6 +1920,279 @@ export class EcoControlComponent
               : 'Não foi possível excluir a ECO.';
         },
       });
+  }
+
+
+  // =====================================================
+  // EXCLUIR TODAS AS ECOS
+  // =====================================================
+
+  deleteAllEcos(): void {
+
+    if (
+      !this.permissions.isAdmin
+      ||
+      this.deletingAll
+      ||
+      this.total === 0
+    ) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Tem certeza que deseja excluir todas as ${this.total} ECOs?\n\n`
+        +
+        'Esta ação não poderá ser desfeita.'
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const confirmation =
+      window.prompt(
+        'Para confirmar, digite:\n\nEXCLUIR TUDO'
+      );
+
+    if (
+      confirmation !==
+      'EXCLUIR TUDO'
+    ) {
+      return;
+    }
+
+    this.deletingAll = true;
+    this.cellError = '';
+
+    this.api
+      .delete<{
+        deleted_rows: number;
+      }>(
+        '/ecos/bulk/all'
+      )
+      .subscribe({
+        next: response => {
+          this.deletingAll = false;
+          this.selectedRow = null;
+          this.viewingRow = null;
+          this.page = 1;
+
+          console.log(
+            `${response.deleted_rows} ECOs excluídas.`
+          );
+
+          this.load();
+        },
+        error: error => {
+          console.error(
+            'Erro ao excluir todas as ECOs:',
+            error,
+          );
+
+          this.deletingAll = false;
+
+          const detail = error?.error?.detail;
+          this.cellError = (
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível excluir todas as ECOs.'
+          );
+        },
+      });
+  }
+
+
+  // =====================================================
+  // IMPORTAÇÃO XLSX - ABRIR
+  // =====================================================
+
+  openImportModal(): void {
+
+    if (
+      !this.permissions.canBulkEdit
+    ) {
+      return;
+    }
+
+    this.importModalOpen = true;
+
+    this.importFile = null;
+    this.importPreview = null;
+    this.importResult = null;
+
+    this.importError = '';
+    this.importSuccess = '';
+  }
+
+
+  closeImportModal(): void {
+
+    if (
+      this.previewingImport
+      ||
+      this.importingFile
+    ) {
+      return;
+    }
+
+    this.importModalOpen = false;
+    this.importFile = null;
+    this.importPreview = null;
+    this.importResult = null;
+    this.importError = '';
+    this.importSuccess = '';
+  }
+
+
+  onImportFileSelected(
+    event: Event,
+  ): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    this.importFile = null;
+    this.importPreview = null;
+    this.importResult = null;
+    this.importError = '';
+    this.importSuccess = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      this.importError = 'Formato inválido. Envie um arquivo .xlsx.';
+      input.value = '';
+      return;
+    }
+
+    if (file.size === 0) {
+      this.importError = 'O arquivo enviado está vazio.';
+      input.value = '';
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      this.importError = 'O arquivo excede o limite máximo de 25 MB.';
+      input.value = '';
+      return;
+    }
+
+    this.importFile = file;
+  }
+
+
+  previewImport(): void {
+
+    if (
+      !this.importFile
+      ||
+      this.previewingImport
+      ||
+      !this.permissions.canBulkEdit
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+
+    this.previewingImport = true;
+    this.importError = '';
+    this.importSuccess = '';
+
+    this.api
+      .post<any>(
+        '/ecos/import/preview',
+        formData,
+      )
+      .subscribe({
+        next: response => {
+          this.importPreview = response;
+          this.previewingImport = false;
+        },
+        error: error => {
+          console.error(
+            'Erro ao analisar planilha:',
+            error,
+          );
+          this.importError = this.importErrorMessage(
+            error,
+            'Não foi possível analisar a planilha.',
+          );
+          this.previewingImport = false;
+        },
+      });
+  }
+
+
+  confirmImport(): void {
+
+    if (
+      !this.importFile
+      ||
+      !this.importPreview?.can_import
+      ||
+      this.importingFile
+      ||
+      !this.permissions.canBulkEdit
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+
+    this.importingFile = true;
+    this.importError = '';
+    this.importSuccess = '';
+
+    this.api
+      .post<any>(
+        '/ecos/import',
+        formData,
+      )
+      .subscribe({
+        next: response => {
+          this.importResult = response;
+          this.importPreview = null;
+          this.importSuccess = (
+            `${response.imported_rows} ECO(s) importada(s) com sucesso.`
+          );
+          this.importingFile = false;
+          this.load();
+        },
+        error: error => {
+          console.error(
+            'Erro ao importar planilha:',
+            error,
+          );
+          this.importError = this.importErrorMessage(
+            error,
+            'Não foi possível importar a planilha.',
+          );
+          this.importingFile = false;
+        },
+      });
+  }
+
+
+  private importErrorMessage(
+    error: any,
+    fallback: string,
+  ): string {
+    const detail = error?.error?.detail;
+
+    if (typeof detail === 'string') {
+      return detail;
+    }
+
+    if (typeof detail?.message === 'string') {
+      return detail.message;
+    }
+
+    return fallback;
   }
 
 

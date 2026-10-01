@@ -222,8 +222,8 @@ class EcoRepository:
             self.db.scalars(
                 query
                 .order_by(
-                    Eco.position.desc(),
                     Eco.item.desc(),
+                    Eco.position.desc(),
                 )
                 .offset(
                     (
@@ -290,8 +290,8 @@ class EcoRepository:
         return (
             self.db.scalars(
                 query.order_by(
-                    Eco.position.desc(),
                     Eco.item.desc(),
+                    Eco.position.desc(),
                 )
             )
             .all()

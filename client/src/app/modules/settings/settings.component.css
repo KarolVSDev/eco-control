@@ -345,6 +345,13 @@
   color: #fff;
 }
 
+.settings-icon-button svg {
+  width: 15px;
+  height: 15px;
+
+  fill: currentColor;
+}
+
 .settings-icon-button.delete:hover {
   background: rgba(237, 23, 76, 0.12);
 
