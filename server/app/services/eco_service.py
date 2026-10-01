@@ -1,4 +1,7 @@
-from datetime import datetime
+from datetime import (
+    date,
+    datetime,
+)
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -306,34 +309,495 @@ class EcoService:
                 )
             )
 
-
+        # =========================================================
+    # FILTROS GENÉRICOS DE COLUNA
     # =========================================================
+
+    @staticmethod
+    def _normalize_filter_text(
+        value,
+    ) -> str:
+
+        if value is None:
+            return ""
+
+
+        if isinstance(
+            value,
+            bool,
+        ):
+            return (
+                "yes"
+                if value
+                else "no"
+            )
+
+
+        if isinstance(
+            value,
+            datetime,
+        ):
+            return (
+                value
+                .date()
+                .isoformat()
+                .casefold()
+            )
+
+
+        if isinstance(
+            value,
+            date,
+        ):
+            return (
+                value
+                .isoformat()
+                .casefold()
+            )
+
+
+        return (
+            " ".join(
+                str(value)
+                .split()
+            )
+            .casefold()
+        )
+
+
+    def _matches_column_filter(
+        self,
+        row: dict,
+        column_key: str,
+        expected,
+    ) -> bool:
+
+        # ---------------------------------------------
+        # aliases externos
+        # ---------------------------------------------
+
+        key = (
+            "group"
+            if column_key
+            == "group_name"
+            else column_key
+        )
+
+
+        # ---------------------------------------------
+        # campo não disponível
+        #
+        # Isso também respeita can_view:
+        # se serialize() removeu o campo,
+        # ele não pode ser usado para inferir dados.
+        # ---------------------------------------------
+
+        if key not in row:
+            return False
+
+
+        actual = row.get(
+            key
+        )
+
+
+        expected_text = (
+            self._normalize_filter_text(
+                expected
+            )
+        )
+
+
+        # ---------------------------------------------
+        # sem filtro
+        # ---------------------------------------------
+
+        if not expected_text:
+            return True
+
+
+        # ---------------------------------------------
+        # filtrar valores vazios
+        # ---------------------------------------------
+
+        if (
+            expected_text
+            == "__empty__"
+        ):
+
+            return (
+                actual is None
+                or
+                self._normalize_filter_text(
+                    actual
+                )
+                in {
+                    "",
+                    "-",
+                }
+            )
+
+
+        # ---------------------------------------------
+        # filtrar valores preenchidos
+        # ---------------------------------------------
+
+        if (
+            expected_text
+            == "__not_empty__"
+        ):
+
+            return not (
+                actual is None
+                or
+                self._normalize_filter_text(
+                    actual
+                )
+                in {
+                    "",
+                    "-",
+                }
+            )
+
+
+        # ---------------------------------------------
+        # boolean
+        #
+        # No Angular é exibido:
+        # True  -> YES
+        # False -> NO
+        # ---------------------------------------------
+
+        if isinstance(
+            actual,
+            bool,
+        ):
+
+            aliases = {
+                True: {
+                    "yes",
+                    "true",
+                    "1",
+                    "sim",
+                },
+
+                False: {
+                    "no",
+                    "false",
+                    "0",
+                    "não",
+                    "nao",
+                },
+            }
+
+
+            return (
+                expected_text
+                in aliases[
+                    actual
+                ]
+            )
+
+
+        # ---------------------------------------------
+        # números
+        #
+        # ITEM = 31 não deve casar com 310.
+        # AZ GAP = 15 não deve casar com 115.
+        # ---------------------------------------------
+
+        if isinstance(
+            actual,
+            (
+                int,
+                float,
+            ),
+        ):
+
+            return (
+                self._normalize_filter_text(
+                    actual
+                )
+                ==
+                expected_text
+            )
+
+
+        # ---------------------------------------------
+        # datas
+        # ---------------------------------------------
+
+        if isinstance(
+            actual,
+            (
+                date,
+                datetime,
+            ),
+        ):
+
+            return (
+                self._normalize_filter_text(
+                    actual
+                )
+                ==
+                expected_text
+            )
+
+
+        # ---------------------------------------------
+        # texto
+        #
+        # OWNER = "Ana" encontra:
+        # "Ana Souza"
+        #
+        # COMMENTS = "motor" encontra:
+        # "Ajuste do motor realizado"
+        # ---------------------------------------------
+
+        actual_text = (
+            self._normalize_filter_text(
+                actual
+            )
+        )
+
+
+        return (
+            expected_text
+            in actual_text
+        )
+
+
+    def _apply_column_filters(
+        self,
+        rows: list[dict],
+        column_filters:
+            dict[str, str]
+            | None,
+    ) -> list[dict]:
+
+        if not column_filters:
+            return rows
+
+
+        active_filters = {
+
+            key: value
+
+            for (
+                key,
+                value,
+            )
+            in column_filters.items()
+
+            if (
+                key
+                and
+                value is not None
+                and
+                str(value).strip()
+            )
+        }
+
+
+        if not active_filters:
+            return rows
+
+
+        filtered = []
+
+
+        for row in rows:
+
+            matches = all(
+
+                self
+                ._matches_column_filter(
+                    row,
+                    key,
+                    value,
+                )
+
+                for (
+                    key,
+                    value,
+                )
+                in active_filters.items()
+            )
+
+
+            if matches:
+                filtered.append(
+                    row
+                )
+
+
+        return filtered
+        # =========================================================
     # LISTAGEM
     # =========================================================
 
     def list(
         self,
+        page=1,
+        page_size=50,
+        column_filters=None,
         **kwargs,
     ):
 
-        items, total = (
-            self.repo.list(
+        # -----------------------------------------------------
+        # SEM FILTROS GENÉRICOS
+        #
+        # Mantém a consulta otimizada no PostgreSQL.
+        # -----------------------------------------------------
+
+        if not column_filters:
+
+            items, total = (
+                self.repo.list(
+                    page=page,
+                    page_size=page_size,
+                    **kwargs,
+                )
+            )
+
+
+            serialized_items = [
+
+                self.serialize(
+                    item
+                )
+
+                for item
+                in items
+            ]
+
+
+            return (
+                serialized_items,
+                total,
+            )
+
+
+        # -----------------------------------------------------
+        # COM FILTROS DE QUALQUER COLUNA
+        #
+        # Precisamos calcular primeiro os campos derivados:
+        #
+        # GAP
+        # AZ GAP
+        # RELEASE MONTH
+        # RELEASE YEAR
+        # ECO WEEK
+        # AGREEMENT...
+        # -----------------------------------------------------
+
+        items = (
+            self.repo.list_all(
                 **kwargs
             )
         )
 
 
         serialized_items = [
-            self.serialize(item)
-            for item in items
+
+            self.serialize(
+                item
+            )
+
+            for item
+            in items
+        ]
+
+
+        # -----------------------------------------------------
+        # APLICAR FILTROS
+        # -----------------------------------------------------
+
+        filtered_items = (
+            self._apply_column_filters(
+                serialized_items,
+                column_filters,
+            )
+        )
+
+
+        total = len(
+            filtered_items
+        )
+
+
+        # -----------------------------------------------------
+        # PAGINAÇÃO APÓS FILTRAR
+        # -----------------------------------------------------
+
+        start = (
+            (
+                page - 1
+            )
+            *
+            page_size
+        )
+
+
+        end = (
+            start
+            +
+            page_size
+        )
+
+
+        return (
+            filtered_items[
+                start:end
+            ],
+            total,
+        )
+
+        # =========================================================
+    # LISTAGEM PARA EXPORTAÇÃO
+    # =========================================================
+
+    def list_for_export(
+        self,
+        column_filters=None,
+        **kwargs,
+    ):
+
+        """
+        Retorna todos os registros que correspondem
+        aos filtros ativos.
+
+        Não aplica paginação.
+
+        A exportação XLSX deve utilizar este método
+        para garantir que o Excel contenha exatamente
+        os mesmos registros filtrados no ECO Control.
+        """
+
+        items = (
+            self.repo.list_all(
+                **kwargs
+            )
+        )
+
+
+        serialized_items = [
+
+            self.serialize(
+                item
+            )
+
+            for item
+            in items
         ]
 
 
         return (
-            serialized_items,
-            total,
+            self._apply_column_filters(
+                serialized_items,
+                column_filters,
+            )
         )
-
 
     # =========================================================
     # SERIALIZAÇÃO

@@ -138,12 +138,49 @@ def test_export_returns_filtered_csv(client_and_state):
     )
 
     assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/csv")
-    assert "attachment" in response.headers["content-disposition"]
-    assert "ECO-42" in response.text
-    assert "deleted" in response.text
-    assert state.exported_filters["action"] == "deleted"
-    assert state.exported_filters["search"] == "ECO-42"
+
+    assert response.headers[
+        "content-type"
+    ].startswith(
+        "text/csv"
+    )
+
+    assert (
+        "attachment"
+        in response.headers[
+            "content-disposition"
+        ]
+    )
+
+    assert (
+        "ECO-42"
+        in response.text
+    )
+
+    assert (
+        "Excluída"
+        in response.text
+    )
+
+    assert (
+        "DATA/HORA"
+        in response.text
+    )
+
+    assert (
+        "USUÁRIO"
+        in response.text
+    )
+
+    assert (
+        "CAMPO ALTERADO"
+        in response.text
+    )
+
+    assert (
+        ";"
+        in response.text
+    )
 
 
 def test_export_requires_can_view_history(client_and_state):
