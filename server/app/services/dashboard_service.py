@@ -1,46 +1,690 @@
-from sqlalchemy import select, func
+from sqlalchemy import (
+    select,
+    func,
+)
+
 from app.models.entities import Eco
-from app.utils.eco_calculations import compute_eco_fields
+from app.utils.eco_calculations import (
+    compute_eco_fields,
+)
+
+
 class DashboardService:
-    def __init__(self,db): self.db=db
-    def _rows(self,month=None):
-        q=select(Eco)
-        if month: q=q.where(Eco.month==month)
-        return self.db.scalars(q).all()
+
+    MONTH_ORDER = [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+    ]
+
+
+    def __init__(
+        self,
+        db,
+    ):
+        self.db = db
+
+
+    # =====================================================
+    # NORMALIZAÇÃO
+    # =====================================================
+
+    @staticmethod
+    def _normalize_text(
+        value,
+        default="N/A",
+    ):
+        """
+        Remove espaços extras das pontas
+        e também espaços duplicados internos.
+
+        Exemplos:
+        ' MEC '      -> 'MEC'
+        'MEC  TEAM'  -> 'MEC TEAM'
+        '   '         -> 'N/A'
+        None          -> 'N/A'
+        """
+
+        if value is None:
+            return default
+
+
+        if not isinstance(
+            value,
+            str,
+        ):
+            return value
+
+
+        normalized = " ".join(
+            value.split()
+        )
+
+
+        return (
+            normalized
+            if normalized
+            else default
+        )
+
+
+    @classmethod
+    def _normalize_month(
+        cls,
+        value,
+    ):
+        normalized = (
+            cls._normalize_text(
+                value,
+                default="",
+            )
+        )
+
+        if not normalized:
+            return ""
+
+
+        return normalized.upper()
+
+
+    # =====================================================
+    # CONSULTA BASE
+    # =====================================================
+
+    def _rows(
+        self,
+        month=None,
+    ):
+        query = select(Eco)
+
+
+        if month:
+
+            normalized_month = (
+                self._normalize_month(
+                    month
+                )
+            )
+
+
+            query = query.where(
+                func.upper(
+                    func.trim(
+                        Eco.month
+                    )
+                )
+                ==
+                normalized_month
+            )
+
+
+        return (
+            self.db
+            .scalars(query)
+            .all()
+        )
+
+
+    # =====================================================
+    # MESES
+    # =====================================================
+
     def months(self):
-        order=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
-        vals=set(self.db.scalars(select(Eco.month).where(Eco.month.is_not(None))).all()); return [m for m in order if m in vals]
+
+        values = (
+            self.db
+            .scalars(
+                select(
+                    Eco.month
+                )
+                .where(
+                    Eco.month.is_not(
+                        None
+                    )
+                )
+            )
+            .all()
+        )
+
+
+        normalized_values = {
+            self._normalize_month(
+                value
+            )
+            for value
+            in values
+            if value
+        }
+
+
+        return [
+            month
+            for month
+            in self.MONTH_ORDER
+            if month
+            in normalized_values
+        ]
+
+
+    # =====================================================
+    # CARDS
+    # =====================================================
+
     def stats(self):
-        rows=self._rows(); comps=[compute_eco_fields(r) for r in rows]
-        count=lambda s: sum(1 for r in rows if r.status==s)
-        return {'total':len(rows),'working':count('WORKING'),'on_hold':count('ON HOLD'),'processing':count('PROCESSING'),'released':count('RELEASED'),'rejected':count('REJECTED'),'cancelled':sum(1 for r in rows if r.status in ('CANCELLED','TO BE CANCELLED')),'overdue':0,'gap7':sum(1 for c in comps if c['contar_eco_7']),'gap14':sum(1 for c in comps if c['contar_eco_14'])}
-    def group(self,dimension,month=None):
-        mapping={'status':Eco.status,'group':Eco.group_name,'owner':Eco.owner,'obu':Eco.obu,'au':Eco.au,'eco_type':Eco.eco_type}
-        col=mapping[dimension]; q=select(col,func.count(Eco.id)).group_by(col)
-        if month: q=q.where(Eco.month==month)
-        data=[]
-        for name,val in self.db.execute(q).all():
-            key=(name or 'N/A').strip() if isinstance(name,str) else 'N/A'; data.append({'name':key,'value':val})
-        merged={}
-        for d in data: merged[d['name']]=merged.get(d['name'],0)+d['value']
-        return [{'name':k,'value':v} for k,v in sorted(merged.items(),key=lambda x:x[1],reverse=True)]
+
+        rows = self._rows()
+
+
+        computed_rows = [
+            compute_eco_fields(
+                row
+            )
+            for row
+            in rows
+        ]
+
+
+        normalized_statuses = [
+            self._normalize_text(
+                row.status,
+                default="",
+            )
+            for row
+            in rows
+        ]
+
+
+        def count_status(
+            status,
+        ):
+            return sum(
+                1
+                for current_status
+                in normalized_statuses
+                if current_status
+                == status
+            )
+
+
+        cancelled = sum(
+            1
+            for current_status
+            in normalized_statuses
+            if current_status
+            in {
+                "CANCELLED",
+                "TO BE CANCELLED",
+            }
+        )
+
+
+        gap7 = sum(
+            1
+            for calculated
+            in computed_rows
+            if calculated[
+                "contar_eco_7"
+            ]
+            is True
+        )
+
+
+        gap14 = sum(
+            1
+            for calculated
+            in computed_rows
+            if calculated[
+                "contar_eco_14"
+            ]
+            is True
+        )
+
+
+        return {
+            "total":
+                len(rows),
+
+            "working":
+                count_status(
+                    "WORKING"
+                ),
+
+            "on_hold":
+                count_status(
+                    "ON HOLD"
+                ),
+
+            "processing":
+                count_status(
+                    "PROCESSING"
+                ),
+
+            "released":
+                count_status(
+                    "RELEASED"
+                ),
+
+            "rejected":
+                count_status(
+                    "REJECTED"
+                ),
+
+            "cancelled":
+                cancelled,
+
+            # A regra de OVERDUE ainda
+            # precisa ser definida pelo P.O.
+            "overdue":
+                0,
+
+            "gap7":
+                gap7,
+
+            # Regra validada:
+            # AZ Gap > 14
+            "gap14":
+                gap14,
+        }
+
+
+    # =====================================================
+    # AGRUPAMENTOS
+    # =====================================================
+
+    def group(
+        self,
+        dimension,
+        month=None,
+    ):
+
+        mapping = {
+            "status":
+                Eco.status,
+
+            "group":
+                Eco.group_name,
+
+            "owner":
+                Eco.owner,
+
+            "obu":
+                Eco.obu,
+
+            "au":
+                Eco.au,
+
+            "eco_type":
+                Eco.eco_type,
+        }
+
+
+        column = mapping[
+            dimension
+        ]
+
+
+        query = (
+            select(
+                column,
+                func.count(
+                    Eco.id
+                ),
+            )
+            .group_by(
+                column
+            )
+        )
+
+
+        if month:
+
+            normalized_month = (
+                self._normalize_month(
+                    month
+                )
+            )
+
+
+            query = query.where(
+                func.upper(
+                    func.trim(
+                        Eco.month
+                    )
+                )
+                ==
+                normalized_month
+            )
+
+
+        merged = {}
+
+
+        for (
+            name,
+            value,
+        ) in self.db.execute(
+            query
+        ).all():
+
+            normalized_name = (
+                self._normalize_text(
+                    name
+                )
+            )
+
+
+            merged[
+                normalized_name
+            ] = (
+                merged.get(
+                    normalized_name,
+                    0,
+                )
+                +
+                value
+            )
+
+
+        return [
+            {
+                "name":
+                    name,
+
+                "value":
+                    value,
+            }
+            for (
+                name,
+                value,
+            )
+            in sorted(
+                merged.items(),
+                key=lambda item:
+                    item[1],
+                reverse=True,
+            )
+        ]
+
+
+    # =====================================================
+    # EVOLUÇÃO POR MÊS
+    # =====================================================
+
     def evolution(self):
-        order=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']; g={d['name']:d['value'] for d in self.group_by_month()}; return [{'name':m,'value':g[m]} for m in order if m in g]
+
+        grouped = {
+            item["name"]:
+                item["value"]
+            for item
+            in self.group_by_month()
+        }
+
+
+        return [
+            {
+                "name":
+                    month,
+
+                "value":
+                    grouped[
+                        month
+                    ],
+            }
+            for month
+            in self.MONTH_ORDER
+            if month
+            in grouped
+        ]
+
+
+    # =====================================================
+    # AGRUPAMENTO POR MÊS
+    # =====================================================
+
     def group_by_month(self):
-        return [{'name':m or 'N/A','value':v} for m,v in self.db.execute(select(Eco.month,func.count(Eco.id)).group_by(Eco.month)).all()]
-    def delay(self,month=None):
-        cats={'No prazo':0,'1-7 dias':0,'8-14 dias':0,'> 14 dias':0}
-        for r in self._rows(month):
-            gap=compute_eco_fields(r)['az_gap']
-            if gap is None or gap<=0: cats['No prazo']+=1
-            elif gap<=7: cats['1-7 dias']+=1
-            elif gap<=14: cats['8-14 dias']+=1
-            else: cats['> 14 dias']+=1
-        return [{'name':k,'value':v} for k,v in cats.items()]
+
+        rows = (
+            self.db
+            .execute(
+                select(
+                    Eco.month,
+                    func.count(
+                        Eco.id
+                    ),
+                )
+                .group_by(
+                    Eco.month
+                )
+            )
+            .all()
+        )
+
+
+        merged = {}
+
+
+        for (
+            month,
+            value,
+        ) in rows:
+
+            normalized_month = (
+                self._normalize_month(
+                    month
+                )
+            )
+
+
+            if not normalized_month:
+                normalized_month = (
+                    "N/A"
+                )
+
+
+            merged[
+                normalized_month
+            ] = (
+                merged.get(
+                    normalized_month,
+                    0,
+                )
+                +
+                value
+            )
+
+
+        return [
+            {
+                "name":
+                    name,
+
+                "value":
+                    value,
+            }
+            for (
+                name,
+                value,
+            )
+            in merged.items()
+        ]
+
+
+    # =====================================================
+    # TEMPO DE ATRASO
+    # =====================================================
+
+    def delay(
+        self,
+        month=None,
+    ):
+
+        categories = {
+            "No prazo":
+                0,
+
+            "1-7 dias":
+                0,
+
+            "8-14 dias":
+                0,
+
+            "> 14 dias":
+                0,
+        }
+
+
+        for row in self._rows(
+            month
+        ):
+
+            gap = (
+                compute_eco_fields(
+                    row
+                )[
+                    "az_gap"
+                ]
+            )
+
+
+            if (
+                gap is None
+                or
+                gap <= 0
+            ):
+
+                categories[
+                    "No prazo"
+                ] += 1
+
+
+            elif gap <= 7:
+
+                categories[
+                    "1-7 dias"
+                ] += 1
+
+
+            elif gap <= 14:
+
+                categories[
+                    "8-14 dias"
+                ] += 1
+
+
+            else:
+
+                categories[
+                    "> 14 dias"
+                ] += 1
+
+
+        return [
+            {
+                "name":
+                    name,
+
+                "value":
+                    value,
+            }
+            for (
+                name,
+                value,
+            )
+            in categories.items()
+        ]
+
+
+    # =====================================================
+    # RESUMO MENSAL
+    # =====================================================
+
     def monthly_summary(self):
-        order=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']; out=[]
-        for m in order:
-            rows=self._rows(m)
-            if not rows: continue
-            out.append({'month':m,'total':len(rows),'working':sum(r.status=='WORKING' for r in rows),'processing':sum(r.status=='PROCESSING' for r in rows),'cancelled':sum(r.status in ('CANCELLED','TO BE CANCELLED') for r in rows),'released':sum(r.status=='RELEASED' for r in rows),'rejected':sum(r.status=='REJECTED' for r in rows)})
-        return out
+
+        result = []
+
+
+        for month in self.MONTH_ORDER:
+
+            rows = self._rows(
+                month
+            )
+
+
+            if not rows:
+                continue
+
+
+            statuses = [
+                self._normalize_text(
+                    row.status,
+                    default="",
+                )
+                for row
+                in rows
+            ]
+
+
+            result.append(
+                {
+                    "month":
+                        month,
+
+                    "total":
+                        len(rows),
+
+                    "working":
+                        sum(
+                            status
+                            == "WORKING"
+                            for status
+                            in statuses
+                        ),
+
+                    "processing":
+                        sum(
+                            status
+                            == "PROCESSING"
+                            for status
+                            in statuses
+                        ),
+
+                    "cancelled":
+                        sum(
+                            status
+                            in {
+                                "CANCELLED",
+                                "TO BE CANCELLED",
+                            }
+                            for status
+                            in statuses
+                        ),
+
+                    "released":
+                        sum(
+                            status
+                            == "RELEASED"
+                            for status
+                            in statuses
+                        ),
+
+                    "rejected":
+                        sum(
+                            status
+                            == "REJECTED"
+                            for status
+                            in statuses
+                        ),
+                }
+            )
+
+
+        return result
