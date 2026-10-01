@@ -146,7 +146,7 @@ def create_service(
     )
 
 
-    service._existing_ecos = (
+    service._existing_rows_by_eco = (
         lambda eco_codes:
             existing
             or {}
@@ -471,7 +471,9 @@ def test_preview_new_eco():
 
 
     row = (
-        result["rows"][0]
+        result[
+            "rows"
+        ][0]
     )
 
 
@@ -521,6 +523,191 @@ def test_preview_new_eco():
         ==
         "JAN"
     )
+
+
+def test_preview_uses_internal_month_and_sheet_release_month():
+
+    rows = [
+        {
+            "item": 1,
+            "obu": "NW1",
+            "owner": "owner.test",
+            "item_type": "MEC",
+            "eco_type": "REGULAR",
+            "status": "WORKING",
+            "eco": "ECO-FEV",
+            "second_aprov_rd_finish_1": date(2026, 2, 7),
+            "az_eco_register_date": date(2026, 2, 5),
+        }
+    ]
+
+    result = create_service().preview(
+        create_workbook(rows=rows),
+        "controle.xlsx",
+    )
+    derived = result["rows"][0]["derived"]
+
+    assert derived["month"] == "FEB"
+    assert derived["release_month"] == "FEV"
+
+
+def test_preview_exact_existing_row_is_duplicate():
+
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+    parsed_data = baseline["rows"][0]["data"]
+    existing_record = SimpleNamespace(
+        **parsed_data,
+        id="existing-id",
+        item=55,
+    )
+
+    service = create_service(
+        existing={
+            "ECO-001": [existing_record],
+        }
+    )
+
+    result = service.preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 0
+    assert result["update_rows"] == 0
+    assert result["duplicate_rows"] == 1
+    assert result["can_import"] is False
+    assert result["rows"][0]["action"] == "DUPLICATE"
+    assert result["rows"][0]["duplicate_source"] == "DATABASE"
+    assert result["rows"][0]["existing"] == {
+        "id": "existing-id",
+        "item": 55,
+    }
+
+
+def test_preview_same_eco_with_different_data_is_new():
+
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+    existing_data = dict(
+        baseline["rows"][0]["data"]
+    )
+    existing_data["product"] = "DIFFERENT-PRODUCT"
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=55,
+    )
+
+    service = create_service(
+        existing={
+            "ECO-001": [existing_record],
+        }
+    )
+
+    result = service.preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 1
+    assert result["update_rows"] == 0
+    assert result["duplicate_rows"] == 0
+    assert result["rows"][0]["action"] == "NEW"
+    assert result["rows"][0]["existing"] is None
+
+
+def test_preview_mixed_new_and_duplicate_rows_can_import():
+
+    new_row = {
+        "item": 1,
+        "product": "AAA",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "YES",
+        "status": "RELEASED",
+        "receb": "NORMAL",
+        "eco": "ECO-MIXED",
+        "change_reason": "Alteração teste",
+        "hq_eco_release_date": date(2026, 1, 2),
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+    baseline = create_service().preview(
+        create_workbook(rows=[new_row]),
+        "controle.xlsx",
+    )
+    existing_record = SimpleNamespace(
+        **baseline["rows"][0]["data"],
+        id="existing-id",
+        item=55,
+    )
+    different_row = {
+        **new_row,
+        "item": 2,
+        "product": "NEW-PRODUCT",
+    }
+    service = create_service(
+        existing={
+            "ECO-MIXED": [existing_record],
+        }
+    )
+
+    result = service.preview(
+        create_workbook(
+            rows=[new_row, different_row]
+        ),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 1
+    assert result["duplicate_rows"] == 1
+    assert result["error_rows"] == 0
+    assert result["can_import"] is True
+    assert result["rows"][0]["action"] == "DUPLICATE"
+    assert result["rows"][1]["action"] == "NEW"
+
+
+def test_preview_identical_rows_in_file_are_duplicate_except_item():
+
+    original_row = {
+        "item": 1,
+        "product": "AAA",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "YES",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-FILE-DUPLICATE",
+        "change_reason": "Alteração teste",
+        "hq_eco_release_date": date(2026, 1, 2),
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+    repeated_row = {
+        **original_row,
+        "item": 2,
+    }
+
+    result = create_service().preview(
+        create_workbook(
+            rows=[original_row, repeated_row]
+        ),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 1
+    assert result["duplicate_rows"] == 1
+    assert result["rows"][0]["action"] == "NEW"
+    assert result["rows"][0]["duplicate_source"] is None
+    assert result["rows"][1]["action"] == "DUPLICATE"
+    assert result["rows"][1]["duplicate_source"] == "FILE"
 
 
 # =========================================================
@@ -592,69 +779,10 @@ def test_preview_recalculates_fields():
 
 
 # =========================================================
-# ECO JÁ EXISTENTE
+# ECO REPETIDA NO PRÓPRIO XLSX
 # =========================================================
 
-def test_preview_existing_eco_is_update():
-
-    service = (
-        create_service(
-            existing={
-                "ECO-001": {
-                    "id":
-                        "123456",
-
-                    "item":
-                        55,
-                }
-            }
-        )
-    )
-
-
-    result = (
-        service.preview(
-            create_workbook(),
-            "controle.xlsx",
-        )
-    )
-
-
-    assert (
-        result["new_rows"]
-        == 0
-    )
-
-
-    assert (
-        result["update_rows"]
-        == 1
-    )
-
-
-    row = (
-        result["rows"][0]
-    )
-
-
-    assert (
-        row["action"]
-        ==
-        "UPDATE"
-    )
-
-
-    assert (
-        row["existing"]["item"]
-        == 55
-    )
-
-
-# =========================================================
-# DUPLICIDADE NO PRÓPRIO XLSX
-# =========================================================
-
-def test_preview_duplicate_eco_in_file():
+def test_preview_repeated_eco_is_allowed():
 
     rows = [
         {
@@ -677,7 +805,7 @@ def test_preview_duplicate_eco_in_file():
                 "WORKING",
 
             "eco":
-                "ECO-DUPLICADA",
+                "ECO-REPETIDA",
 
             "az_eco_register_date":
                 date(
@@ -692,7 +820,7 @@ def test_preview_duplicate_eco_in_file():
                 2,
 
             "obu":
-                "NW1",
+                "NWE",
 
             "owner":
                 "owner.test",
@@ -707,7 +835,7 @@ def test_preview_duplicate_eco_in_file():
                 "WORKING",
 
             "eco":
-                "ECO-DUPLICADA",
+                "ECO-REPETIDA",
 
             "az_eco_register_date":
                 date(
@@ -719,8 +847,11 @@ def test_preview_duplicate_eco_in_file():
     ]
 
 
-    service = (
-        create_service()
+    service = create_service(
+        obu_map={
+            "NW1": "GLZ",
+            "NWE": "GLZ",
+        }
     )
 
 
@@ -742,19 +873,19 @@ def test_preview_duplicate_eco_in_file():
 
     assert (
         result["new_rows"]
-        == 1
+        == 2
     )
 
 
     assert (
         result["error_rows"]
-        == 1
+        == 0
     )
 
 
     assert (
         result["can_import"]
-        is False
+        is True
     )
 
 
@@ -768,20 +899,7 @@ def test_preview_duplicate_eco_in_file():
     assert (
         result["rows"][1]["action"]
         ==
-        "ERROR"
-    )
-
-
-    assert any(
-        "duplicada"
-        in error.lower()
-
-        for error
-        in result[
-            "rows"
-        ][1][
-            "errors"
-        ]
+        "NEW"
     )
 
 

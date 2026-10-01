@@ -38,7 +38,6 @@ from app.repository.settings_repository import (
 )
 
 from app.utils.eco_calculations import (
-    MONTH_ABBR,
     compute_eco_fields,
 )
 
@@ -50,6 +49,21 @@ class EcoImportService:
     # =========================================================
 
     SHEET_NAME = "CTRL GERAL"
+
+    INTERNAL_MONTHS = [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+    ]
 
     MAX_SCAN_ROWS = 10000
 
@@ -1080,10 +1094,7 @@ class EcoImportService:
         Não dependemos de um número fixo.
         """
 
-        max_row = min(
-            worksheet.max_row,
-            30,
-        )
+        max_row = 30
 
 
         for row_number in range(
@@ -1767,72 +1778,99 @@ class EcoImportService:
 
 
     # =========================================================
-    # ECOS JÁ EXISTENTES
+    # REGISTROS JÁ EXISTENTES
     # =========================================================
 
-    def _existing_ecos(
+    def _existing_rows_by_eco(
         self,
         eco_codes,
     ):
+        """
+        Busca todas as linhas existentes com ECOs
+        presentes no XLSX, agrupadas pelo código ECO.
+        """
         normalized_codes = {
-            code.upper()
-            for code
-            in eco_codes
+            str(code).strip().upper()
+            for code in eco_codes
             if code
         }
 
-
         if not normalized_codes:
-
             return {}
 
-
         rows = (
-            self.db.execute(
-                select(
-                    Eco.eco,
-                    Eco.item,
-                    Eco.id,
-                )
-                .where(
-                    func.upper(
-                        Eco.eco
-                    )
-                    .in_(
-                        normalized_codes
-                    )
+            self.db.scalars(
+                select(Eco).where(
+                    func.upper(Eco.eco).in_(normalized_codes)
                 )
             )
             .all()
         )
 
+        grouped = {}
+        for eco in rows:
+            if not eco.eco:
+                continue
 
-        return {
-            str(
-                eco
-            )
-            .strip()
-            .upper():
-                {
-                    "id":
-                        str(
-                            eco_id
-                        ),
+            key = str(eco.eco).strip().upper()
+            grouped.setdefault(key, []).append(eco)
 
-                    "item":
-                        item,
-                }
+        return grouped
 
-            for (
-                eco,
-                item,
-                eco_id,
-            )
-            in rows
 
-            if eco
-        }
+    def _normalize_existing_value(
+        self,
+        field,
+        value,
+    ):
+        """Normalize database values as spreadsheet values are normalized."""
+        spec = next(
+            (
+                candidate
+                for candidate in self.COLUMN_SPECS.values()
+                if candidate["field"] == field
+            ),
+            None,
+        )
 
+        if spec is None:
+            return value
+
+        if spec["type"] == "date":
+            if isinstance(value, datetime):
+                return value.date()
+            return value
+
+        return self._normalize_field_value(field, value)
+
+
+    def _find_exact_existing(
+        self,
+        parsed_row,
+        existing_rows,
+    ):
+        """Return an existing record only when every source field matches."""
+        data = parsed_row["data"]
+
+        for existing in existing_rows:
+            is_same = True
+
+            for spec in self.COLUMN_SPECS.values():
+                field = spec["field"]
+                spreadsheet_value = data.get(field)
+                database_value = self._normalize_existing_value(
+                    field,
+                    getattr(existing, field, None),
+                )
+
+                if spreadsheet_value != database_value:
+                    is_same = False
+                    break
+
+            if is_same:
+                return existing
+
+        return None
 
     # =========================================================
     # ADICIONAR CAMPOS DERIVADOS
@@ -1935,7 +1973,7 @@ class EcoImportService:
 
 
         month = (
-            MONTH_ABBR[
+            self.INTERNAL_MONTHS[
                 register_date.month
                 - 1
             ]
@@ -1996,6 +2034,22 @@ class EcoImportService:
     # =========================================================
     # PREVIEW
     # =========================================================
+
+    def _row_signature(
+        self,
+        parsed_row,
+    ):
+        """Build a signature from importable source fields only."""
+        data = parsed_row["data"]
+
+        return tuple(
+            (
+                spec["field"],
+                data.get(spec["field"]),
+            )
+            for spec in self.COLUMN_SPECS.values()
+        )
+
 
     def preview(
         self,
@@ -2159,8 +2213,18 @@ class EcoImportService:
             )
 
 
+            worksheet_max_row = (
+                worksheet.max_row
+                or (
+                    header_row
+                    +
+                    self.MAX_SCAN_ROWS
+                )
+            )
+
+
             end_row = min(
-                worksheet.max_row,
+                worksheet_max_row,
                 header_row
                 +
                 self.MAX_SCAN_ROWS,
@@ -2236,52 +2300,13 @@ class EcoImportService:
                 )
 
 
-            # -------------------------------------------------
-            # DUPLICIDADES DENTRO DO ARQUIVO
-            # -------------------------------------------------
-
-            seen = {}
-
-
-            for row in parsed_rows:
-
-                eco_code = row.get(
-                    "eco"
-                )
-
-
-                if not eco_code:
-                    continue
-
-
-                if eco_code in seen:
-
-                    row[
-                        "errors"
-                    ].append(
-                        (
-                            f"ECO duplicada no arquivo. "
-                            f"Primeira ocorrência na "
-                            f"linha {seen[eco_code]}."
-                        )
-                    )
-
-
-                else:
-
-                    seen[
-                        eco_code
-                    ] = row[
-                        "excel_row"
-                    ]
-
-
+                        
             # -------------------------------------------------
             # REGISTROS EXISTENTES NO BANCO
             # -------------------------------------------------
 
-            existing = (
-                self._existing_ecos(
+            existing_by_eco = (
+                self._existing_rows_by_eco(
                     [
                         row.get(
                             "eco"
@@ -2297,6 +2322,8 @@ class EcoImportService:
             # AÇÃO DE CADA LINHA
             # -------------------------------------------------
 
+            seen_signatures = {}
+
             for row in parsed_rows:
 
                 eco_code = row.get(
@@ -2304,15 +2331,18 @@ class EcoImportService:
                 )
 
 
-                existing_record = (
-                    existing.get(
-                        eco_code
-                    )
-
-                    if eco_code
-
-                    else None
+                signature = self._row_signature(
+                    row
                 )
+
+
+                first_excel_row = seen_signatures.get(
+                    signature
+                )
+
+
+                matching_record = None
+                duplicate_source = None
 
 
                 if row[
@@ -2321,15 +2351,45 @@ class EcoImportService:
 
                     action = "ERROR"
 
+                elif first_excel_row is not None:
 
-                elif existing_record:
-
-                    action = "UPDATE"
-
+                    action = "DUPLICATE"
+                    duplicate_source = "FILE"
 
                 else:
 
-                    action = "NEW"
+                    seen_signatures[
+                        signature
+                    ] = row[
+                        "excel_row"
+                    ]
+
+
+                    if eco_code:
+
+                        matching_record = (
+                            self._find_exact_existing(
+                                row,
+                                existing_by_eco.get(
+                                    str(
+                                        eco_code
+                                    )
+                                    .strip()
+                                    .upper(),
+                                    [],
+                                ),
+                            )
+                        )
+
+
+                    if matching_record:
+
+                        action = "DUPLICATE"
+                        duplicate_source = "DATABASE"
+
+                    else:
+
+                        action = "NEW"
 
 
                 row[
@@ -2340,10 +2400,18 @@ class EcoImportService:
                 row[
                     "existing"
                 ] = (
-                    existing_record
+                    {
+                        "id": str(matching_record.id),
+                        "item": matching_record.item,
+                    }
+                    if matching_record
+                    else None
                 )
 
 
+                row[
+                    "duplicate_source"
+                ] = duplicate_source
             # -------------------------------------------------
             # RESUMO
             # -------------------------------------------------
@@ -2395,6 +2463,20 @@ class EcoImportService:
             )
 
 
+            duplicate_rows = sum(
+                1
+                for row
+                in parsed_rows
+                if (
+                    row[
+                        "action"
+                    ]
+                    ==
+                    "DUPLICATE"
+                )
+            )
+
+
             warning_rows = sum(
                 1
                 for row
@@ -2442,6 +2524,9 @@ class EcoImportService:
                 "update_rows":
                     update_rows,
 
+                "duplicate_rows":
+                    duplicate_rows,
+
                 "error_rows":
                     error_rows,
 
@@ -2449,7 +2534,11 @@ class EcoImportService:
                     warning_rows,
 
                 "can_import":
-                    error_rows == 0,
+                    (
+                        error_rows == 0
+                        and
+                        new_rows > 0
+                    ),
 
                 "preview_limit":
                     self.MAX_PREVIEW_ROWS,
