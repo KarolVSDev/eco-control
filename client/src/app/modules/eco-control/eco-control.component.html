@@ -133,16 +133,17 @@
         Importar XLSX
       </button>
 
-
-      <!-- EXCLUIR TODAS -->
-
       <button
-        *ngIf="permissions.isAdmin"
+        *ngIf="
+          permissions.isAdmin
+          &&
+          selectedRowsCount > 0
+        "
         class="eco-delete-all-button"
         type="button"
-        [disabled]="deletingAll || total === 0"
+        [disabled]="deletingSelected"
         (click)="
-          deleteAllEcos();
+          deleteSelectedEcos();
           $event.stopPropagation()
         "
       >
@@ -151,12 +152,17 @@
         </span>
 
         {{
-          deletingAll
+          deletingSelected
             ? 'Excluindo...'
-            : 'Excluir todas'
+            : (
+                'Excluir selecionadas ('
+                +
+                selectedRowsCount
+                +
+                ')'
+              )
         }}
       </button>
-
 
       <!-- EXPORTAR -->
 
@@ -680,9 +686,10 @@
                   type="checkbox"
                   class="row-checkbox"
                   aria-label="Selecionar ECO"
-                  [checked]="isRowSelected(row)"
+                  [checked]="isRowChecked(row)"
+                  (click)="$event.stopPropagation()"
                   (change)="
-                    toggleRow(
+                    toggleRowChecked(
                       row,
                       $any($event.target).checked
                     )
@@ -1845,6 +1852,31 @@
             </div>
           </div>
 
+          <div
+            *ngIf="importPreview.error_rows > 0"
+            class="import-message import-message-error"
+          >
+            <strong>
+              Foram encontradas
+              {{ importPreview.error_rows }}
+              linha(s) com erro.
+            </strong>
+
+            <br>
+
+            Corrija as linhas abaixo na planilha antes de tentar importar.
+
+            <ng-container
+              *ngIf="importPreview.preview_truncated"
+            >
+              <br>
+
+              Mostrando os primeiros
+              {{ importPreview.preview_rows_count }}
+              erros encontrados.
+            </ng-container>
+          </div>
+
           <div class="import-preview-table-wrapper">
             <table class="import-preview-table">
               <thead>
@@ -1852,7 +1884,13 @@
                   <th>Linha</th>
                   <th>ECO</th>
                   <th>Ação</th>
-                  <th>Avisos / erros</th>
+                  <th>
+                    {{
+                      importPreview.error_rows > 0
+                        ? 'Erro encontrado'
+                        : 'Avisos / erros'
+                    }}
+                  </th>
                 </tr>
               </thead>
 
@@ -1908,12 +1946,6 @@
             Nenhuma ECO nova foi encontrada. Todas as linhas já existem no sistema.
           </div>
 
-          <div
-            *ngIf="importPreview.error_rows > 0"
-            class="import-message import-message-error"
-          >
-            A importação está bloqueada. Corrija os erros da planilha antes de continuar.
-          </div>
         </ng-container>
       </div>
 
@@ -1937,7 +1969,23 @@
           {{
             importingFile
               ? 'Importando...'
-              : 'Importar ' + importPreview.new_rows + ' ECO(s)'
+              : (
+                  importPreview.error_rows > 0
+                    ? (
+                        'Corrija '
+                        +
+                        importPreview.error_rows
+                        +
+                        ' erro(s)'
+                      )
+                    : (
+                        'Importar '
+                        +
+                        importPreview.new_rows
+                        +
+                        ' ECO(s)'
+                      )
+                )
           }}
         </button>
       </div>

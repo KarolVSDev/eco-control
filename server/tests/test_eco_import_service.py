@@ -464,6 +464,12 @@ def test_preview_new_eco():
     )
 
 
+    assert result["preview_mode"] == "ALL"
+    assert result["preview_rows_total"] == 1
+    assert result["preview_rows_count"] == 1
+    assert result["preview_truncated"] is False
+
+
     assert (
         result["can_import"]
         is True
@@ -1121,6 +1127,45 @@ def test_preview_requires_obu_mapping():
             "errors"
         ]
     )
+
+
+def test_preview_limits_to_errors_when_errors_exist():
+
+    rows = [
+        {
+            "item": item,
+            "product": "AAA",
+            "obu": obu,
+            "owner": "owner.test",
+            "item_type": "MEC",
+            "eco_type": "REGULAR",
+            "status": "WORKING",
+            "eco": f"ECO-{item}",
+            "az_eco_register_date": date(2026, 1, 5),
+        }
+        for item, obu in (
+            (1, "NW1"),
+            (2, "NW9"),
+            (3, "NW9"),
+        )
+    ]
+    service = create_service()
+    service.MAX_PREVIEW_ROWS = 1
+
+    result = service.preview(
+        create_workbook(rows=rows),
+        "controle.xlsx",
+    )
+
+    assert result["total_rows"] == 3
+    assert result["error_rows"] == 2
+    assert result["preview_mode"] == "ERRORS"
+    assert result["preview_rows_total"] == 2
+    assert result["preview_rows_count"] == 1
+    assert result["preview_truncated"] is True
+    assert len(result["rows"]) == 1
+    assert result["rows"][0]["action"] == "ERROR"
+    assert result["rows"][0]["data"]["eco"] == "ECO-2"
 
 
 # =========================================================

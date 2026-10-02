@@ -70,30 +70,42 @@ def test_import_route_delegates_xlsx_to_service(monkeypatch):
     }
 
 
-def test_bulk_delete_route_delegates_to_service(monkeypatch):
+def test_bulk_delete_route_is_not_registered():
+    response = TestClient(app).delete(
+        "/api/v1/ecos/bulk/all"
+    )
+
+    assert response.status_code == 404
+
+
+def test_selected_delete_route_delegates_to_service(monkeypatch):
     overrides_before = app.dependency_overrides.copy()
     database = object()
+    eco_id = "aa0eeeb2-9ddb-4f5e-8ee6-1611ee88077a"
     app.dependency_overrides[get_db] = lambda: database
     app.dependency_overrides[current_user] = lambda: object()
     captured = {}
 
-    def fake_delete_all(service):
+    def fake_delete_many(service, ids):
         captured["db"] = service.db
-        return {"deleted_rows": 12}
+        captured["ids"] = ids
+        return {"deleted_rows": len(ids)}
 
     monkeypatch.setattr(
         EcoService,
-        "delete_all",
-        fake_delete_all,
+        "delete_many",
+        fake_delete_many,
     )
 
     try:
-        response = TestClient(app).delete(
-            "/api/v1/ecos/bulk/all"
+        response = TestClient(app).post(
+            "/api/v1/ecos/bulk-delete",
+            json={"ids": [eco_id]},
         )
     finally:
         app.dependency_overrides = overrides_before
 
     assert response.status_code == 200
-    assert response.json() == {"deleted_rows": 12}
+    assert response.json() == {"deleted_rows": 1}
     assert captured["db"] is database
+    assert str(captured["ids"][0]) == eco_id

@@ -90,8 +90,6 @@ export class EcoControlComponent
 
   creatingBelow = false;
 
-  deletingAll = false;
-
 
   // =====================================================
   // IMPORTAÇÃO XLSX
@@ -157,6 +155,10 @@ export class EcoControlComponent
   // =====================================================
 
   selectedRow: any = null;
+
+  selectedRowIds = new Set<string>();
+
+  deletingSelected = false;
 
 
   // =====================================================
@@ -942,24 +944,45 @@ export class EcoControlComponent
   }
 
 
-  toggleRow(
+  isRowChecked(
+    row: any,
+  ): boolean {
+
+    return this.selectedRowIds
+      .has(
+        row.id
+      );
+  }
+
+
+  toggleRowChecked(
     row: any,
     checked: boolean,
   ): void {
 
     if (checked) {
 
-      this.selectedRow =
-        row;
+      this.selectedRowIds
+        .add(
+          row.id
+        );
 
-    } else if (
-      this.selectedRow?.id ===
-      row.id
-    ) {
+    } else {
 
-      this.selectedRow =
-        null;
+      this.selectedRowIds
+        .delete(
+          row.id
+        );
     }
+  }
+
+
+  get selectedRowsCount():
+    number {
+
+    return (
+      this.selectedRowIds.size
+    );
   }
 
 
@@ -1873,6 +1896,11 @@ export class EcoControlComponent
 
         next: () => {
 
+          this.selectedRowIds
+            .delete(
+              row.id
+            );
+
           if (
             this.selectedRow?.id ===
             row.id
@@ -1923,81 +1951,78 @@ export class EcoControlComponent
   }
 
 
-  // =====================================================
-  // EXCLUIR TODAS AS ECOS
-  // =====================================================
-
-  deleteAllEcos(): void {
+  deleteSelectedEcos(): void {
 
     if (
       !this.permissions.isAdmin
-      ||
-      this.deletingAll
-      ||
-      this.total === 0
+      || this.selectedRowsCount === 0
+      || this.deletingSelected
     ) {
       return;
     }
 
     const confirmed =
       window.confirm(
-        `Tem certeza que deseja excluir todas as ${this.total} ECOs?\n\n`
-        +
-        'Esta ação não poderá ser desfeita.'
+        `Excluir ${this.selectedRowsCount} ECO(s) selecionada(s)?`
       );
 
     if (!confirmed) {
       return;
     }
 
-    const confirmation =
-      window.prompt(
-        'Para confirmar, digite:\n\nEXCLUIR TUDO'
-      );
-
-    if (
-      confirmation !==
-      'EXCLUIR TUDO'
-    ) {
-      return;
-    }
-
-    this.deletingAll = true;
+    this.deletingSelected = true;
     this.cellError = '';
 
     this.api
-      .delete<{
+      .post<{
         deleted_rows: number;
       }>(
-        '/ecos/bulk/all'
+        '/ecos/bulk-delete',
+        {
+          ids:
+            Array.from(
+              this.selectedRowIds
+            ),
+        },
       )
       .subscribe({
-        next: response => {
-          this.deletingAll = false;
-          this.selectedRow = null;
-          this.viewingRow = null;
-          this.page = 1;
+        next: () => {
+          this.deletingSelected =
+            false;
 
-          console.log(
-            `${response.deleted_rows} ECOs excluídas.`
-          );
+          this.selectedRowIds
+            .clear();
+
+          this.selectedRow =
+            null;
+
+          this.viewingRow =
+            null;
+
+          this.page = 1;
 
           this.load();
         },
         error: error => {
           console.error(
-            'Erro ao excluir todas as ECOs:',
+            'Erro ao excluir ECOs selecionadas:',
             error,
           );
 
-          this.deletingAll = false;
+          this.deletingSelected =
+            false;
 
-          const detail = error?.error?.detail;
-          this.cellError = (
+          const detail =
+            error?.error?.detail;
+
+          this.cellError =
             typeof detail === 'string'
               ? detail
-              : 'Não foi possível excluir todas as ECOs.'
-          );
+              : (
+                  'Não foi possível excluir '
+                  +
+                  'as ECOs selecionadas.'
+                );
         },
       });
   }

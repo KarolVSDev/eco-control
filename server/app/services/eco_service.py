@@ -5,8 +5,6 @@ from datetime import (
 
 from fastapi import HTTPException
 from sqlalchemy import (
-    delete,
-    func,
     select,
 )
 
@@ -1426,6 +1424,154 @@ class EcoService:
         )
 
 
+    def delete_many(
+        self,
+        ids,
+    ):
+        if (
+            self.user.role
+            != "admin"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Somente administradores "
+                    "podem excluir ECOs."
+                ),
+            )
+
+        unique_ids = list(
+            dict.fromkeys(
+                ids
+            )
+        )
+        ecos = self.db.scalars(
+            select(Eco).where(
+                Eco.id.in_(
+                    unique_ids
+                )
+            )
+        ).all()
+
+        if len(ecos) != len(unique_ids):
+            raise HTTPException(
+                status_code=404,
+                detail="Uma ou mais ECOs não foram encontradas.",
+            )
+
+        all_ecos = self.db.scalars(
+            select(Eco)
+        ).all()
+        selected_ids = {
+            eco.id
+            for eco in ecos
+        }
+        deleted_items = sorted(
+            (
+                eco.item
+                for eco in ecos
+                if eco.item is not None
+            ),
+            reverse=True,
+        )
+        deleted_positions = sorted(
+            (
+                eco.position
+                for eco in ecos
+                if eco.position is not None
+            ),
+            reverse=True,
+        )
+
+        try:
+            for eco in ecos:
+                deleted_fields = {
+                    column.name: (
+                        getattr(eco, column.name),
+                        None,
+                    )
+                    for column in eco.__table__.columns
+                    if (
+                        column.name
+                        not in {
+                            "id",
+                            "created_at",
+                            "updated_at",
+                        }
+                        and getattr(eco, column.name) is not None
+                    )
+                }
+                self._record_history_fields(
+                    eco,
+                    "deleted",
+                    deleted_fields,
+                )
+
+            for eco in all_ecos:
+                if eco.id in selected_ids:
+                    continue
+
+                old_item = eco.item
+                old_position = eco.position
+                fields = {}
+
+                if old_item is not None:
+                    new_item = old_item - sum(
+                        deleted_item < old_item
+                        for deleted_item in deleted_items
+                    )
+                    if new_item != old_item:
+                        fields["item"] = (
+                            old_item,
+                            new_item,
+                        )
+
+                if old_position is not None:
+                    new_position = old_position - sum(
+                        deleted_position < old_position
+                        for deleted_position in deleted_positions
+                    )
+                    if new_position != old_position:
+                        fields["position"] = (
+                            old_position,
+                            new_position,
+                        )
+
+                if fields:
+                    self._record_history_fields(
+                        eco,
+                        "updated",
+                        fields,
+                    )
+
+            for eco in ecos:
+                self.repo.delete(
+                    eco
+                )
+
+            self.db.flush()
+
+            for deleted_item in deleted_items:
+                self.repo.shift_items_down_after(
+                    deleted_item
+                )
+
+            for deleted_position in deleted_positions:
+                self.repo.close_space_after_position(
+                    deleted_position
+                )
+
+            self.db.commit()
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return {
+            "deleted_rows": len(ecos),
+        }
+
+
     # =========================================================
     # UPDATE
     # =========================================================
@@ -1845,48 +1991,3 @@ class EcoService:
 
             raise
 
-
-    # =========================================================
-    # DELETE ALL
-    # =========================================================
-
-    def delete_all(
-        self,
-    ):
-        if (
-            self.user.role
-            != "admin"
-        ):
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Somente administradores "
-                    "podem excluir todas as ECOs."
-                ),
-            )
-
-        try:
-            total = (
-                self.db.scalar(
-                    select(
-                        func.count()
-                    ).select_from(
-                        Eco
-                    )
-                )
-                or 0
-            )
-
-            self.db.execute(
-                delete(Eco)
-            )
-
-            self.db.commit()
-
-        except Exception:
-            self.db.rollback()
-            raise
-
-        return {
-            "deleted_rows": total,
-        }

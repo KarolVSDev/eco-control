@@ -732,8 +732,104 @@ def test_delete_renumbers_item_and_position_and_records_history():
 
 
     assert db.flushed
-
     assert db.committed
+
+
+def test_delete_many_reindexes_both_sequences_in_one_transaction():
+
+    deleted_by_item = Eco(
+        id=uuid.uuid4(),
+        eco="ECO-2",
+        item=2,
+        position=4,
+    )
+    deleted_by_position = Eco(
+        id=uuid.uuid4(),
+        eco="ECO-4",
+        item=4,
+        position=2,
+    )
+    survivors = [
+        Eco(
+            id=uuid.uuid4(),
+            eco="ECO-1",
+            item=1,
+            position=1,
+        ),
+        Eco(
+            id=uuid.uuid4(),
+            eco="ECO-3",
+            item=3,
+            position=3,
+        ),
+        Eco(
+            id=uuid.uuid4(),
+            eco="ECO-5",
+            item=5,
+            position=5,
+        ),
+    ]
+    selected = [
+        deleted_by_item,
+        deleted_by_position,
+    ]
+    all_ecos = selected + survivors
+    query_count = 0
+    deleted = []
+    item_shifts = []
+    position_shifts = []
+    commits = []
+    rollbacks = []
+
+    def scalars(query):
+        nonlocal query_count
+        query_count += 1
+        result = selected if query_count == 1 else all_ecos
+        return SimpleNamespace(
+            all=lambda: result
+        )
+
+    database = SimpleNamespace(
+        scalars=scalars,
+        flush=lambda: None,
+        commit=lambda: commits.append(True),
+        rollback=lambda: rollbacks.append(True),
+    )
+    repository = SimpleNamespace(
+        delete=deleted.append,
+        shift_items_down_after=item_shifts.append,
+        close_space_after_position=position_shifts.append,
+    )
+    service = make_service(
+        repository,
+        database,
+    )
+
+    result = service.delete_many(
+        [
+            deleted_by_item.id,
+            deleted_by_position.id,
+            deleted_by_item.id,
+        ]
+    )
+
+    assert result == {"deleted_rows": 2}
+    assert deleted == selected
+    assert item_shifts == [4, 2]
+    assert position_shifts == [4, 2]
+    assert commits == [True]
+    assert rollbacks == []
+
+    history = {
+        (event.eco_id, event.field_key): event
+        for event in service.history.events
+    }
+    assert history[(survivors[1].id, "item")].old_value == "3"
+    assert history[(survivors[1].id, "item")].new_value == "2"
+    assert history[(survivors[1].id, "position")].old_value == "3"
+    assert history[(survivors[1].id, "position")].new_value == "2"
+    assert history[(survivors[2].id, "item")].new_value == "3"
+    assert history[(survivors[2].id, "position")].new_value == "3"
 
 
 # =========================================================
@@ -792,40 +888,3 @@ def test_next_position_uses_current_position_sequence():
     )
 
 
-def test_delete_all_executes_one_bulk_delete_and_commits():
-
-    statements = []
-    commits = []
-    rollbacks = []
-    database = SimpleNamespace(
-        scalar=lambda query: 12,
-        execute=statements.append,
-        commit=lambda: commits.append(True),
-        rollback=lambda: rollbacks.append(True),
-    )
-    service = make_service(
-        repo=None,
-        db=database,
-    )
-
-    result = service.delete_all()
-
-    assert result == {"deleted_rows": 12}
-    assert len(statements) == 1
-    assert str(statements[0]).lower() == "delete from ecos"
-    assert commits == [True]
-    assert rollbacks == []
-
-
-def test_delete_all_rejects_non_admin():
-
-    service = make_service(
-        repo=None,
-        db=SimpleNamespace(),
-    )
-    service.user.role = "analyst"
-
-    with pytest.raises(HTTPException) as error:
-        service.delete_all()
-
-    assert error.value.status_code == 403

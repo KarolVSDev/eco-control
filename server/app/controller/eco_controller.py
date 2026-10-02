@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from app.config.database import get_db
 
 from app.schemas.eco import (
+    EcoBulkDelete,
     EcoCreate,
     EcoUpdate,
 )
@@ -1580,18 +1581,14 @@ def update_eco(
     )
 
 
-# =========================================================
-# EXCLUIR ECO
-# =========================================================
-
-@router.delete(
-    "/bulk/all",
+@router.post(
+    "/bulk-delete",
 )
-def delete_all_ecos(
+def delete_selected_ecos(
+    body: EcoBulkDelete,
     db: Session = Depends(
         get_db
     ),
-
     user=Depends(
         current_user
     ),
@@ -1601,7 +1598,9 @@ def delete_all_ecos(
         user,
     )
 
-    return service.delete_all()
+    return service.delete_many(
+        body.ids
+    )
 
 
 @router.delete(
@@ -1637,3 +1636,4 @@ def delete_eco(
             status.HTTP_204_NO_CONTENT
         )
     )
+

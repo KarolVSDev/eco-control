@@ -2645,14 +2645,30 @@ class EcoImportService:
             )
 
 
-            preview_rows = (
-                parsed_rows
-                if _include_all_rows
-                else parsed_rows[
-                    :
-                    self.MAX_PREVIEW_ROWS
-                ]
-            )
+            if _include_all_rows:
+                preview_rows = parsed_rows
+                preview_mode = "ALL"
+                preview_rows_total = total
+            else:
+                if error_rows > 0:
+                    rows_with_error = [
+                        row
+                        for row in parsed_rows
+                        if row["action"] == "ERROR"
+                    ]
+                    preview_rows = rows_with_error[
+                        :
+                        self.MAX_PREVIEW_ROWS
+                    ]
+                    preview_mode = "ERRORS"
+                    preview_rows_total = len(rows_with_error)
+                else:
+                    preview_rows = parsed_rows[
+                        :
+                        self.MAX_PREVIEW_ROWS
+                    ]
+                    preview_mode = "ALL"
+                    preview_rows_total = total
 
 
             return {
@@ -2696,9 +2712,18 @@ class EcoImportService:
                 "preview_limit":
                     self.MAX_PREVIEW_ROWS,
 
+                "preview_mode":
+                    preview_mode,
+
+                "preview_rows_total":
+                    preview_rows_total,
+
+                "preview_rows_count":
+                    len(preview_rows),
+
                 "preview_truncated":
                     (
-                        total
+                        preview_rows_total
                         >
                         self.MAX_PREVIEW_ROWS
                     ),
