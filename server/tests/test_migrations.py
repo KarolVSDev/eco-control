@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.models.entities import Eco
+
 
 MIGRATION_PATH = (
     Path(__file__).parents[1]
@@ -17,6 +19,21 @@ SPEC = importlib.util.spec_from_file_location(
 )
 MIGRATION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MIGRATION)
+
+TEXT_MIGRATION_PATH = (
+    Path(__file__).parents[1]
+    / "alembic"
+    / "versions"
+    / "0003_remove_eco_text_limits.py"
+)
+TEXT_SPEC = importlib.util.spec_from_file_location(
+    "remove_eco_text_limits",
+    TEXT_MIGRATION_PATH,
+)
+TEXT_MIGRATION = importlib.util.module_from_spec(
+    TEXT_SPEC
+)
+TEXT_SPEC.loader.exec_module(TEXT_MIGRATION)
 
 
 @pytest.mark.parametrize(
@@ -98,3 +115,36 @@ def test_downgrade_does_not_duplicate_existing_foreign_key(
 
     assert len(executed) == 1
     assert len(created) == (0 if foreign_keys else 1)
+
+
+def test_eco_free_text_migration_alters_all_bounded_fields(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        TEXT_MIGRATION.op,
+        "alter_column",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    TEXT_MIGRATION.upgrade()
+
+    assert len(calls) == len(TEXT_MIGRATION.FIELDS)
+    assert "obu" in TEXT_MIGRATION.FIELDS
+    assert isinstance(
+        Eco.__table__.c.obu.type,
+        TEXT_MIGRATION.sa.Text,
+    )
+    assert all(
+        args[0] == "ecos"
+        and kwargs["type_"].__class__ is TEXT_MIGRATION.sa.Text
+        for args, kwargs in calls
+    )
+
+    calls.clear()
+    TEXT_MIGRATION.downgrade()
+
+    assert len(calls) == len(TEXT_MIGRATION.FIELDS)
+    assert all(
+        args[0] == "ecos"
+        and kwargs["type_"].__class__ is TEXT_MIGRATION.sa.String
+        for args, kwargs in calls
+    )
