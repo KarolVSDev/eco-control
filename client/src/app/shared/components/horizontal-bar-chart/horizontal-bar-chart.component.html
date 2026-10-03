@@ -1,1 +1,90 @@
-<div class="bars" *ngIf="data.length;else empty"><div class="row" *ngFor="let d of data"><label [title]="d.name">{{d.name}}</label><div class="track"><div class="bar" [style.width.%]="d.value/max*100" [title]="d.name+': '+d.value"></div></div></div><div class="axis"><span>0</span><span>{{max}}</span></div></div><ng-template #empty><div class="empty">Sem dados</div></ng-template>
+<div
+  class="bars"
+  *ngIf="
+    data.length;
+    else empty
+  "
+>
+
+  <div
+    class="row"
+    *ngFor="let d of data"
+    (mouseenter)="
+      showTooltip(
+        $event,
+        d
+      )
+    "
+    (mousemove)="
+      moveTooltip($event)
+    "
+    (mouseleave)="
+      hideTooltip()
+    "
+  >
+
+    <label
+      [title]="d.name"
+    >
+      {{ d.name }}
+    </label>
+
+
+    <div class="track">
+
+      <div
+        class="bar"
+        [style.width.%]="
+          d.value
+          /
+          max
+          *
+          100
+        "
+      ></div>
+
+    </div>
+
+  </div>
+
+
+  <div class="axis">
+
+    <span>
+      0
+    </span>
+
+    <span>
+      {{ max }}
+    </span>
+
+  </div>
+
+
+  <div
+    *ngIf="tooltipVisible"
+    class="chart-tooltip"
+    [style.left.px]="tooltipX"
+    [style.top.px]="tooltipY"
+  >
+
+    <strong>
+      {{ tooltipName }}
+    </strong>
+
+    <span>
+      value : {{ tooltipValue }}
+    </span>
+
+  </div>
+
+</div>
+
+
+<ng-template #empty>
+
+  <div class="empty">
+    Sem dados
+  </div>
+
+</ng-template>

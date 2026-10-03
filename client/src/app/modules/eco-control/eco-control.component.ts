@@ -5,11 +5,8 @@ import {
 } from '@angular/core';
 
 import {
-  FormControl,
-  FormGroup,
-} from '@angular/forms';
-
-import { ApiService } from '../../core/services/api.service';
+  ApiService,
+} from '../../core/services/api.service';
 
 import {
   EcoPermissionService,
@@ -17,19 +14,12 @@ import {
 
 import {
   COLUMN_GROUPS,
-  EDITABLE_COLUMNS,
   EcoColumn,
   EcoColumnGroup,
   FIELD_TYPES,
-  STATUS_OPTIONS,
+  YES_NO_OPTIONS,
   isCalculatedField,
 } from './eco-fields';
-
-
-interface EditableGroup
-  extends Omit<EcoColumnGroup, 'columns'> {
-  columns: readonly EcoColumn[];
-}
 
 
 @Component({
@@ -45,127 +35,203 @@ export class EcoControlComponent
   readonly permissions =
     inject(EcoPermissionService);
 
-
   readonly fieldTypes =
     FIELD_TYPES;
 
 
-  /*
-   * Essas listas não podem mais ser readonly
-   * como valor fixo, porque serão filtradas
-   * pelas permissões do usuário.
-   */
+  // =====================================================
+  // COLUNAS
+  // =====================================================
+
   columnGroups:
     readonly EcoColumnGroup[] = [];
 
   columns:
     readonly EcoColumn[] = [];
 
-  editableGroups:
-    readonly EditableGroup[] = [];
+  hiddenColumns =
+    new Set<string>();
 
+
+  // =====================================================
+  // DADOS
+  // =====================================================
 
   rows: any[] = [];
 
   total = 0;
 
   page = 1;
+
   pageSize = 25;
 
+
+  // =====================================================
+  // OWNERS CONFIGURADOS
+  // =====================================================
+
+  ownerOptions: string[] = [];
+
+  ownerGroupMap:
+    Record<string, string> = {};
+
+
+  // =====================================================
+  // ESTADOS
+  // =====================================================
+
+  loading = false;
+
+  loadError = '';
+
+  cellError = '';
+
+  exporting = false;
+
+  creatingBelow = false;
+
+
+  // =====================================================
+  // IMPORTAÇÃO XLSX
+  // =====================================================
+
+  importModalOpen = false;
+
+  importFile: File | null = null;
+
+  importPreview: any = null;
+
+  importResult: any = null;
+
+  previewingImport = false;
+
+  importingFile = false;
+
+  importError = '';
+
+  importSuccess = '';
+
+
+  // =====================================================
+  // BUSCA
+  // =====================================================
+
   search = '';
-  status = '';
-
-  editing: any = undefined;
-
-  saving = false;
-  saveError = '';
 
 
-  readonly statuses = [
-    '',
-    ...STATUS_OPTIONS,
+  // =====================================================
+  // FILTROS
+  // =====================================================
+
+  columnFilters:
+    Record<string, string> = {};
+
+  filterDrafts:
+    Record<string, string> = {};
+
+  openFilterKey:
+    string | null = null;
+
+  showColumns = false;
+
+  readonly monthFilterOptions = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
   ];
 
 
-  form = this.createForm();
+  // =====================================================
+  // LINHA SELECIONADA
+  // =====================================================
+
+  selectedRow: any = null;
+
+  selectedRowIds = new Set<string>();
+
+  deletingSelected = false;
 
 
-  /*
-   * Primeiro carregamos as permissões.
-   * Só depois montamos a tabela e carregamos
-   * as ECOs.
-   */
+  // =====================================================
+  // DRAWER
+  // =====================================================
+
+  viewingRow: any = null;
+
+  drawerEditing = false;
+
+  drawerSaving = false;
+
+  drawerError = '';
+
+  drawerSuccess = '';
+
+  drawerDraft:
+    Record<string, any> = {};
+
+
+  // =====================================================
+  // EDIÇÃO INLINE
+  // =====================================================
+
+  cellSaving =
+    new Set<string>();
+
+
+  // =====================================================
+  // INIT
+  // =====================================================
+
   ngOnInit(): void {
+
+    this.loadOwnerOptions();
+
     this.permissions
       .load()
       .subscribe({
+
         next: () => {
+
           this.applyPermissions();
+
           this.load();
         },
 
         error: error => {
+
           console.error(
             'Erro ao carregar permissões:',
             error,
           );
 
-          /*
-           * Em caso de erro:
-           * - campos ficam visíveis por padrão;
-           * - edição continua restrita.
-           */
           this.applyPermissions();
+
           this.load();
         },
       });
   }
 
 
-  /*
-   * Cria controles para todos os campos
-   * editáveis existentes no ECO Control.
-   */
-  private createForm(): FormGroup {
-    const controls:
-      Record<
-        string,
-        FormControl<string | null>
-      > = {};
+  // =====================================================
+  // PERMISSÕES
+  // =====================================================
 
-
-    for (
-      const column
-      of EDITABLE_COLUMNS
-    ) {
-      controls[column.key] =
-        new FormControl<string | null>(
-          null
-        );
-    }
-
-
-    return new FormGroup(
-      controls
-    );
-  }
-
-
-  /*
-   * Aplica permissões de visualização e edição.
-   */
   private applyPermissions(): void {
 
-    /*
-     * COLUNAS DA TABELA
-     *
-     * Campos sem permissão de visualizar
-     * simplesmente deixam de fazer parte
-     * da tabela.
-     */
     this.columnGroups =
       COLUMN_GROUPS
+
         .map(group => ({
+
           ...group,
 
           columns:
@@ -177,6 +243,7 @@ export class EcoControlComponent
                   )
             ),
         }))
+
         .filter(
           group =>
             group.columns.length > 0
@@ -191,93 +258,93 @@ export class EcoControlComponent
         );
 
 
-    /*
-     * CAMPOS DO FORMULÁRIO
-     *
-     * Calculados continuam fora.
-     * Campos sem can_view também ficam fora.
-     */
-    this.editableGroups =
-      COLUMN_GROUPS
-        .map(group => ({
-          ...group,
-
-          columns:
-            group.columns.filter(
-              column =>
-                !isCalculatedField(
-                  column
-                )
-                &&
-                this.permissions
-                  .canView(
-                    column.key
-                  )
-            ),
-        }))
-        .filter(
-          group =>
-            group.columns.length > 0
-        );
-
-
-    /*
-     * EDITABILIDADE
-     *
-     * O campo pode aparecer no formulário,
-     * mas fica desabilitado se o analista
-     * possuir apenas permissão de leitura.
-     */
     for (
-      const column
-      of EDITABLE_COLUMNS
+      const key
+      of Array.from(
+        this.hiddenColumns
+      )
     ) {
-      const control =
-        this.form.get(
-          column.key
+
+      const exists =
+        this.columns.some(
+          column =>
+            column.key === key
         );
 
 
-      if (!control) {
-        continue;
-      }
+      if (!exists) {
 
+        this.hiddenColumns
+          .delete(
+            key
+          );
+      }
+    }
+
+
+    const allowedKeys =
+      new Set(
+        this.columns.map(
+          column =>
+            column.key
+        )
+      );
+
+
+    for (
+      const key
+      of Object.keys(
+        this.columnFilters
+      )
+    ) {
 
       if (
-        this.permissions
-          .canEdit(
-            column.key
-          )
+        !allowedKeys.has(
+          key
+        )
       ) {
-        control.enable({
-          emitEvent: false,
-        });
 
-      } else {
-        control.disable({
-          emitEvent: false,
-        });
+        delete this.columnFilters[
+          key
+        ];
+      }
+    }
+
+
+    for (
+      const key
+      of Object.keys(
+        this.filterDrafts
+      )
+    ) {
+
+      if (
+        !allowedKeys.has(
+          key
+        )
+      ) {
+
+        delete this.filterDrafts[
+          key
+        ];
       }
     }
   }
 
 
-  private resetForm(): void {
-    this.form.reset();
-
-
-    this.form.patchValue({
-      item_type: 'MEC',
-      eco_type: 'REGULAR',
-      status: 'WORKING',
-    });
-
-
-    this.saveError = '';
-  }
-
+  // =====================================================
+  // CARREGAR ECOS
+  // =====================================================
 
   load(): void {
+
+    this.loading = true;
+
+    this.loadError = '';
+
+    this.cellError = '';
+
+
     this.api
       .get<any>(
         '/ecos',
@@ -291,238 +358,1515 @@ export class EcoControlComponent
           search:
             this.search,
 
-          status:
-            this.status,
+          column_filters:
+            this.columnFiltersParam(),
         },
       )
       .subscribe({
+
         next: response => {
+
+
           this.rows =
             response.items;
 
           this.total =
             response.total;
+
+
+          if (this.selectedRow) {
+
+            const selected =
+              this.rows.find(
+                row =>
+                  row.id ===
+                  this.selectedRow.id
+              );
+
+
+            this.selectedRow =
+              selected || null;
+          }
+
+
+          if (
+            this.viewingRow
+            &&
+            !this.drawerEditing
+          ) {
+
+            const updated =
+              this.rows.find(
+                row =>
+                  row.id ===
+                  this.viewingRow.id
+              );
+
+
+            if (updated) {
+
+              this.viewingRow =
+                updated;
+            }
+          }
+
+
+          this.loading = false;
         },
 
+
         error: error => {
+
           console.error(
             'Erro ao carregar ECOs:',
             error,
           );
+
+
+          this.loadError =
+            'Não foi possível carregar as ECOs. Tente novamente.';
+
+
+          this.loading = false;
         },
       });
   }
 
 
+  // =====================================================
+  // BUSCA
+  // =====================================================
+
   searchEcos(): void {
+
     this.page = 1;
+
+    this.selectedRow = null;
+
     this.load();
   }
 
 
-  changeStatus(): void {
+  // =====================================================
+  // FILTROS
+  // =====================================================
+
+  applyFilters(): void {
+
     this.page = 1;
+
+    this.selectedRow = null;
+
     this.load();
   }
 
 
-  /*
-   * Abre criação ou edição.
-   */
-  open(
-    row: any = null,
+  clearFilters(): void {
+
+    this.columnFilters = {};
+
+    this.filterDrafts = {};
+
+    this.openFilterKey = null;
+
+    this.page = 1;
+
+    this.selectedRow = null;
+
+    this.load();
+  }
+
+
+  get hasActiveFilters():
+    boolean {
+
+    return (
+      Object.keys(
+        this.columnFilters
+      ).length > 0
+    );
+  }
+
+
+  // =====================================================
+  // FILTROS NO CABEÇALHO
+  // =====================================================
+
+  isFilterableColumn(
+    _column: EcoColumn,
+  ): boolean {
+
+    return true;
+  }
+
+
+  toggleColumnFilter(
+    columnKey: string,
+    event: Event,
   ): void {
 
-    /*
-     * Se estiver tentando criar uma ECO
-     * e não tiver permissão, não abre.
-     */
+    event.stopPropagation();
+
+
     if (
-      !row &&
-      !this.permissions
-        .canCreateEco
+      this.openFilterKey ===
+      columnKey
     ) {
+
+      this.openFilterKey = null;
+
       return;
     }
 
 
-    this.resetForm();
+    this.filterDrafts[
+      columnKey
+    ] =
+      this.columnFilters[
+        columnKey
+      ] ?? '';
 
 
-    /*
-     * EDIÇÃO
-     */
-    if (row) {
-      this.editing = row;
+    this.openFilterKey =
+      columnKey;
+  }
 
 
-      const values:
-        Record<
-          string,
-          string | null
-        > = {};
+  getFilterValue(
+    columnKey: string,
+  ): string {
+
+    return (
+      this.columnFilters[
+        columnKey
+      ]
+      ??
+      ''
+    );
+  }
 
 
-      for (
-        const column
-        of EDITABLE_COLUMNS
-      ) {
-        const value =
-          row[column.key];
+  getFilterOptions(
+    columnKey: string,
+  ): readonly string[] {
 
-
-        values[column.key] =
-          value === undefined ||
-          value === null
-            ? null
-            : String(value);
-      }
-
-
-      this.form.patchValue(
-        values
+    const column =
+      this.columns.find(
+        item =>
+          item.key ===
+          columnKey
       );
 
 
-      return;
+    if (!column) {
+
+      return [];
     }
 
 
-    /*
-     * NOVA ECO
-     */
-    this.editing = {};
-  }
-
-
-  closeModal(): void {
-    this.editing =
-      undefined;
-
-    this.resetForm();
-  }
-
-
-  save(): void {
-    if (this.saving) {
-      return;
-    }
-
-
-    this.saving = true;
-    this.saveError = '';
-
-
-    const raw =
-      this.form.getRawValue();
-
-
-    const body:
-      Record<
-        string,
-        unknown
-      > = {};
-
-
-    /*
-     * Não enviamos campos desabilitados.
-     *
-     * Isso evita que um campo somente leitura
-     * seja enviado de volta ao backend.
-     */
-    for (
-      const column
-      of EDITABLE_COLUMNS
+    if (
+      column.key ===
+      'month'
     ) {
-      const control =
-        this.form.get(
+
+      return (
+        this.monthFilterOptions
+      );
+    }
+
+
+    if (
+      column.key ===
+      'owner'
+      &&
+      this.ownerOptions.length > 0
+    ) {
+
+      return (
+        this.ownerOptions
+      );
+    }
+
+
+    if (
+      column.type ===
+      FIELD_TYPES.BOOL_YN
+      ||
+      column.type ===
+      FIELD_TYPES.CALC_BOOL
+    ) {
+
+      return (
+        YES_NO_OPTIONS
+      );
+    }
+
+
+    if (
+      column.options
+      &&
+      column.options.length > 0
+    ) {
+
+      return (
+        column.options
+      );
+    }
+
+
+    return [];
+  }
+
+
+  hasFilterOptions(
+    columnKey: string,
+  ): boolean {
+
+    return (
+      this.getFilterOptions(
+        columnKey
+      ).length > 0
+    );
+  }
+
+
+  getFilterInputType(
+    column: EcoColumn,
+  ): 'text' | 'date' | 'number' {
+
+    if (
+      column.type ===
+      FIELD_TYPES.DATE
+    ) {
+
+      return 'date';
+    }
+
+
+    if (
+      column.type ===
+      FIELD_TYPES.CALC_NUMBER
+      ||
+      column.key ===
+      'item'
+    ) {
+
+      return 'number';
+    }
+
+
+    return 'text';
+  }
+
+
+  getFilterPlaceholder(
+    column: EcoColumn,
+  ): string {
+
+    if (
+      column.type ===
+      FIELD_TYPES.DATE
+    ) {
+
+      return '';
+    }
+
+
+    if (
+      column.type ===
+      FIELD_TYPES.CALC_NUMBER
+      ||
+      column.key ===
+      'item'
+    ) {
+
+      return 'Digite o valor';
+    }
+
+
+    return (
+      `Buscar em ${column.label}`
+    );
+  }
+
+
+  setColumnFilter(
+    columnKey: string,
+    value: string,
+  ): void {
+
+    const normalized =
+      String(
+        value ?? ''
+      ).trim();
+
+
+    if (normalized) {
+
+      this.columnFilters[
+        columnKey
+      ] = normalized;
+
+    } else {
+
+      delete this.columnFilters[
+        columnKey
+      ];
+    }
+
+
+    this.filterDrafts[
+      columnKey
+    ] = normalized;
+
+
+    this.openFilterKey = null;
+
+    this.applyFilters();
+  }
+
+
+  applyColumnFilter(
+    columnKey: string,
+  ): void {
+
+    const value =
+      this.filterDrafts[
+        columnKey
+      ] ?? '';
+
+
+    this.setColumnFilter(
+      columnKey,
+      value,
+    );
+  }
+
+
+  clearColumnFilter(
+    columnKey: string,
+  ): void {
+
+    delete this.columnFilters[
+      columnKey
+    ];
+
+    delete this.filterDrafts[
+      columnKey
+    ];
+
+
+    this.openFilterKey = null;
+
+    this.applyFilters();
+  }
+
+
+  filterEmpty(
+    columnKey: string,
+  ): void {
+
+    this.setColumnFilter(
+      columnKey,
+      '__empty__',
+    );
+  }
+
+
+  filterNotEmpty(
+    columnKey: string,
+  ): void {
+
+    this.setColumnFilter(
+      columnKey,
+      '__not_empty__',
+    );
+  }
+
+
+  private columnFiltersParam():
+    string | undefined {
+
+    const activeFilters =
+      Object.fromEntries(
+
+        Object.entries(
+          this.columnFilters
+        )
+
+          .filter(
+            ([
+              key,
+              value,
+            ]) => {
+
+              return (
+                !!key
+                &&
+                value !== null
+                &&
+                value !== undefined
+                &&
+                String(
+                  value
+                ).trim() !== ''
+              );
+            }
+          )
+      );
+
+
+    if (
+      Object.keys(
+        activeFilters
+      ).length === 0
+    ) {
+
+      return undefined;
+    }
+
+
+    return JSON.stringify(
+      activeFilters
+    );
+  }
+
+
+  // =====================================================
+  // COLUNAS VISÍVEIS
+  // =====================================================
+
+  get visibleColumns():
+    readonly EcoColumn[] {
+
+    return this.columns.filter(
+      column =>
+        !this.hiddenColumns.has(
           column.key
+        )
+    );
+  }
+
+
+  get visibleColumnGroups():
+    readonly EcoColumnGroup[] {
+
+    return this.columnGroups
+
+      .map(group => ({
+
+        ...group,
+
+        columns:
+          group.columns.filter(
+            column =>
+              !this.hiddenColumns
+                .has(
+                  column.key
+                )
+          ),
+      }))
+
+      .filter(
+        group =>
+          group.columns.length > 0
+      );
+  }
+
+
+  isColumnVisible(
+    column: EcoColumn,
+  ): boolean {
+
+    return (
+      !this.hiddenColumns.has(
+        column.key
+      )
+    );
+  }
+
+
+  toggleColumn(
+    column: EcoColumn,
+  ): void {
+
+    if (
+      this.hiddenColumns.has(
+        column.key
+      )
+    ) {
+
+      this.hiddenColumns.delete(
+        column.key
+      );
+
+    } else {
+
+      this.hiddenColumns.add(
+        column.key
+      );
+    }
+  }
+
+
+  // =====================================================
+  // SELEÇÃO DA LINHA
+  // =====================================================
+
+  isRowSelected(
+    row: any,
+  ): boolean {
+
+    return (
+      this.selectedRow?.id ===
+      row.id
+    );
+  }
+
+
+  selectRow(
+    row: any,
+  ): void {
+
+    if (
+      this.selectedRow?.id ===
+      row.id
+    ) {
+
+      this.selectedRow = null;
+
+      return;
+    }
+
+
+    this.selectedRow =
+      row;
+  }
+
+
+  isRowChecked(
+    row: any,
+  ): boolean {
+
+    return this.selectedRowIds
+      .has(
+        row.id
+      );
+  }
+
+
+  toggleRowChecked(
+    row: any,
+    checked: boolean,
+  ): void {
+
+    if (checked) {
+
+      this.selectedRowIds
+        .add(
+          row.id
         );
 
+    } else {
 
-      if (
-        !control ||
-        control.disabled
-      ) {
-        continue;
-      }
+      this.selectedRowIds
+        .delete(
+          row.id
+        );
+    }
+  }
 
+
+  get selectedRowsCount():
+    number {
+
+    return (
+      this.selectedRowIds.size
+    );
+  }
+
+
+  get selectedItem():
+    number | null {
+
+    return (
+      this.selectedRow?.item ??
+      null
+    );
+  }
+
+
+  // =====================================================
+  // ADICIONAR ABAIXO DA ECO SELECIONADA
+  // =====================================================
+
+  addBelowSelected(): void {
+
+    if (
+      !this.permissions
+        .canCreateEco
+    ) {
+
+      return;
+    }
+
+
+    if (
+      !this.selectedRow
+    ) {
+
+      this.cellError =
+        'Selecione uma ECO para adicionar uma nova linha abaixo dela.';
+
+      return;
+    }
+
+
+    if (
+      this.creatingBelow
+    ) {
+
+      return;
+    }
+
+
+    this.creatingBelow = true;
+
+    this.cellError = '';
+
+
+    this.api
+      .post<any>(
+        `/ecos/${this.selectedRow.id}/after`,
+        {},
+      )
+      .subscribe({
+
+        next: created => {
+
+          this.creatingBelow = false;
+
+          this.selectedRow =
+            created;
+
+          this.load();
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao adicionar ECO abaixo:',
+            error,
+          );
+
+
+          this.creatingBelow = false;
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.cellError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível adicionar a ECO.';
+        },
+      });
+  }
+
+
+  // =====================================================
+  // DRAWER
+  // =====================================================
+
+  openDetails(
+    row: any,
+  ): void {
+
+    this.viewingRow =
+      row;
+
+    this.drawerEditing =
+      false;
+
+    this.drawerSaving =
+      false;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+    this.drawerDraft = {};
+  }
+
+
+  closeDetails(): void {
+
+    if (
+      this.drawerSaving
+    ) {
+
+      return;
+    }
+
+
+    this.viewingRow =
+      null;
+
+    this.drawerEditing =
+      false;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+    this.drawerDraft = {};
+  }
+
+
+  // =====================================================
+  // DRAWER - PERMISSÃO DE EDIÇÃO
+  // =====================================================
+
+  get canEditDrawer(): boolean {
+
+    return this.columns.some(
+      column =>
+        this.isColumnEditable(
+          column
+        )
+    );
+  }
+
+
+  // =====================================================
+  // DRAWER - INICIAR EDIÇÃO
+  // =====================================================
+
+  startDrawerEdit(): void {
+
+    if (
+      !this.viewingRow
+      ||
+      !this.canEditDrawer
+    ) {
+
+      return;
+    }
+
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+
+    this.drawerDraft =
+      this.buildDrawerDraft(
+        this.viewingRow
+      );
+
+
+    this.drawerEditing =
+      true;
+  }
+
+
+  // =====================================================
+  // DRAWER - CANCELAR EDIÇÃO
+  // =====================================================
+
+  cancelDrawerEdit(): void {
+
+    if (
+      this.drawerSaving
+    ) {
+
+      return;
+    }
+
+
+    this.drawerEditing =
+      false;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+    this.drawerDraft = {};
+  }
+
+
+  // =====================================================
+  // DRAWER - CRIAR RASCUNHO
+  // =====================================================
+
+  private buildDrawerDraft(
+    row: any,
+  ): Record<string, any> {
+
+    const draft:
+      Record<string, any> = {};
+
+
+    for (
+      const column
+      of this.columns
+    ) {
 
       const value =
-        raw[column.key];
+        row?.[column.key];
 
 
-      body[column.key] =
-        value === ''
-          ? null
+      draft[column.key] =
+        value === null ||
+        value === undefined
+          ? ''
           : value;
     }
 
 
-    const request =
-      this.editing?.id
-
-        ? this.api.patch(
-            `/ecos/${this.editing.id}`,
-            body,
-          )
-
-        : this.api.post(
-            '/ecos',
-            body,
-          );
-
-
-    request.subscribe({
-      next: () => {
-        this.saving = false;
-
-        this.closeModal();
-
-        this.load();
-      },
-
-
-      error: error => {
-        this.saving = false;
-
-
-        const detail =
-          error.error?.detail;
-
-
-        if (
-          typeof detail ===
-          'string'
-        ) {
-          this.saveError =
-            detail;
-
-        } else {
-          this.saveError =
-            'Não foi possível salvar a ECO.';
-        }
-
-
-        console.error(
-          'Erro ao salvar ECO:',
-          error,
-        );
-      },
-    });
+    return draft;
   }
 
 
-  remove(row: any): void {
+  // =====================================================
+  // DRAWER - VALOR
+  // =====================================================
 
-    /*
-     * Camada extra no Angular.
-     * O botão também ficará oculto no HTML.
-     */
+  drawerValue(
+    column: EcoColumn,
+  ): any {
+
+    if (
+      this.drawerEditing
+    ) {
+
+      return (
+        this.drawerDraft[
+          column.key
+        ] ?? ''
+      );
+    }
+
+
+    return (
+      this.viewingRow?.[
+        column.key
+      ] ?? ''
+    );
+  }
+
+
+  // =====================================================
+  // DRAWER - ALTERAR VALOR
+  // =====================================================
+
+  setDrawerValue(
+    column: EcoColumn,
+    value: any,
+  ): void {
+
+    if (
+      !this.drawerEditing
+      ||
+      !this.isColumnEditable(
+        column
+      )
+    ) {
+
+      return;
+    }
+
+
+    this.drawerDraft[
+      column.key
+    ] = value;
+
+
+    if (
+      column.key === 'owner'
+    ) {
+
+      const owner = String(
+        value ?? ''
+      ).trim();
+
+      const mappedGroup =
+        this.ownerGroupMap[
+          owner
+        ];
+
+      if (mappedGroup) {
+
+        this.drawerDraft[
+          'group'
+        ] = mappedGroup;
+      }
+    }
+  }
+
+
+  // =====================================================
+  // DRAWER - DETECTAR ALTERAÇÕES
+  // =====================================================
+
+  get drawerHasChanges(): boolean {
+
+    if (
+      !this.drawerEditing
+      ||
+      !this.viewingRow
+    ) {
+
+      return false;
+    }
+
+
+    return this.columns.some(
+      column => {
+
+        if (
+          !this.isColumnEditable(
+            column
+          )
+        ) {
+
+          return false;
+        }
+
+
+        const oldValue =
+          this.viewingRow[
+            column.key
+          ] ?? '';
+
+
+        const newValue =
+          this.drawerDraft[
+            column.key
+          ] ?? '';
+
+
+        return (
+          String(oldValue)
+          !==
+          String(newValue)
+        );
+      }
+    );
+  }
+
+
+  // =====================================================
+  // DRAWER - SALVAR ALTERAÇÕES
+  // =====================================================
+
+  saveDrawerChanges(): void {
+
+    if (
+      !this.viewingRow
+      ||
+      !this.drawerEditing
+      ||
+      this.drawerSaving
+    ) {
+
+      return;
+    }
+
+
+    const changes:
+      Record<string, any> = {};
+
+
+    for (
+      const column
+      of this.columns
+    ) {
+
+      if (
+        !this.isColumnEditable(
+          column
+        )
+      ) {
+
+        continue;
+      }
+
+
+      const previousValue =
+        this.viewingRow[
+          column.key
+        ] ?? null;
+
+
+      let newValue =
+        this.drawerDraft[
+          column.key
+        ];
+
+
+      if (
+        newValue === ''
+      ) {
+
+        newValue = null;
+      }
+
+
+      if (
+        String(
+          previousValue ?? ''
+        )
+        ===
+        String(
+          newValue ?? ''
+        )
+      ) {
+
+        continue;
+      }
+
+
+      changes[
+        column.key
+      ] = newValue;
+    }
+
+
+    if (
+      Object.keys(
+        changes
+      ).length === 0
+    ) {
+
+      this.drawerEditing =
+        false;
+
+      this.drawerDraft = {};
+
+      this.drawerSuccess =
+        'Nenhuma alteração foi realizada.';
+
+      return;
+    }
+
+
+    const id =
+      this.viewingRow.id;
+
+
+    this.drawerSaving =
+      true;
+
+    this.drawerError = '';
+
+    this.drawerSuccess = '';
+
+
+    this.api
+      .patch<any>(
+        `/ecos/${id}`,
+        changes,
+      )
+      .subscribe({
+
+        next: updated => {
+
+          this.drawerSaving =
+            false;
+
+
+          this.viewingRow =
+            updated;
+
+
+          const row =
+            this.rows.find(
+              item =>
+                item.id === id
+            );
+
+
+          if (row) {
+
+            Object.assign(
+              row,
+              updated
+            );
+          }
+
+
+          if (
+            this.selectedRow?.id
+            === id
+          ) {
+
+            this.selectedRow =
+              row || updated;
+          }
+
+
+          this.drawerEditing =
+            false;
+
+          this.drawerDraft = {};
+
+          this.drawerSuccess =
+            'Alterações salvas com sucesso.';
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao salvar alterações da ECO:',
+            error,
+          );
+
+
+          this.drawerSaving =
+            false;
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.drawerError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível salvar as alterações.';
+        },
+      });
+  }
+
+
+  // =====================================================
+  // OWNERS
+  // =====================================================
+
+  loadOwnerOptions(): void {
+
+    this.api
+      .get<
+        {
+          owner: string;
+          group: string;
+        }[]
+      >(
+        '/settings/owner-options'
+      )
+      .subscribe({
+
+        next: items => {
+
+          this.ownerOptions =
+            items
+
+              .map(
+                item =>
+                  item.owner
+              )
+
+              .filter(
+                owner =>
+                  !!owner
+              );
+
+
+          this.ownerGroupMap =
+            Object.fromEntries(
+              items
+                .filter(
+                  item =>
+                    !!item.owner
+                    &&
+                    !!item.group
+                )
+                .map(
+                  item => [
+                    item.owner,
+                    item.group,
+                  ]
+                )
+            );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao carregar owners:',
+            error,
+          );
+
+          this.ownerOptions = [];
+
+          this.ownerGroupMap = {};
+        },
+      });
+  }
+
+
+  isOwnerColumn(
+    column: EcoColumn,
+  ): boolean {
+
+    return (
+      column.key ===
+      'owner'
+    );
+  }
+
+
+  // =====================================================
+  // STATUS
+  // =====================================================
+
+  statusClass(
+    status: string | null | undefined,
+  ): string {
+
+    const normalized =
+      String(
+        status || ''
+      )
+        .trim()
+        .toUpperCase();
+
+
+    switch (normalized) {
+
+      case 'RELEASED':
+        return 'status-released';
+
+      case 'CANCELLED':
+        return 'status-cancelled';
+
+      case 'REJECTED':
+        return 'status-rejected';
+
+      case 'WORKING':
+        return 'status-working';
+
+      case 'ON HOLD':
+        return 'status-hold';
+
+      case 'PROCESSING':
+        return 'status-processing';
+
+      default:
+        return 'status-default';
+    }
+  }
+
+
+  // =====================================================
+  // EDITABILIDADE
+  // =====================================================
+
+  isColumnEditable(
+    column: EcoColumn,
+  ): boolean {
+
+    if (
+      isCalculatedField(
+        column
+      )
+    ) {
+
+      return false;
+    }
+
+
+    return (
+      this.permissions
+        .canEdit(
+          column.key
+        )
+    );
+  }
+
+
+  isCellSaving(
+    row: any,
+    column: EcoColumn,
+  ): boolean {
+
+    const key =
+      `${row.id}:${column.key}`;
+
+
+    return (
+      this.cellSaving.has(
+        key
+      )
+    );
+  }
+
+
+  // =====================================================
+  // EDIÇÃO INLINE
+  // =====================================================
+
+  updateCell(
+    row: any,
+    column: EcoColumn,
+    event: Event,
+  ): void {
+
+    if (
+      !this.isColumnEditable(
+        column
+      )
+    ) {
+
+      return;
+    }
+
+
+    const element =
+      event.target as
+        HTMLInputElement |
+        HTMLSelectElement;
+
+
+    const rawValue =
+      element.value;
+
+
+    const value =
+      rawValue === ''
+        ? null
+        : rawValue;
+
+
+    const previousValue =
+      row[column.key] ??
+      null;
+
+
+    if (
+      String(
+        previousValue ?? ''
+      )
+      ===
+      String(
+        value ?? ''
+      )
+    ) {
+
+      return;
+    }
+
+
+    const cellKey =
+      `${row.id}:${column.key}`;
+
+
+    this.cellSaving.add(
+      cellKey
+    );
+
+
+    this.cellError = '';
+
+
+    this.api
+      .patch<any>(
+        `/ecos/${row.id}`,
+        {
+          [column.key]:
+            value,
+        },
+      )
+      .subscribe({
+
+        next: updated => {
+
+          Object.assign(
+            row,
+            updated
+          );
+
+
+          if (
+            this.viewingRow?.id ===
+            row.id
+          ) {
+
+            this.viewingRow =
+              row;
+          }
+
+
+          if (
+            this.selectedRow?.id ===
+            row.id
+          ) {
+
+            this.selectedRow =
+              row;
+          }
+
+
+          this.cellSaving.delete(
+            cellKey
+          );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao atualizar campo:',
+            error,
+          );
+
+
+          this.cellSaving.delete(
+            cellKey
+          );
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.cellError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível atualizar o campo.';
+
+
+          element.value =
+            previousValue === null ||
+            previousValue === undefined
+              ? ''
+              : String(
+                  previousValue
+                );
+        },
+      });
+  }
+
+
+  // =====================================================
+  // EXCLUIR ECO
+  // =====================================================
+
+  remove(
+    row: any,
+  ): void {
+
     if (
       !this.permissions
         .isAdmin
     ) {
+
       return;
     }
 
@@ -539,6 +1883,7 @@ export class EcoControlComponent
 
 
     if (!confirmed) {
+
       return;
     }
 
@@ -548,87 +1893,525 @@ export class EcoControlComponent
         `/ecos/${row.id}`,
       )
       .subscribe({
+
         next: () => {
+
+          this.selectedRowIds
+            .delete(
+              row.id
+            );
+
+          if (
+            this.selectedRow?.id ===
+            row.id
+          ) {
+
+            this.selectedRow =
+              null;
+          }
+
+
+          if (
+            this.viewingRow?.id ===
+            row.id
+          ) {
+
+            this.viewingRow =
+              null;
+
+            this.drawerEditing =
+              false;
+
+            this.drawerDraft = {};
+          }
+
+
           this.load();
         },
 
+
         error: error => {
+
           console.error(
             'Erro ao excluir ECO:',
             error,
           );
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.cellError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível excluir a ECO.';
         },
       });
   }
 
 
+  deleteSelectedEcos(): void {
+
+    if (
+      !this.permissions.isAdmin
+      || this.selectedRowsCount === 0
+      || this.deletingSelected
+    ) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Excluir ${this.selectedRowsCount} ECO(s) selecionada(s)?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingSelected = true;
+    this.cellError = '';
+
+    this.api
+      .post<{
+        deleted_rows: number;
+      }>(
+        '/ecos/bulk-delete',
+        {
+          ids:
+            Array.from(
+              this.selectedRowIds
+            ),
+        },
+      )
+      .subscribe({
+        next: () => {
+          this.deletingSelected =
+            false;
+
+          this.selectedRowIds
+            .clear();
+
+          this.selectedRow =
+            null;
+
+          this.viewingRow =
+            null;
+
+          this.page = 1;
+
+          this.load();
+        },
+        error: error => {
+          console.error(
+            'Erro ao excluir ECOs selecionadas:',
+            error,
+          );
+
+          this.deletingSelected =
+            false;
+
+          const detail =
+            error?.error?.detail;
+
+          this.cellError =
+            typeof detail === 'string'
+              ? detail
+              : (
+                  'Não foi possível excluir '
+                  +
+                  'as ECOs selecionadas.'
+                );
+        },
+      });
+  }
+
+
+  // =====================================================
+  // IMPORTAÇÃO XLSX - ABRIR
+  // =====================================================
+
+  openImportModal(): void {
+
+    if (
+      !this.permissions.canBulkEdit
+    ) {
+      return;
+    }
+
+    this.importModalOpen = true;
+
+    this.importFile = null;
+    this.importPreview = null;
+    this.importResult = null;
+
+    this.importError = '';
+    this.importSuccess = '';
+  }
+
+
+  closeImportModal(): void {
+
+    if (
+      this.previewingImport
+      ||
+      this.importingFile
+    ) {
+      return;
+    }
+
+    this.importModalOpen = false;
+    this.importFile = null;
+    this.importPreview = null;
+    this.importResult = null;
+    this.importError = '';
+    this.importSuccess = '';
+  }
+
+
+  onImportFileSelected(
+    event: Event,
+  ): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    this.importFile = null;
+    this.importPreview = null;
+    this.importResult = null;
+    this.importError = '';
+    this.importSuccess = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      this.importError = 'Formato inválido. Envie um arquivo .xlsx.';
+      input.value = '';
+      return;
+    }
+
+    if (file.size === 0) {
+      this.importError = 'O arquivo enviado está vazio.';
+      input.value = '';
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      this.importError = 'O arquivo excede o limite máximo de 25 MB.';
+      input.value = '';
+      return;
+    }
+
+    this.importFile = file;
+  }
+
+
+  previewImport(): void {
+
+    if (
+      !this.importFile
+      ||
+      this.previewingImport
+      ||
+      !this.permissions.canBulkEdit
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+
+    this.previewingImport = true;
+    this.importError = '';
+    this.importSuccess = '';
+
+    this.api
+      .post<any>(
+        '/ecos/import/preview',
+        formData,
+      )
+      .subscribe({
+        next: response => {
+          this.importPreview = response;
+          this.previewingImport = false;
+        },
+        error: error => {
+          console.error(
+            'Erro ao analisar planilha:',
+            error,
+          );
+          this.importError = this.importErrorMessage(
+            error,
+            'Não foi possível analisar a planilha.',
+          );
+          this.previewingImport = false;
+        },
+      });
+  }
+
+
+  confirmImport(): void {
+
+    if (
+      !this.importFile
+      ||
+      !this.importPreview?.can_import
+      ||
+      this.importingFile
+      ||
+      !this.permissions.canBulkEdit
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', this.importFile);
+
+    this.importingFile = true;
+    this.importError = '';
+    this.importSuccess = '';
+
+    this.api
+      .post<any>(
+        '/ecos/import',
+        formData,
+      )
+      .subscribe({
+        next: response => {
+          this.importResult = response;
+          this.importPreview = null;
+          this.importSuccess = (
+            `${response.imported_rows} ECO(s) importada(s) com sucesso.`
+          );
+          this.importingFile = false;
+          this.load();
+        },
+        error: error => {
+          console.error(
+            'Erro ao importar planilha:',
+            error,
+          );
+          this.importError = this.importErrorMessage(
+            error,
+            'Não foi possível importar a planilha.',
+          );
+          this.importingFile = false;
+        },
+      });
+  }
+
+
+  private importErrorMessage(
+    error: any,
+    fallback: string,
+  ): string {
+    const detail = error?.error?.detail;
+
+    if (typeof detail === 'string') {
+      return detail;
+    }
+
+    if (typeof detail?.message === 'string') {
+      return detail.message;
+    }
+
+    return fallback;
+  }
+
+
+  // =====================================================
+  // EXPORTAÇÃO EXCEL
+  // =====================================================
+
+  exportExcel(): void {
+
+    if (
+      this.exporting
+    ) {
+
+      return;
+    }
+
+
+    this.exporting = true;
+
+    this.cellError = '';
+
+
+    this.api
+      .getBlob(
+        '/ecos/export',
+        {
+          search:
+            this.search,
+
+          column_filters:
+            this.columnFiltersParam(),
+        },
+      )
+      .subscribe({
+
+        next: blob => {
+
+          const url =
+            URL.createObjectURL(
+              blob
+            );
+
+
+          const link =
+            document.createElement(
+              'a'
+            );
+
+
+          const now =
+            new Date();
+
+
+          const year =
+            now.getFullYear();
+
+
+          const month =
+            String(
+              now.getMonth() + 1
+            ).padStart(
+              2,
+              '0'
+            );
+
+
+          const day =
+            String(
+              now.getDate()
+            ).padStart(
+              2,
+              '0'
+            );
+
+
+          link.href =
+            url;
+
+
+          link.download =
+            `ECO_CONTROL_${year}-${month}-${day}.xlsx`;
+
+
+          document.body
+            .appendChild(
+              link
+            );
+
+
+          link.click();
+
+
+          document.body
+            .removeChild(
+              link
+            );
+
+
+          URL.revokeObjectURL(
+            url
+          );
+
+
+          this.exporting =
+            false;
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao exportar Excel:',
+            error,
+          );
+
+
+          this.exporting =
+            false;
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.cellError =
+            typeof detail ===
+            'string'
+              ? detail
+              : 'Não foi possível exportar as ECOs para Excel.';
+        },
+      });
+  }
+
+
+  // =====================================================
+  // PAGINAÇÃO
+  // =====================================================
+
   previousPage(): void {
+
     if (
       this.page <= 1
+      ||
+      this.loading
     ) {
+
       return;
     }
 
 
     this.page--;
 
+    this.selectedRow = null;
+
     this.load();
   }
 
 
   nextPage(): void {
+
     if (
       this.page >=
       this.pages()
+      ||
+      this.loading
     ) {
+
       return;
     }
 
 
     this.page++;
 
+    this.selectedRow = null;
+
     this.load();
   }
 
 
   pages(): number {
+
     return Math.max(
       1,
       Math.ceil(
         this.total /
         this.pageSize
-      ),
+      )
     );
   }
 
 
-  /*
-   * Indica se o usuário possui permissão
-   * para editar pelo menos um campo.
-   *
-   * Usaremos isso para mostrar/esconder
-   * o botão Editar.
-   */
-  get canEditAny(): boolean {
-
-    if (
-      this.permissions
-        .isAdmin
-    ) {
-      return true;
-    }
-
-
-    return EDITABLE_COLUMNS
-      .some(
-        column =>
-          this.permissions
-            .canEdit(
-              column.key
-            )
-      );
-  }
-
+  // =====================================================
+  // EXIBIÇÃO
+  // =====================================================
 
   displayValue(
     row: any,
@@ -644,6 +2427,7 @@ export class EcoControlComponent
       value === undefined ||
       value === ''
     ) {
+
       return '-';
     }
 
@@ -652,15 +2436,22 @@ export class EcoControlComponent
       typeof value ===
       'boolean'
     ) {
+
       return value
         ? 'YES'
         : 'NO';
     }
 
 
-    return String(value);
+    return String(
+      value
+    );
   }
 
+
+  // =====================================================
+  // HELPERS
+  // =====================================================
 
   isBooleanColumn(
     column: EcoColumn,
@@ -689,11 +2480,9 @@ export class EcoControlComponent
   ): boolean {
 
     return (
-      column.key ===
-        'eco'
+      column.key === 'eco'
       ||
-      column.key ===
-        'az_eco_no'
+      column.key === 'az_eco_no'
     );
   }
 
@@ -718,9 +2507,7 @@ export class EcoControlComponent
 
   trackGroup(
     _index: number,
-    group:
-      EditableGroup |
-      EcoColumnGroup,
+    group: EcoColumnGroup,
   ): string {
 
     return group.key;

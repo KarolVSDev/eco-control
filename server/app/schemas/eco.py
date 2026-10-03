@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -109,6 +110,17 @@ class EcoCreate(EcoBase):
 
 class EcoUpdate(EcoBase):
     pass
+
+
+class EcoBulkDelete(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid"
+    )
+
+    ids: list[UUID] = Field(
+        min_length=1,
+        max_length=500,
+    )
 
 
 class EcoOut(EcoBase):

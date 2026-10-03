@@ -1,0 +1,680 @@
+/* =====================================================
+   CABEÇALHO
+   ===================================================== */
+
+.users-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 16px;
+}
+
+
+/* =====================================================
+   FORMULÁRIO DE NOVO USUÁRIO
+   ===================================================== */
+
+.users-form-card {
+  max-width: 760px;
+
+  margin-top: 20px;
+}
+
+.users-form-header {
+  margin-bottom: 18px;
+}
+
+.users-form-header h3 {
+  margin: 0 0 4px;
+
+  color: #fff;
+
+  font-size: 18px;
+}
+
+.users-form-header p {
+  margin: 0;
+
+  color: #858585;
+
+  font-size: 13px;
+}
+
+
+/* =====================================================
+   CAMPOS
+   ===================================================== */
+
+.form-field {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.form-field label {
+  color: #bdbdbd;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-field .input,
+.form-field .select {
+  width: 100%;
+}
+
+.field-error {
+  color: #ff5479;
+
+  font-size: 11px;
+}
+
+
+/* =====================================================
+   AÇÕES DO FORMULÁRIO
+   ===================================================== */
+
+.users-form-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  margin-top: 18px;
+}
+
+
+/* =====================================================
+   MENSAGENS
+   ===================================================== */
+
+.users-message {
+  margin-top: 14px;
+
+  padding: 10px 12px;
+
+  border-radius: 7px;
+
+  font-size: 12px;
+}
+
+.users-message-error {
+  border:
+    1px solid
+    rgba(237, 23, 76, 0.35);
+
+  background:
+    rgba(237, 23, 76, 0.08);
+
+  color: #ff607f;
+}
+
+.users-message-success {
+  border:
+    1px solid
+    rgba(34, 197, 94, 0.35);
+
+  background:
+    rgba(34, 197, 94, 0.08);
+
+  color: #4ade80;
+}
+
+
+/* =====================================================
+   TABELA
+   ===================================================== */
+
+.users-table-wrap {
+  margin-top: 20px;
+}
+
+.users-table {
+  min-width: 850px;
+}
+
+.users-table th {
+  height: 42px;
+}
+
+.users-table td {
+  height: 48px;
+
+  vertical-align: middle;
+}
+
+.actions-column {
+  width: 240px;
+
+  text-align: right !important;
+}
+
+
+/* =====================================================
+   NOME DO USUÁRIO
+   ===================================================== */
+
+.user-name-cell {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.user-name {
+  color: #f2f2f2;
+
+  font-weight: 500;
+}
+
+.current-user-badge {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 20px;
+
+  padding: 2px 7px;
+
+  border:
+    1px solid
+    rgba(237, 23, 76, 0.3);
+
+  border-radius: 999px;
+
+  background:
+    rgba(237, 23, 76, 0.1);
+
+  color: #ff416d;
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+/* =====================================================
+   PERFIL
+   ===================================================== */
+
+.user-role {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 24px;
+
+  padding: 3px 8px;
+
+  border: 1px solid #3b3b3b;
+  border-radius: 6px;
+
+  background: #222;
+
+  color: #c9c9c9;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.user-role.role-admin {
+  border-color:
+    rgba(237, 23, 76, 0.35);
+
+  background:
+    rgba(237, 23, 76, 0.09);
+
+  color: #ff5275;
+}
+
+
+/* =====================================================
+   STATUS
+   ===================================================== */
+
+.user-status {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 24px;
+
+  padding: 3px 8px;
+
+  border: 1px solid;
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.status-active {
+  border-color: #087c43;
+
+  background:
+    rgba(0, 134, 72, 0.14);
+
+  color: #2bdd80;
+}
+
+.status-inactive {
+  border-color: #494949;
+
+  background: #292929;
+
+  color: #aaa;
+}
+
+
+/* =====================================================
+   AÇÕES DO USUÁRIO
+   ===================================================== */
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 7px;
+}
+
+.user-action-button {
+  min-height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding: 0 9px;
+
+  border: 1px solid #383838;
+  border-radius: 6px;
+
+  background: #191919;
+
+  color: #c8c8c8;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.user-action-button:hover:not(:disabled) {
+  border-color: #555;
+
+  background: #242424;
+
+  color: #fff;
+}
+
+.user-action-button:disabled {
+  opacity: 0.5;
+
+  cursor: default;
+}
+
+
+/* redefinir senha */
+
+.password-action:hover:not(:disabled) {
+  border-color:
+    rgba(59, 130, 246, 0.55);
+
+  background:
+    rgba(59, 130, 246, 0.1);
+
+  color: #79aaff;
+}
+
+
+/* excluir */
+
+.delete-action {
+  border-color:
+    rgba(237, 23, 76, 0.25);
+}
+
+.delete-action:hover:not(:disabled) {
+  border-color:
+    rgba(237, 23, 76, 0.55);
+
+  background:
+    rgba(237, 23, 76, 0.12);
+
+  color: #ff5275;
+}
+
+
+/* =====================================================
+   PRÓPRIA CONTA
+   ===================================================== */
+
+.self-delete-hint {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 30px;
+
+  padding: 0 9px;
+
+  border-radius: 6px;
+
+  color: #666;
+
+  font-size: 10px;
+
+  white-space: nowrap;
+}
+
+
+/* =====================================================
+   ESTADO VAZIO
+   ===================================================== */
+
+.users-empty {
+  height: 110px;
+
+  text-align: center !important;
+
+  color: #777 !important;
+}
+
+
+/* =====================================================
+   OVERLAY DO MODAL
+   ===================================================== */
+
+.user-modal-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 500;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background:
+    rgba(0, 0, 0, 0.72);
+
+  animation:
+    usersOverlayFade
+    0.15s ease;
+}
+
+@keyframes usersOverlayFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+
+/* =====================================================
+   MODAL
+   ===================================================== */
+
+.user-modal {
+  width: min(
+    480px,
+    100%
+  );
+
+  overflow: hidden;
+
+  border: 1px solid #363636;
+  border-radius: 12px;
+
+  background: #171717;
+
+  box-shadow:
+    0 24px 70px
+    rgba(0, 0, 0, 0.7);
+
+  animation:
+    usersModalEnter
+    0.18s ease;
+}
+
+@keyframes usersModalEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(10px)
+      scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+
+/* =====================================================
+   CABEÇALHO DO MODAL
+   ===================================================== */
+
+.user-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 20px 22px 16px;
+
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.user-modal-header h2 {
+  margin: 0 0 5px;
+
+  color: #fff;
+
+  font-size: 18px;
+}
+
+.user-modal-header p {
+  margin: 0;
+
+  color: #858585;
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.user-modal-header strong {
+  color: #d5d5d5;
+}
+
+.user-modal-close {
+  width: 32px;
+  height: 32px;
+
+  display: grid;
+  place-items: center;
+
+  flex: 0 0 auto;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 6px;
+
+  background: transparent;
+
+  color: #999;
+
+  font-size: 22px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.user-modal-close:hover:not(:disabled) {
+  background: #242424;
+
+  color: #fff;
+}
+
+.user-modal-close:disabled {
+  opacity: 0.45;
+
+  cursor: default;
+}
+
+
+/* =====================================================
+   CORPO DO MODAL
+   ===================================================== */
+
+.user-modal-body {
+  display: flex;
+  flex-direction: column;
+
+  gap: 16px;
+
+  padding: 20px 22px;
+}
+
+
+/* =====================================================
+   INFORMAÇÃO DO USUÁRIO
+   ===================================================== */
+
+.password-user-info {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+
+  padding: 11px 12px;
+
+  border: 1px solid #313131;
+  border-radius: 7px;
+
+  background: #202020;
+}
+
+.password-user-label {
+  color: #777;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.05em;
+
+  text-transform: uppercase;
+}
+
+.password-user-info strong {
+  color: #e5e5e5;
+
+  font-size: 12px;
+}
+
+
+/* =====================================================
+   RODAPÉ DO MODAL
+   ===================================================== */
+
+.user-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  padding: 14px 22px;
+
+  border-top: 1px solid #2d2d2d;
+
+  background: #191919;
+}
+
+
+/* =====================================================
+   RESPONSIVIDADE
+   ===================================================== */
+
+@media (
+  max-width: 760px
+) {
+
+  .users-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .users-header .btn {
+    width: 100%;
+  }
+
+  .users-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .users-form-actions .btn {
+    width: 100%;
+  }
+
+  .users-table {
+    min-width: 720px;
+  }
+
+  .action-label {
+    display: none;
+  }
+
+  .user-action-button {
+    width: 32px;
+    min-width: 32px;
+
+    padding: 0;
+  }
+
+  .actions-column {
+    width: 120px;
+  }
+
+  .user-modal-overlay {
+    align-items: flex-end;
+
+    padding: 10px;
+  }
+
+  .user-modal {
+    width: 100%;
+
+    border-radius: 12px;
+  }
+
+  .user-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .user-modal-footer .btn {
+    width: 100%;
+  }
+}

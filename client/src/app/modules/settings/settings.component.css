@@ -1,0 +1,604 @@
+/* =====================================================
+   CABEÇALHO
+   ===================================================== */
+
+.settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 16px;
+}
+
+
+/* =====================================================
+   MENSAGENS
+   ===================================================== */
+
+.settings-message {
+  margin-top: 14px;
+
+  padding: 10px 12px;
+
+  border-radius: 7px;
+
+  font-size: 12px;
+}
+
+.settings-message-error {
+  border: 1px solid rgba(237, 23, 76, 0.35);
+
+  background: rgba(237, 23, 76, 0.08);
+
+  color: #ff607f;
+}
+
+.settings-message-success {
+  border: 1px solid rgba(34, 197, 94, 0.35);
+
+  background: rgba(34, 197, 94, 0.08);
+
+  color: #4ade80;
+}
+
+.settings-loading {
+  margin-top: 20px;
+
+  color: #8a8a8a;
+
+  font-size: 13px;
+}
+
+
+/* =====================================================
+   CARD
+   ===================================================== */
+
+.settings-card {
+  padding: 18px;
+
+  border: 1px solid #343434;
+  border-radius: 12px;
+
+  background: #151515;
+}
+
+.obu-card {
+  margin-top: 26px;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 16px;
+}
+
+.settings-card-header h2 {
+  margin: 0;
+
+  color: #fff;
+
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.settings-card-header h2 span {
+  color: #bdbdbd;
+
+  font-weight: 600;
+}
+
+
+/* =====================================================
+   CAMPOS
+   ===================================================== */
+
+.settings-input,
+.settings-select {
+  min-height: 42px;
+
+  border: 1px solid #393939;
+  border-radius: 7px;
+
+  background: #202020;
+
+  color: #f5f5f5;
+
+  outline: none;
+
+  box-sizing: border-box;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.settings-input {
+  width: 100%;
+
+  padding: 0 14px;
+}
+
+.settings-select {
+  padding: 0 38px 0 14px;
+
+  cursor: pointer;
+
+  color-scheme: dark;
+}
+
+.settings-input::placeholder {
+  color: #8d8d8d;
+}
+
+.settings-input:focus,
+.settings-select:focus {
+  border-color: #555;
+
+  background: #232323;
+}
+
+.settings-select option {
+  background: #1b1b1b;
+
+  color: #fff;
+}
+
+.settings-select.compact {
+  min-height: 30px;
+
+  padding: 0 28px 0 8px;
+
+  font-size: 12px;
+}
+
+
+/* =====================================================
+   BOTÃO +
+   ===================================================== */
+
+.settings-add-button {
+  width: 44px;
+  height: 42px;
+
+  display: grid;
+  place-items: center;
+
+  flex: 0 0 auto;
+
+  padding: 0;
+
+  border: 1px solid #ed174c;
+  border-radius: 7px;
+
+  background: #ed174c;
+
+  color: #fff;
+
+  font-size: 25px;
+  font-weight: 300;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.settings-add-button:hover {
+  border-color: #d91445;
+
+  background: #d91445;
+}
+
+.settings-add-button:active {
+  transform: scale(0.96);
+}
+
+
+/* =====================================================
+   OBU → AU - LINHA DE ADIÇÃO
+   ===================================================== */
+
+.obu-add-row {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  margin-bottom: 16px;
+}
+
+.obu-add-row .settings-select {
+  width: 155px;
+}
+
+
+/* =====================================================
+   OBU → AU - GRID
+   ===================================================== */
+
+.obu-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 9px;
+}
+
+.obu-item {
+  min-width: 0;
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding: 0 10px;
+
+  border-radius: 6px;
+
+  background: #202020;
+}
+
+.obu-code {
+  min-width: 0;
+
+  overflow: hidden;
+
+  color: #d6d6d6;
+
+  font-family:
+    Consolas,
+    "Courier New",
+    monospace;
+
+  font-size: 13px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obu-item-right {
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+
+  flex: 0 0 auto;
+}
+
+.obu-item-right strong {
+  min-width: 35px;
+
+  color: #fff;
+
+  font-family:
+    Consolas,
+    "Courier New",
+    monospace;
+
+  font-size: 13px;
+
+  text-align: right;
+}
+
+.obu-edit-fields {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+
+  flex: 1;
+}
+
+.obu-edit-fields .settings-select {
+  width: 50%;
+}
+
+
+/* =====================================================
+   BOTÕES DE AÇÃO
+   ===================================================== */
+
+.settings-icon-button {
+  width: 25px;
+  height: 25px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 5px;
+
+  background: transparent;
+
+  color: #747474;
+
+  font-size: 15px;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.settings-icon-button:hover {
+  background: #2d2d2d;
+
+  color: #fff;
+}
+
+.settings-icon-button svg {
+  width: 15px;
+  height: 15px;
+
+  fill: currentColor;
+}
+
+.settings-icon-button.delete:hover {
+  background: rgba(237, 23, 76, 0.12);
+
+  color: #ff4f73;
+}
+
+.settings-icon-button.save:hover {
+  background: rgba(34, 197, 94, 0.12);
+
+  color: #4ade80;
+}
+
+
+/* =====================================================
+   GRID INFERIOR
+   ===================================================== */
+
+.settings-bottom-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 18px;
+
+  margin-top: 28px;
+}
+
+
+/* =====================================================
+   OWNER → GROUP
+   ===================================================== */
+
+.owner-add-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    120px
+    44px;
+
+  gap: 10px;
+
+  align-items: center;
+}
+
+.group-select {
+  width: 100%;
+}
+
+
+/* =====================================================
+   MANAGERS
+   ===================================================== */
+
+.manager-add-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    44px;
+
+  gap: 10px;
+
+  align-items: center;
+}
+
+
+/* =====================================================
+   LISTAS SIMPLES
+   ===================================================== */
+
+.simple-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 8px;
+
+  margin-top: 14px;
+}
+
+.simple-list-item {
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding: 0 10px;
+
+  border-radius: 6px;
+
+  background: #202020;
+
+  color: #ddd;
+
+  font-size: 13px;
+}
+
+.simple-list-item span {
+  min-width: 0;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simple-list-item strong {
+  color: #fff;
+}
+
+.settings-empty {
+  padding: 10px 2px;
+
+  color: #777;
+
+  font-size: 12px;
+}
+
+
+/* =====================================================
+   EXPORT
+   ===================================================== */
+
+/* .settings-export-wrapper {
+  display: flex;
+  justify-content: flex-end;
+
+  margin-top: 28px;
+
+  padding-bottom: 8px;
+}
+
+.settings-export-button {
+  min-width: 132px;
+  height: 48px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  padding: 0 18px;
+
+  border: 0;
+  border-radius: 18px;
+
+  background: #ff713c;
+
+  color: #fff;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 8px 25px
+    rgba(255, 113, 60, 0.25);
+
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.settings-export-button:hover {
+  background: #ff632a;
+
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 10px 30px
+    rgba(255, 113, 60, 0.32);
+} */
+
+
+/* =====================================================
+   RESPONSIVIDADE
+   ===================================================== */
+
+@media (
+  max-width: 1150px
+) {
+
+  .obu-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+
+@media (
+  max-width: 900px
+) {
+
+  .settings-bottom-grid {
+    grid-template-columns:
+      1fr;
+  }
+}
+
+
+@media (
+  max-width: 700px
+) {
+
+  .obu-add-row {
+    align-items: stretch;
+
+    flex-direction: column;
+  }
+
+  .obu-add-row .settings-select,
+  .obu-add-row .settings-add-button {
+    width: 100%;
+  }
+
+  .obu-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .owner-add-row,
+  .manager-add-row {
+    grid-template-columns:
+      1fr;
+  }
+
+  .owner-add-row
+  .settings-add-button,
+  .manager-add-row
+  .settings-add-button {
+    width: 100%;
+  }
+
+  .settings-export-button {
+    width: 100%;
+  }
+}

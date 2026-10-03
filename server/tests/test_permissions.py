@@ -1,4 +1,6 @@
+import json
 from types import SimpleNamespace
+import uuid
 
 import pytest
 from fastapi import HTTPException
@@ -6,6 +8,7 @@ from fastapi import HTTPException
 from app.services.eco_service import EcoService
 from app.controller import history_controller
 from app.controller.history_controller import list_history
+from app.models.entities import EcoHistory
 
 
 def service_with(user, db):
@@ -75,8 +78,14 @@ def test_analyst_does_not_receive_hidden_history_fields(monkeypatch):
         def __init__(self, db):
             pass
 
-        def list(self, *args):
-            return [history_item], 1
+        def list(self, *args, **kwargs):
+            hidden_fields = kwargs.get('hidden_fields', set())
+            visible_items = (
+                []
+                if history_item.field_key in hidden_fields
+                else [history_item]
+            )
+            return visible_items, len(visible_items)
 
     monkeypatch.setattr(history_controller, 'HistoryRepository', FakeHistoryRepository)
     db = SimpleNamespace(
@@ -88,4 +97,44 @@ def test_analyst_does_not_receive_hidden_history_fields(monkeypatch):
     response = list_history(db=db, user=user)
 
     assert response['items'] == []
-    assert response['total'] == 1
+    assert response['total'] == 0
+
+
+def test_analyst_snapshot_omits_hidden_fields(monkeypatch):
+    history_item = EcoHistory(
+        id=uuid.uuid4(),
+        eco_id=uuid.uuid4(),
+        eco_code='ECO-1',
+        item=1,
+        field_key='eco',
+        field_label='ECO criada',
+        new_value=json.dumps({
+            'eco': 'ECO-1',
+            'status': 'WORKING',
+            'comments': 'Confidential note',
+        }),
+        user_email='analyst@example.com',
+        user_name='Analyst',
+        action='created',
+    )
+    analyst_permission = SimpleNamespace(can_view_history=True)
+    hidden_permission = SimpleNamespace(field_key='comments', can_view=False)
+
+    class FakeHistoryRepository:
+        def __init__(self, db):
+            pass
+
+        def list(self, *args, **kwargs):
+            return [history_item], 1
+
+    monkeypatch.setattr(history_controller, 'HistoryRepository', FakeHistoryRepository)
+    db = SimpleNamespace(
+        scalar=lambda query: analyst_permission,
+        scalars=lambda query: SimpleNamespace(all=lambda: [hidden_permission]),
+    )
+    user = SimpleNamespace(role='analyst', email='analyst@example.com')
+
+    response = list_history(db=db, user=user)
+
+    snapshot = json.loads(response['items'][0]['new_value'])
+    assert snapshot == {'eco': 'ECO-1', 'status': 'WORKING'}

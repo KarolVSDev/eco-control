@@ -1,3 +1,742 @@
-<div class="page"><h1 class="title">Dashboard</h1><p class="subtitle">Visão geral do controle de ECOs.</p><div class="stats" *ngIf="stats"><app-stat-card label="Total ECO" [value]="stats.total"></app-stat-card><app-stat-card label="Working" [value]="stats.working" tone="info"></app-stat-card><app-stat-card label="On Hold" [value]="stats.on_hold" tone="warning"></app-stat-card><app-stat-card label="Processing" [value]="stats.processing" tone="info"></app-stat-card><app-stat-card label="Released" [value]="stats.released" tone="success"></app-stat-card><app-stat-card label="Rejected" [value]="stats.rejected" tone="danger"></app-stat-card><app-stat-card label="Cancelled" [value]="stats.cancelled"></app-stat-card><app-stat-card label="Overdue" [value]="stats.overdue" tone="danger"></app-stat-card><app-stat-card label="Gap > 7 dias" [value]="stats.gap7" tone="warning"></app-stat-card><app-stat-card label="Gap > 14 dias" [value]="stats.gap14" tone="danger"></app-stat-card></div>
-<div class="grid grid-2 charts"><app-chart-card title="ECO por Status" subtitle="Distribuição por status atual" [months]="months" (monthChange)="reload('status',$event)"><app-donut-chart [data]="status"></app-donut-chart></app-chart-card><app-chart-card title="Evolução de ECOs por Mês" subtitle="Quantidade de ECOs registrados por mês" [filter]="false"><app-line-chart [data]="evolution"></app-line-chart></app-chart-card><app-chart-card title="ECO por Grupo" subtitle="Distribuição por grupo de trabalho" [months]="months" (monthChange)="reload('group',$event)"><app-donut-chart [data]="groups"></app-donut-chart></app-chart-card><app-chart-card title="ECO por Owner" subtitle="ECOs por responsável" [months]="months" (monthChange)="reload('owner',$event)"><app-horizontal-bar-chart [data]="owner"></app-horizontal-bar-chart></app-chart-card><app-chart-card title="ECO por OBU" subtitle="ECOs por unidade de negócio" [months]="months" (monthChange)="reload('obu',$event)"><app-horizontal-bar-chart [data]="obu"></app-horizontal-bar-chart></app-chart-card><app-chart-card title="ECO por AU" subtitle="ECOs por área de suporte" [months]="months" (monthChange)="reload('au',$event)"><app-horizontal-bar-chart [data]="au"></app-horizontal-bar-chart></app-chart-card><app-chart-card title="ECO por Tipo" subtitle="Distribuição por tipo de ECO" [months]="months" (monthChange)="reload('eco_type',$event)"><app-horizontal-bar-chart [data]="types"></app-horizontal-bar-chart></app-chart-card><app-chart-card title="ECO por Tempo de Atraso" subtitle="Distribuição por tempo de processamento (AZ Gap)" [months]="months" (monthChange)="reload('delay',$event)"><app-delay-bar-chart [data]="delay"></app-delay-bar-chart></app-chart-card></div>
-<section class="card summary"><h3>Resumo por Mês</h3><p class="subtitle">Distribuição mensal de ECOs por status</p><div class="table-wrap"><table class="table"><thead><tr><th>Mês</th><th>Total</th><th>Working</th><th>Processing</th><th>Cancelled</th><th>Released</th><th>Rejected</th></tr></thead><tbody><tr *ngFor="let r of summary"><td><b>{{r.month}}</b></td><td>{{r.total}}</td><td class="info">{{r.working}}</td><td>{{r.processing}}</td><td>{{r.cancelled}}</td><td class="success">{{r.released}}</td><td class="danger">{{r.rejected}}</td></tr></tbody></table></div></section></div>
+<div class="page">
+
+  <!-- ================================================= -->
+  <!-- CABEÇALHO -->
+  <!-- ================================================= -->
+
+  <h1 class="title">
+    Dashboard
+  </h1>
+
+  <p class="subtitle">
+    Visão geral do controle de ECOs.
+  </p>
+
+
+  <!-- ================================================= -->
+  <!-- LOADING GERAL -->
+  <!-- ================================================= -->
+
+  <div
+    class="dashboard-state dashboard-loading"
+    *ngIf="loading"
+  >
+
+    <div class="dashboard-spinner"></div>
+
+    <span>
+      Carregando indicadores e gráficos...
+    </span>
+
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- ERRO GERAL -->
+  <!-- ================================================= -->
+
+  <div
+    class="dashboard-state dashboard-error"
+    *ngIf="
+      loadError
+      &&
+      !loading
+    "
+  >
+
+    <div class="dashboard-error-content">
+
+      <strong>
+        Não foi possível carregar o Dashboard
+      </strong>
+
+      <span>
+        {{ loadError }}
+      </span>
+
+    </div>
+
+
+    <button
+      class="dashboard-retry-button"
+      type="button"
+      (click)="retry()"
+    >
+      Tentar novamente
+    </button>
+
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- CONTEÚDO -->
+  <!-- ================================================= -->
+
+  <ng-container
+    *ngIf="
+      !loading
+      &&
+      !loadError
+    "
+  >
+
+
+    <!-- ================================================= -->
+    <!-- INDICADORES -->
+    <!-- ================================================= -->
+
+    <div
+      class="stats"
+      *ngIf="stats"
+    >
+
+      <app-stat-card
+        label="Total ECO"
+        [value]="stats.total"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Working"
+        [value]="stats.working"
+        tone="info"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="On Hold"
+        [value]="stats.on_hold"
+        tone="warning"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Processing"
+        [value]="stats.processing"
+        tone="info"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Released"
+        [value]="stats.released"
+        tone="success"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Rejected"
+        [value]="stats.rejected"
+        tone="danger"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Cancelled"
+        [value]="stats.cancelled"
+      ></app-stat-card>
+
+
+      <!--
+        A regra de Overdue ainda precisa
+        ser validada com o P.O.
+      -->
+
+      <app-stat-card
+        label="Overdue"
+        [value]="stats.overdue"
+        tone="danger"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Gap > 7 dias"
+        [value]="stats.gap7"
+        tone="warning"
+      ></app-stat-card>
+
+
+      <app-stat-card
+        label="Gap > 14 dias"
+        [value]="stats.gap14"
+        tone="danger"
+      ></app-stat-card>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- GRÁFICOS -->
+    <!-- ================================================= -->
+
+    <div class="grid grid-2 charts">
+
+
+      <!-- ================================================= -->
+      <!-- ECO POR STATUS -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por Status"
+        subtitle="Distribuição por status atual"
+        [months]="months"
+        [month]="filters['status']"
+        (monthChange)="
+          reload(
+            'status',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['status']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['status']
+            &&
+            chartErrors['status']
+          "
+        >
+
+          <span>
+            {{ chartErrors['status'] }}
+          </span>
+
+        </div>
+
+
+        <app-donut-chart
+          *ngIf="
+            !chartLoading['status']
+            &&
+            !chartErrors['status']
+          "
+          [data]="status"
+        ></app-donut-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- EVOLUÇÃO -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="Evolução de ECOs por Mês"
+        subtitle="Quantidade de ECOs registrados por mês"
+        [filter]="false"
+      >
+
+        <app-line-chart
+          [data]="evolution"
+        ></app-line-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- ECO POR GRUPO -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por Grupo"
+        subtitle="Distribuição por grupo de trabalho"
+        [months]="months"
+        [month]="filters['group']"
+        (monthChange)="
+          reload(
+            'group',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['group']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['group']
+            &&
+            chartErrors['group']
+          "
+        >
+
+          <span>
+            {{ chartErrors['group'] }}
+          </span>
+
+        </div>
+
+
+        <app-donut-chart
+          *ngIf="
+            !chartLoading['group']
+            &&
+            !chartErrors['group']
+          "
+          [data]="groups"
+        ></app-donut-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- ECO POR OWNER -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por Owner"
+        subtitle="ECOs por responsável"
+        [months]="months"
+        [month]="filters['owner']"
+        (monthChange)="
+          reload(
+            'owner',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['owner']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['owner']
+            &&
+            chartErrors['owner']
+          "
+        >
+
+          <span>
+            {{ chartErrors['owner'] }}
+          </span>
+
+        </div>
+
+
+        <app-horizontal-bar-chart
+          *ngIf="
+            !chartLoading['owner']
+            &&
+            !chartErrors['owner']
+          "
+          [data]="owner"
+        ></app-horizontal-bar-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- ECO POR OBU -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por OBU"
+        subtitle="ECOs por unidade de negócio"
+        [months]="months"
+        [month]="filters['obu']"
+        (monthChange)="
+          reload(
+            'obu',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['obu']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['obu']
+            &&
+            chartErrors['obu']
+          "
+        >
+
+          <span>
+            {{ chartErrors['obu'] }}
+          </span>
+
+        </div>
+
+
+        <app-horizontal-bar-chart
+          *ngIf="
+            !chartLoading['obu']
+            &&
+            !chartErrors['obu']
+          "
+          [data]="obu"
+        ></app-horizontal-bar-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- ECO POR AU -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por AU"
+        subtitle="ECOs por área de suporte"
+        [months]="months"
+        [month]="filters['au']"
+        (monthChange)="
+          reload(
+            'au',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['au']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['au']
+            &&
+            chartErrors['au']
+          "
+        >
+
+          <span>
+            {{ chartErrors['au'] }}
+          </span>
+
+        </div>
+
+
+        <app-horizontal-bar-chart
+          *ngIf="
+            !chartLoading['au']
+            &&
+            !chartErrors['au']
+          "
+          [data]="au"
+        ></app-horizontal-bar-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- ECO POR TIPO -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por Tipo"
+        subtitle="Distribuição por tipo de ECO"
+        [months]="months"
+        [month]="filters['eco_type']"
+        (monthChange)="
+          reload(
+            'eco_type',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['eco_type']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['eco_type']
+            &&
+            chartErrors['eco_type']
+          "
+        >
+
+          <span>
+            {{ chartErrors['eco_type'] }}
+          </span>
+
+        </div>
+
+
+        <app-horizontal-bar-chart
+          *ngIf="
+            !chartLoading['eco_type']
+            &&
+            !chartErrors['eco_type']
+          "
+          [data]="types"
+        ></app-horizontal-bar-chart>
+
+      </app-chart-card>
+
+
+      <!-- ================================================= -->
+      <!-- TEMPO DE ATRASO -->
+      <!-- ================================================= -->
+
+      <app-chart-card
+        title="ECO por Tempo de Atraso"
+        subtitle="Distribuição por tempo de processamento (AZ Gap)"
+        [months]="months"
+        [month]="filters['delay']"
+        (monthChange)="
+          reload(
+            'delay',
+            $event
+          )
+        "
+      >
+
+        <div
+          class="chart-state"
+          *ngIf="
+            chartLoading['delay']
+          "
+        >
+
+          <div class="chart-spinner"></div>
+
+          <span>
+            Atualizando...
+          </span>
+
+        </div>
+
+
+        <div
+          class="chart-state chart-state-error"
+          *ngIf="
+            !chartLoading['delay']
+            &&
+            chartErrors['delay']
+          "
+        >
+
+          <span>
+            {{ chartErrors['delay'] }}
+          </span>
+
+        </div>
+
+
+        <app-delay-bar-chart
+          *ngIf="
+            !chartLoading['delay']
+            &&
+            !chartErrors['delay']
+          "
+          [data]="delay"
+        ></app-delay-bar-chart>
+
+      </app-chart-card>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- RESUMO POR MÊS -->
+    <!-- ================================================= -->
+
+    <section class="card summary">
+
+      <h3>
+        Resumo por Mês
+      </h3>
+
+      <p class="subtitle">
+        Distribuição mensal de ECOs por status
+      </p>
+
+
+      <div
+        class="table-wrap"
+        *ngIf="
+          summary.length > 0;
+          else emptySummary
+        "
+      >
+
+        <table class="table">
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Mês
+              </th>
+
+              <th>
+                Total
+              </th>
+
+              <th>
+                Working
+              </th>
+
+              <th>
+                Processing
+              </th>
+
+              <th>
+                Cancelled
+              </th>
+
+              <th>
+                Released
+              </th>
+
+              <th>
+                Rejected
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            <tr
+              *ngFor="
+                let r of summary
+              "
+            >
+
+              <td>
+                <b>
+                  {{ r.month }}
+                </b>
+              </td>
+
+              <td>
+                {{ r.total }}
+              </td>
+
+              <td class="info">
+                {{ r.working }}
+              </td>
+
+              <td>
+                {{ r.processing }}
+              </td>
+
+              <td>
+                {{ r.cancelled }}
+              </td>
+
+              <td class="success">
+                {{ r.released }}
+              </td>
+
+              <td class="danger">
+                {{ r.rejected }}
+              </td>
+
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+
+      <ng-template #emptySummary>
+
+        <div class="summary-empty">
+          Nenhum dado mensal disponível.
+        </div>
+
+      </ng-template>
+
+    </section>
+
+  </ng-container>
+
+</div>
