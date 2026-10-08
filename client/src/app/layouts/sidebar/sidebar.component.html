@@ -5,28 +5,51 @@
   </div>
 
 
-  <nav>
+  <nav class="sidebar-nav">
 
-    <ng-container
-      *ngFor="let l of links"
-    >
+    @for (section of menuSections; track section.title) {
 
-      <a
-        *ngIf="canShow(l)"
-        [routerLink]="l.to"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{
-          exact: l.to === '/'
-        }"
-      >
-        <b>
-          {{ l.icon }}
-        </b>
+      @if (canShowSection(section)) {
 
-        {{ l.label }}
-      </a>
+        <div class="menu-section">
 
-    </ng-container>
+          <span class="menu-section-title">
+            {{ section.title }}
+          </span>
+
+          @for (item of section.items; track item.route) {
+
+            @if (canShow(item)) {
+
+              <a
+                class="menu-item"
+                [routerLink]="item.route"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{
+                  exact: item.route === '/dashboard'
+                }"
+              >
+                <b
+                  class="menu-item-icon"
+                  aria-hidden="true"
+                >
+                  {{ iconSymbol(item.icon) }}
+                </b>
+
+                <span>
+                  {{ item.label }}
+                </span>
+              </a>
+
+            }
+
+          }
+
+        </div>
+
+      }
+
+    }
 
   </nav>
 

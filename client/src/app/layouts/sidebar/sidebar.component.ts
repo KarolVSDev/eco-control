@@ -17,13 +17,26 @@ import {
 
 
 interface NavLink {
-  to: string;
-  icon: string;
+  route: string;
+  icon: NavIcon;
   label: string;
 
   adminOnly?: boolean;
   historyOnly?: boolean;
 }
+
+interface MenuSection {
+  title: string;
+  items: NavLink[];
+}
+
+type NavIcon =
+  | 'layout-dashboard'
+  | 'file-text'
+  | 'history'
+  | 'users'
+  | 'shield'
+  | 'settings';
 
 
 @Component({
@@ -34,42 +47,66 @@ interface NavLink {
 export class SidebarComponent
   implements OnInit {
 
-  links: NavLink[] = [
+  menuSections: MenuSection[] = [
     {
-      to: '/',
-      icon: '▦',
-      label: 'Dashboard',
+      title: 'VISÃO GERAL',
+      items: [
+        {
+          label: 'Dashboard',
+          icon: 'layout-dashboard',
+          route: '/dashboard',
+        },
+      ],
     },
     {
-      to: '/eco-control',
-      icon: '▤',
-      label: 'ECO Control',
+      title: 'GESTÃO',
+      items: [
+        {
+          label: 'ECO Control',
+          icon: 'file-text',
+          route: '/eco-control',
+        },
+        {
+          label: 'Histórico',
+          icon: 'history',
+          route: '/historico-alteracoes',
+          historyOnly: true,
+        },
+      ],
     },
     {
-      to: '/relatorios',
-      icon: '▥',
-      label: 'Relatórios',
-      historyOnly: true,
-    },
-    {
-      to: '/usuarios',
-      icon: '♙',
-      label: 'Usuários',
-      adminOnly: true,
-    },
-    {
-      to: '/permissoes',
-      icon: '♢',
-      label: 'Permissões',
-      adminOnly: true,
-    },
-    {
-      to: '/configuracoes',
-      icon: '⚙',
-      label: 'Configurações',
-      adminOnly: true,
+      title: 'ADMINISTRAÇÃO',
+      items: [
+        {
+          label: 'Usuários',
+          icon: 'users',
+          route: '/usuarios',
+          adminOnly: true,
+        },
+        {
+          label: 'Permissões',
+          icon: 'shield',
+          route: '/permissoes',
+          adminOnly: true,
+        },
+        {
+          label: 'Configurações',
+          icon: 'settings',
+          route: '/configuracoes',
+          adminOnly: true,
+        },
+      ],
     },
   ];
+
+  private readonly iconSymbols: Record<NavIcon, string> = {
+    'layout-dashboard': '▦',
+    'file-text': '▤',
+    history: '↺',
+    users: '♙',
+    shield: '♢',
+    settings: '⚙',
+  };
 
 
   constructor(
@@ -90,6 +127,17 @@ export class SidebarComponent
           );
         },
       });
+  }
+
+
+  canShowSection(
+    section: MenuSection,
+  ): boolean {
+    return section.items.some(
+      item => this.canShow(
+        item,
+      ),
+    );
   }
 
 
@@ -118,6 +166,13 @@ export class SidebarComponent
 
 
     return true;
+  }
+
+
+  iconSymbol(
+    icon: NavIcon,
+  ): string {
+    return this.iconSymbols[icon];
   }
 
 
