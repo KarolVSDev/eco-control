@@ -186,14 +186,14 @@
       </button>
 
 
-      <!-- ADICIONAR ABAIXO -->
+      <!-- ADICIONAR ECO -->
 
       <button
         *ngIf="permissions.canCreateEco"
         class="eco-add-button"
         type="button"
-        [disabled]="!selectedRow || creatingBelow"
-        (click)="addBelowSelected(); $event.stopPropagation()"
+        [disabled]="creatingEco"
+        (click)="addEco(); $event.stopPropagation()"
       >
 
         <span aria-hidden="true">
@@ -201,30 +201,13 @@
         </span>
 
 
-        <ng-container *ngIf="creatingBelow">
+        <ng-container *ngIf="creatingEco">
           Adicionando...
         </ng-container>
 
 
-        <ng-container
-          *ngIf="
-            !creatingBelow
-            &&
-            selectedRow
-          "
-        >
-          Adicionar abaixo do item {{ selectedItem }}
-        </ng-container>
-
-
-        <ng-container
-          *ngIf="
-            !creatingBelow
-            &&
-            !selectedRow
-          "
-        >
-          Selecione uma ECO
+        <ng-container *ngIf="!creatingEco">
+          {{ addEcoLabel }}
         </ng-container>
 
       </button>

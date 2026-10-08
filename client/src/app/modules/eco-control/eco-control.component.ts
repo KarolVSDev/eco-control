@@ -88,7 +88,7 @@ export class EcoControlComponent
 
   exporting = false;
 
-  creatingBelow = false;
+  creatingEco = false;
 
 
   // =====================================================
@@ -997,10 +997,27 @@ export class EcoControlComponent
 
 
   // =====================================================
-  // ADICIONAR ABAIXO DA ECO SELECIONADA
+  // ADICIONAR ECO
   // =====================================================
 
-  addBelowSelected(): void {
+  get addEcoLabel():
+    string {
+
+    if (
+      !this.selectedRow
+    ) {
+
+      return 'Adicionar ECO';
+    }
+
+
+    return (
+      `Adicionar ECO abaixo do item ${this.selectedItem ?? '-'}`
+    );
+  }
+
+
+  addEco(): void {
 
     if (
       !this.permissions
@@ -1012,42 +1029,50 @@ export class EcoControlComponent
 
 
     if (
-      !this.selectedRow
-    ) {
-
-      this.cellError =
-        'Selecione uma ECO para adicionar uma nova linha abaixo dela.';
-
-      return;
-    }
-
-
-    if (
-      this.creatingBelow
+      this.creatingEco
     ) {
 
       return;
     }
 
 
-    this.creatingBelow = true;
+    this.creatingEco = true;
 
     this.cellError = '';
 
 
+    const referenceRow =
+      this.selectedRow;
+
+
+    const endpoint =
+      referenceRow
+        ? `/ecos/${referenceRow.id}/after`
+        : '/ecos';
+
+
     this.api
       .post<any>(
-        `/ecos/${this.selectedRow.id}/after`,
+        endpoint,
         {},
       )
       .subscribe({
 
         next: created => {
 
-          this.creatingBelow = false;
+          this.creatingEco = false;
 
           this.selectedRow =
             created;
+
+
+          if (
+            !referenceRow
+          ) {
+
+            this.page = 1;
+          }
+
 
           this.load();
         },
@@ -1056,12 +1081,12 @@ export class EcoControlComponent
         error: error => {
 
           console.error(
-            'Erro ao adicionar ECO abaixo:',
+            'Erro ao adicionar ECO:',
             error,
           );
 
 
-          this.creatingBelow = false;
+          this.creatingEco = false;
 
 
           const detail =
