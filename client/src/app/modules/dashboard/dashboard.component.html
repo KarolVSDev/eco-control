@@ -14,6 +14,77 @@
 
 
   <!-- ================================================= -->
+  <!-- AVISO DE BACKUP ANUAL -->
+  <!-- ================================================= -->
+
+  <div
+    class="annual-backup-warning"
+    *ngIf="showAnnualBackupWarning"
+  >
+
+    <div class="annual-backup-content">
+
+      <div class="annual-backup-icon">
+        !
+      </div>
+
+
+      <div class="annual-backup-text">
+
+        <strong>
+          Backup anual recomendado
+        </strong>
+
+
+        <span>
+          O período de fechamento anual está se aproximando.
+          Recomendamos exportar uma cópia dos dados do
+          ECO CONTROL para armazenamento de segurança.
+        </span>
+
+
+        <span
+          class="annual-backup-error"
+          *ngIf="backupError"
+        >
+          {{ backupError }}
+        </span>
+
+      </div>
+
+    </div>
+
+
+    <div class="annual-backup-actions">
+
+      <button
+        type="button"
+        class="annual-backup-secondary"
+        (click)="dismissAnnualBackupWarning()"
+      >
+        Lembrar depois
+      </button>
+
+
+      <button
+        type="button"
+        class="annual-backup-primary"
+        [disabled]="backupExporting"
+        (click)="exportAnnualBackup()"
+      >
+        {{
+          backupExporting
+            ? 'Gerando...'
+            : 'Exportar dados'
+        }}
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- ================================================= -->
   <!-- LOADING GERAL -->
   <!-- ================================================= -->
 

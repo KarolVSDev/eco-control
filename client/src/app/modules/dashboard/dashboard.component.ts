@@ -73,6 +73,17 @@ export class DashboardComponent
 
 
   // =====================================================
+  // BACKUP ANUAL
+  // =====================================================
+
+  showAnnualBackupWarning = false;
+
+  backupExporting = false;
+
+  backupError = '';
+
+
+  // =====================================================
   // ESTADO DOS GRÁFICOS
   // =====================================================
 
@@ -135,6 +146,8 @@ export class DashboardComponent
   // =====================================================
 
   ngOnInit(): void {
+
+    this.checkAnnualBackupWarning();
 
     this.loadDashboard();
   }
@@ -286,6 +299,183 @@ export class DashboardComponent
   retry(): void {
 
     this.loadDashboard();
+  }
+
+
+  // =====================================================
+  // AVISO DE BACKUP ANUAL
+  // =====================================================
+
+  private checkAnnualBackupWarning(): void {
+
+    const now =
+      new Date();
+
+    const month =
+      now.getMonth();
+
+
+    if (
+      month < 9
+      ||
+      month > 11
+    ) {
+
+      this.showAnnualBackupWarning =
+        false;
+
+      return;
+    }
+
+
+    const year =
+      now.getFullYear();
+
+
+    const dismissed =
+      sessionStorage.getItem(
+        `eco-control-backup-warning-${year}`,
+      );
+
+
+    this.showAnnualBackupWarning =
+      dismissed !== 'true';
+  }
+
+
+  dismissAnnualBackupWarning(): void {
+
+    const year =
+      new Date()
+        .getFullYear();
+
+
+    sessionStorage.setItem(
+      `eco-control-backup-warning-${year}`,
+      'true',
+    );
+
+
+    this.showAnnualBackupWarning =
+      false;
+  }
+
+
+  exportAnnualBackup(): void {
+
+    if (
+      this.backupExporting
+    ) {
+
+      return;
+    }
+
+
+    this.backupExporting =
+      true;
+
+    this.backupError = '';
+
+
+    this.api
+      .getBlob(
+        '/ecos/export'
+      )
+      .pipe(
+        finalize(
+          () => {
+
+            this.backupExporting =
+              false;
+          }
+        )
+      )
+      .subscribe({
+
+        next: blob => {
+
+          const url =
+            URL.createObjectURL(
+              blob
+            );
+
+
+          const link =
+            document.createElement(
+              'a'
+            );
+
+
+          const now =
+            new Date();
+
+
+          const year =
+            now.getFullYear();
+
+
+          const month =
+            String(
+              now.getMonth() + 1
+            ).padStart(
+              2,
+              '0',
+            );
+
+
+          const day =
+            String(
+              now.getDate()
+            ).padStart(
+              2,
+              '0',
+            );
+
+
+          link.href =
+            url;
+
+          link.download =
+            `ECO_CONTROL_BACKUP_${year}-${month}-${day}.xlsx`;
+
+
+          document.body
+            .appendChild(
+              link
+            );
+
+          link.click();
+
+          document.body
+            .removeChild(
+              link
+            );
+
+
+          URL.revokeObjectURL(
+            url
+          );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao gerar backup anual:',
+            error,
+          );
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.backupError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível gerar o backup dos dados.';
+        },
+      });
   }
 
 
