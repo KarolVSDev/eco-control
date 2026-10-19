@@ -955,6 +955,54 @@ export class EcoControlComponent
   }
 
 
+  get areAllCurrentPageRowsSelected():
+    boolean {
+
+    return (
+      this.rows.length > 0
+      &&
+      this.rows.every(
+        row => this.selectedRowIds.has(row.id)
+      )
+    );
+  }
+
+
+  get isCurrentPageSelectionIndeterminate():
+    boolean {
+
+    const selectedCount =
+      this.rows.filter(
+        row => this.selectedRowIds.has(row.id)
+      ).length;
+
+
+    return (
+      selectedCount > 0
+      &&
+      selectedCount < this.rows.length
+    );
+  }
+
+
+  toggleCurrentPageSelection(
+    checked: boolean,
+  ): void {
+
+    for (const row of this.rows) {
+
+      if (checked) {
+
+        this.selectedRowIds.add(row.id);
+
+      } else {
+
+        this.selectedRowIds.delete(row.id);
+      }
+    }
+  }
+
+
   toggleRowChecked(
     row: any,
     checked: boolean,

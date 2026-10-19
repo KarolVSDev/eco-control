@@ -290,7 +290,34 @@
             <th
               class="row-tools-column row-tools-header"
               rowspan="2"
-            ></th>
+            >
+              <div class="row-tools">
+                <input
+                  type="checkbox"
+                  class="row-checkbox"
+                  title="Selecionar todas as ECOs desta página"
+                  aria-label="Selecionar todas as ECOs desta página"
+                  [checked]="areAllCurrentPageRowsSelected"
+                  [indeterminate]="isCurrentPageSelectionIndeterminate"
+                  [disabled]="rows.length === 0"
+                  (click)="$event.stopPropagation()"
+                  (change)="
+                    toggleCurrentPageSelection(
+                      $any($event.target).checked
+                    )
+                  "
+                >
+                <span
+                  class="row-tools-spacer"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  *ngIf="permissions.isAdmin"
+                  class="row-tools-spacer"
+                  aria-hidden="true"
+                ></span>
+              </div>
+            </th>
 
 
             <th

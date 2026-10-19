@@ -479,6 +479,14 @@
 }
 
 
+.row-tools-spacer {
+  width: 22px;
+  height: 22px;
+
+  flex: 0 0 22px;
+}
+
+
 .row-checkbox {
   width: 15px;
   height: 15px;
