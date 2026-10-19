@@ -13,6 +13,10 @@ import {
 } from '../../core/services/eco-permission.service';
 
 import {
+  monthLabel,
+} from '../../shared/utils/month-label';
+
+import {
   COLUMN_GROUPS,
   EcoColumn,
   EcoColumnGroup,
@@ -2513,6 +2517,14 @@ export class EcoControlComponent
       return value
         ? 'YES'
         : 'NO';
+    }
+
+
+    if (
+      column.key === 'month'
+      || column.key === 'release_month'
+    ) {
+      return monthLabel(value);
     }
 
 

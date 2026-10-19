@@ -521,7 +521,11 @@
                       >
 
                         <span>
-                          {{ option }}
+                          {{
+                            column.key === 'month'
+                              ? (option | monthLabel)
+                              : option
+                          }}
                         </span>
 
 
