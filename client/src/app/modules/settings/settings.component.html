@@ -279,6 +279,14 @@
             Owner → Group
           </h2>
 
+          <button
+            class="owner-import-button"
+            type="button"
+            (click)="openOwnerImportModal()"
+          >
+            Importar Owners
+          </button>
+
         </div>
 
 
@@ -458,6 +466,177 @@
 
       </section>
 
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- IMPORTAÇÃO DE OWNERS -->
+    <!-- ================================================= -->
+
+    <div
+      *ngIf="ownerImportModalOpen"
+      class="owner-import-overlay"
+      (click)="closeOwnerImportModal()"
+    >
+      <section
+        class="owner-import-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="owner-import-title"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="owner-import-header">
+          <div>
+            <h2 id="owner-import-title">Importar Owners</h2>
+            <p>Arquivo XLSX com as colunas OWNER e GROUP.</p>
+          </div>
+
+          <button
+            class="owner-import-close"
+            type="button"
+            aria-label="Fechar importação de Owners"
+            [disabled]="previewingOwnerImport || importingOwners"
+            (click)="closeOwnerImportModal()"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="owner-import-body">
+          <div
+            *ngIf="ownerImportError"
+            class="owner-import-message owner-import-error"
+          >
+            {{ ownerImportError }}
+          </div>
+
+          <label class="owner-import-file">
+            <span>Selecionar planilha</span>
+            <input
+              type="file"
+              accept=".xlsx"
+              [disabled]="previewingOwnerImport || importingOwners"
+              (change)="onOwnerImportFileSelected($event)"
+            >
+          </label>
+
+          <div
+            *ngIf="ownerImportFile"
+            class="owner-import-filename"
+          >
+            {{ ownerImportFile.name }}
+          </div>
+
+          <button
+            *ngIf="ownerImportFile && !ownerImportPreview"
+            class="owner-import-analyze"
+            type="button"
+            [disabled]="previewingOwnerImport"
+            (click)="previewOwnerImport()"
+          >
+            {{
+              previewingOwnerImport
+                ? 'Analisando arquivo...'
+                : 'Analisar arquivo'
+            }}
+          </button>
+
+          <ng-container *ngIf="ownerImportPreview as preview">
+            <h3 class="owner-import-preview-title">
+              Resultado da análise
+            </h3>
+
+            <div class="owner-import-summary">
+              <div class="owner-import-summary-card">
+                <span>Total</span>
+                <strong>{{ preview.total_rows }}</strong>
+              </div>
+              <div class="owner-import-summary-card owner-import-new">
+                <span>Novos</span>
+                <strong>{{ preview.new_rows }}</strong>
+              </div>
+              <div class="owner-import-summary-card">
+                <span>Duplicados</span>
+                <strong>{{ preview.duplicate_rows }}</strong>
+              </div>
+              <div class="owner-import-summary-card owner-import-conflicts">
+                <span>Conflitos</span>
+                <strong>{{ preview.conflict_rows }}</strong>
+              </div>
+              <div class="owner-import-summary-card owner-import-errors">
+                <span>Erros</span>
+                <strong>{{ preview.error_rows }}</strong>
+              </div>
+            </div>
+
+            <div
+              *ngIf="
+                !preview.can_import
+                && preview.new_rows === 0
+                && preview.conflict_rows === 0
+                && preview.error_rows === 0
+              "
+              class="owner-import-message owner-import-info"
+            >
+              Nenhum Owner novo foi encontrado.
+            </div>
+
+            <div class="owner-import-table-wrap">
+              <table class="owner-import-table">
+                <thead>
+                  <tr>
+                    <th>Linha</th>
+                    <th>Owner</th>
+                    <th>Group</th>
+                    <th>Situação</th>
+                    <th>Detalhe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of preview.rows">
+                    <td>{{ row.excel_row }}</td>
+                    <td>{{ row.owner || '-' }}</td>
+                    <td>{{ row.group || '-' }}</td>
+                    <td>
+                      <span
+                        class="owner-import-status"
+                        [class.owner-import-status-new]="row.status === 'NOVO'"
+                        [class.owner-import-status-duplicate]="row.status === 'DUPLICADO'"
+                        [class.owner-import-status-conflict]="row.status === 'CONFLITO'"
+                        [class.owner-import-status-error]="row.status === 'ERRO'"
+                      >
+                        {{ row.status }}
+                      </span>
+                    </td>
+                    <td>{{ row.message }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
+        </div>
+
+        <footer class="owner-import-footer">
+          <button
+            class="owner-import-cancel"
+            type="button"
+            [disabled]="previewingOwnerImport || importingOwners"
+            (click)="closeOwnerImportModal()"
+          >
+            Fechar
+          </button>
+
+          <button
+            *ngIf="ownerImportPreview"
+            class="owner-import-submit"
+            type="button"
+            [disabled]="!ownerImportPreview.can_import || importingOwners"
+            (click)="importOwnerGroups()"
+          >
+            {{ importingOwners ? 'Importando...' : 'Importar' }}
+          </button>
+        </footer>
+      </section>
     </div>
 
 

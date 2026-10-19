@@ -13,6 +13,10 @@ import {
 } from '../../core/services/eco-permission.service';
 
 import {
+  monthLabel,
+} from '../../shared/utils/month-label';
+
+import {
   COLUMN_GROUPS,
   EcoColumn,
   EcoColumnGroup,
@@ -952,6 +956,54 @@ export class EcoControlComponent
       .has(
         row.id
       );
+  }
+
+
+  get areAllCurrentPageRowsSelected():
+    boolean {
+
+    return (
+      this.rows.length > 0
+      &&
+      this.rows.every(
+        row => this.selectedRowIds.has(row.id)
+      )
+    );
+  }
+
+
+  get isCurrentPageSelectionIndeterminate():
+    boolean {
+
+    const selectedCount =
+      this.rows.filter(
+        row => this.selectedRowIds.has(row.id)
+      ).length;
+
+
+    return (
+      selectedCount > 0
+      &&
+      selectedCount < this.rows.length
+    );
+  }
+
+
+  toggleCurrentPageSelection(
+    checked: boolean,
+  ): void {
+
+    for (const row of this.rows) {
+
+      if (checked) {
+
+        this.selectedRowIds.add(row.id);
+
+      } else {
+
+        this.selectedRowIds.delete(row.id);
+      }
+    }
   }
 
 
@@ -2465,6 +2517,14 @@ export class EcoControlComponent
       return value
         ? 'YES'
         : 'NO';
+    }
+
+
+    if (
+      column.key === 'month'
+      || column.key === 'release_month'
+    ) {
+      return monthLabel(value);
     }
 
 

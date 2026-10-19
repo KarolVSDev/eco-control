@@ -290,7 +290,34 @@
             <th
               class="row-tools-column row-tools-header"
               rowspan="2"
-            ></th>
+            >
+              <div class="row-tools">
+                <input
+                  type="checkbox"
+                  class="row-checkbox"
+                  title="Selecionar todas as ECOs desta página"
+                  aria-label="Selecionar todas as ECOs desta página"
+                  [checked]="areAllCurrentPageRowsSelected"
+                  [indeterminate]="isCurrentPageSelectionIndeterminate"
+                  [disabled]="rows.length === 0"
+                  (click)="$event.stopPropagation()"
+                  (change)="
+                    toggleCurrentPageSelection(
+                      $any($event.target).checked
+                    )
+                  "
+                >
+                <span
+                  class="row-tools-spacer"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  *ngIf="permissions.isAdmin"
+                  class="row-tools-spacer"
+                  aria-hidden="true"
+                ></span>
+              </div>
+            </th>
 
 
             <th
@@ -494,7 +521,11 @@
                       >
 
                         <span>
-                          {{ option }}
+                          {{
+                            column.key === 'month'
+                              ? (option | monthLabel)
+                              : option
+                          }}
                         </span>
 
 
@@ -689,7 +720,14 @@
                   aria-label="Visualizar ECO"
                   (click)="openDetails(row)"
                 >
-                  ◉
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 5c-5.5 0-9.7 4.1-11 7 1.3 2.9 5.5 7 11 7s9.7-4.1 11-7c-1.3-2.9-5.5-7-11-7Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-2.2a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z"
+                    />
+                  </svg>
                 </button>
 
 
