@@ -35,10 +35,47 @@
 }
 
 
+.summary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+}
+
+
 .summary h3 {
   margin: 0;
 
   font-size: 14px;
+}
+
+
+.summary-year-filter {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color: #aaa;
+
+  font-size: 12px;
+}
+
+
+.summary-year-filter select {
+  height: 34px;
+
+  padding: 0 10px;
+
+  border: 1px solid #333;
+  border-radius: 7px;
+
+  background: #151515;
+
+  color: #eee;
+
+  font: inherit;
 }
 
 

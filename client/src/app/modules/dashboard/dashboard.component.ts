@@ -62,6 +62,14 @@ export class DashboardComponent
 
   summary: any[] = [];
 
+  availableYears: number[] = [];
+
+  selectedYear: number | null = null;
+
+  summaryLoading = false;
+
+  summaryError = '';
+
 
   // =====================================================
   // ESTADO GERAL
@@ -150,6 +158,8 @@ export class DashboardComponent
     this.checkAnnualBackupWarning();
 
     this.loadDashboard();
+
+    this.loadSummaryYears();
   }
 
 
@@ -224,10 +234,6 @@ export class DashboardComponent
           '/dashboard/delay'
         ),
 
-      summary:
-        this.api.get<any[]>(
-          '/dashboard/monthly-summary'
-        ),
     })
       .pipe(
         finalize(
@@ -272,8 +278,6 @@ export class DashboardComponent
           this.delay =
             response.delay;
 
-          this.summary =
-            response.summary;
         },
 
 
@@ -299,6 +303,142 @@ export class DashboardComponent
   retry(): void {
 
     this.loadDashboard();
+  }
+
+
+  // =====================================================
+  // RESUMO POR MÊS
+  // =====================================================
+
+  private loadSummaryYears(): void {
+
+    this.summaryLoading = true;
+    this.summaryError = '';
+
+
+    this.api
+      .get<number[]>(
+        '/dashboard/years'
+      )
+      .subscribe({
+
+        next: years => {
+
+          this.availableYears = years;
+
+
+          const currentYear =
+            new Date().getFullYear();
+
+
+          this.selectedYear =
+            years.includes(currentYear)
+              ? currentYear
+              : years[0] ?? null;
+
+
+          if (this.selectedYear === null) {
+
+            this.summary = [];
+            this.summaryLoading = false;
+
+            return;
+          }
+
+
+          this.loadMonthlySummary(
+            this.selectedYear
+          );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao carregar anos do Resumo por Mês:',
+            error,
+          );
+
+
+          this.summaryError =
+            'Não foi possível carregar os anos disponíveis.';
+
+          this.summaryLoading = false;
+        },
+      });
+  }
+
+
+  onSummaryYearChange(event: Event): void {
+
+    const year = Number(
+      (event.target as HTMLSelectElement).value
+    );
+
+
+    if (
+      !Number.isInteger(year)
+      || year === this.selectedYear
+    ) {
+
+      return;
+    }
+
+
+    this.selectedYear = year;
+
+    this.loadMonthlySummary(year);
+  }
+
+
+  private loadMonthlySummary(year: number): void {
+
+    this.summaryLoading = true;
+    this.summaryError = '';
+
+
+    this.api
+      .get<any[]>(
+        '/dashboard/monthly-summary',
+        { year },
+      )
+      .pipe(
+        finalize(
+          () => {
+
+            if (this.selectedYear === year) {
+
+              this.summaryLoading = false;
+            }
+          }
+        )
+      )
+      .subscribe({
+
+        next: summary => {
+
+          if (this.selectedYear === year) {
+
+            this.summary = summary;
+          }
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao carregar Resumo por Mês:',
+            error,
+          );
+
+
+          if (this.selectedYear === year) {
+
+            this.summaryError =
+              'Não foi possível carregar o Resumo por Mês.';
+          }
+        },
+      });
   }
 
 

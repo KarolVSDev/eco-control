@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import (
     select,
     func,
@@ -103,6 +105,7 @@ class DashboardService:
     def _rows(
         self,
         month=None,
+        year=None,
     ):
         query = select(Eco)
 
@@ -124,6 +127,13 @@ class DashboardService:
                 )
                 ==
                 normalized_month
+            )
+
+
+        if year is not None:
+            query = query.where(
+                Eco.az_eco_register_date >= date(year, 1, 1),
+                Eco.az_eco_register_date < date(year + 1, 1, 1),
             )
 
 
@@ -173,6 +183,39 @@ class DashboardService:
             if month
             in normalized_values
         ]
+
+
+    # =====================================================
+    # ANOS
+    # =====================================================
+
+    def years(self):
+
+        dates = (
+            self.db
+            .scalars(
+                select(
+                    Eco.az_eco_register_date
+                )
+                .where(
+                    Eco.az_eco_register_date.is_not(
+                        None
+                    )
+                )
+            )
+            .all()
+        )
+
+
+        return sorted(
+            {
+                value.year
+                for value
+                in dates
+                if value is not None
+            },
+            reverse=True,
+        )
 
 
     # =====================================================
@@ -607,7 +650,7 @@ class DashboardService:
     # RESUMO MENSAL
     # =====================================================
 
-    def monthly_summary(self):
+    def monthly_summary(self, year=None):
 
         result = []
 
@@ -615,7 +658,8 @@ class DashboardService:
         for month in self.MONTH_ORDER:
 
             rows = self._rows(
-                month
+                month=month,
+                year=year,
             )
 
 

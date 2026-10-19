@@ -1,3 +1,4 @@
+import os
 from datetime import date, timedelta
 
 from sqlalchemy import select
@@ -12,46 +13,59 @@ from app.models.entities import (
 from app.utils.security import hash_password
 
 
-ADMIN_EMAIL = "admin@eco.com"
-ADMIN_PASSWORD = "admin123"
+# =========================================================
+# Credenciais do ambiente DEMO
+# Devem ser configuradas por variáveis de ambiente no Render
+# =========================================================
+ADMIN_EMAIL = os.getenv("DEMO_ADMIN_EMAIL")
+ADMIN_PASSWORD = os.getenv("DEMO_ADMIN_PASSWORD")
 
 
 def main():
+    # ---------------------------------------------------------
+    # Validação das variáveis de ambiente
+    # ---------------------------------------------------------
+    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+        raise RuntimeError(
+            "DEMO_ADMIN_EMAIL e DEMO_ADMIN_PASSWORD "
+            "precisam estar configurados."
+        )
+
     db = SessionLocal()
 
     try:
         # ---------------------------------------------------------
-        # Usuário administrador local
+        # Usuário administrador de demonstração
         # ---------------------------------------------------------
         admin = db.scalar(
-            select(User).where(User.email == ADMIN_EMAIL)
+            select(User).where(
+                User.email == ADMIN_EMAIL
+            )
         )
 
         if not admin:
             db.add(
                 User(
                     email=ADMIN_EMAIL,
-                    full_name="Administrador Local",
-                    hashed_password=hash_password(ADMIN_PASSWORD),
+                    full_name="Administrador Demo",
+                    hashed_password=hash_password(
+                        ADMIN_PASSWORD
+                    ),
                     role="admin",
                 )
             )
 
         # ---------------------------------------------------------
         # Mapeamento OBU -> AU
+        # Dados totalmente fictícios para demonstração
         # ---------------------------------------------------------
         obu_au_mappings = {
-            "NW1": "GLZ",
-            "NWD": "GLZ",
-            "NWE": "GLZ",
-            "NWZ": "GLZ",
-            "NWH": "GMZ",
-            "NWW": "GMZ",
-            "NWU": "PNZ",
-            "NWX": "PNZ",
-            "NWV": "PGZ",
-            "NWK": "LMZ",
-            "NYE": "GMZ",
+            "D01": "AU1",
+            "D02": "AU1",
+            "D03": "AU2",
+            "D04": "AU2",
+            "D05": "AU3",
+            "D06": "AU3",
         }
 
         for obu, au in obu_au_mappings.items():
@@ -71,20 +85,24 @@ def main():
 
         # ---------------------------------------------------------
         # Mapeamento Owner -> Group
+        # Dados totalmente fictícios
         # ---------------------------------------------------------
         owner_group_mappings = {
-            "kamila.pimentel": "BOM",
-            "giseli.santos": "BOM",
-            "maria.ribeiro": "HW",
-            "leandro.moraes": "MEC",
-            "wallacea.roberto": "DEV",
-            "adriano.junior": "MEC",
+            "analista.demo01": "BOM",
+            "analista.demo02": "BOM",
+            "analista.demo03": "HW",
+            "analista.demo04": "MEC",
+            "analista.demo05": "DEV",
+            "analista.demo06": "MEC",
         }
 
-        for owner, group_name in owner_group_mappings.items():
+        for owner, group_name in (
+            owner_group_mappings.items()
+        ):
             existing_mapping = db.scalar(
                 select(OwnerGroupMapping).where(
-                    OwnerGroupMapping.owner == owner
+                    OwnerGroupMapping.owner
+                    == owner
                 )
             )
 
@@ -110,18 +128,18 @@ def main():
                 "JAN",
                 "FEB",
                 "MAR",
+                "APR",
+                "MAY",
+                "JUN",
+                "JUL",
+                "AUG",
                 "SEP",
-                "NOV",
+                "OCT",
             ]
 
-            obus = [
-                "NWH",
-                "NW1",
-                "NWE",
-                "NWZ",
-                "NWU",
-                "NWV",
-            ]
+            obus = list(
+                obu_au_mappings.keys()
+            )
 
             owner_names = list(
                 owner_group_mappings.keys()
@@ -130,7 +148,8 @@ def main():
             statuses = (
                 ["RELEASED"] * 8
                 + ["CANCELLED"] * 3
-                + ["WORKING", "PROCESSING"]
+                + ["WORKING"] * 3
+                + ["PROCESSING"] * 2
             )
 
             eco_types = [
@@ -141,19 +160,29 @@ def main():
                 "DESENHO - IMPRESSOS/BOX",
             ]
 
-            base_date = date(2026, 1, 1)
+            base_date = date(
+                2026,
+                1,
+                5,
+            )
 
             for i in range(1, 31):
                 creation_date = (
                     base_date
-                    + timedelta(days=i * 2)
+                    + timedelta(
+                        days=i * 8
+                    )
                 )
 
-                gap_days = (i % 20) + 1
+                gap_days = (
+                    i % 20
+                ) + 1
 
                 approval_finish_date = (
                     creation_date
-                    + timedelta(days=gap_days)
+                    + timedelta(
+                        days=gap_days
+                    )
                 )
 
                 obu = obus[
@@ -161,29 +190,43 @@ def main():
                 ]
 
                 owner = owner_names[
-                    i % len(owner_names)
+                    i % len(
+                        owner_names
+                    )
                 ]
 
                 group_name = (
-                    owner_group_mappings[owner]
+                    owner_group_mappings[
+                        owner
+                    ]
                 )
 
-                au = obu_au_mappings.get(obu)
+                au = (
+                    obu_au_mappings[
+                        obu
+                    ]
+                )
 
                 eco = Eco(
                     item=i,
                     position=i,
 
                     month=months[
-                        i % len(months)
+                        (i - 1)
+                        % len(months)
                     ],
 
-                    product="AAA",
+                    product=(
+                        "PROD-DEMO"
+                    ),
 
                     obu=obu,
                     au=au,
 
-                    group_name=group_name,
+                    group_name=(
+                        group_name
+                    ),
+
                     owner=owner,
 
                     item_type=(
@@ -192,15 +235,27 @@ def main():
                         else "ELET"
                     ),
 
-                    eco_type=eco_types[
-                        i % len(eco_types)
-                    ],
+                    eco_type=(
+                        eco_types[
+                            i
+                            % len(
+                                eco_types
+                            )
+                        ]
+                    ),
 
-                    status=statuses[
-                        i % len(statuses)
-                    ],
+                    status=(
+                        statuses[
+                            i
+                            % len(
+                                statuses
+                            )
+                        ]
+                    ),
 
-                    eco=f"DEMO{i:05d}",
+                    eco=(
+                        f"DEMO{i:05d}"
+                    ),
 
                     change_bom=(
                         "YES"
@@ -210,12 +265,16 @@ def main():
 
                     hq_eco_release_date=(
                         creation_date
-                        - timedelta(days=5)
+                        - timedelta(
+                            days=5
+                        )
                     ),
 
                     az_eco_register_date=(
                         creation_date
-                        - timedelta(days=3)
+                        - timedelta(
+                            days=3
+                        )
                     ),
 
                     az_eco_creation_date=(
@@ -227,23 +286,29 @@ def main():
                     ),
 
                     comments=(
-                        "Dado sintético para "
-                        "desenvolvimento local"
+                        "Dado totalmente fictício "
+                        "utilizado somente no "
+                        "ambiente de demonstração."
                     ),
                 )
 
-                samples.append(eco)
+                samples.append(
+                    eco
+                )
 
-            db.add_all(samples)
+            db.add_all(
+                samples
+            )
 
         # ---------------------------------------------------------
-        # Salva tudo
+        # Salva as alterações
         # ---------------------------------------------------------
         db.commit()
 
         print(
-            "Seed concluído. "
-            f"Login: {ADMIN_EMAIL} / {ADMIN_PASSWORD}"
+            "Seed de demonstração "
+            "concluído com sucesso. "
+            f"Usuário: {ADMIN_EMAIL}"
         )
 
     except Exception:

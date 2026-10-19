@@ -695,9 +695,34 @@
 
     <section class="card summary">
 
-      <h3>
-        Resumo por Mês
-      </h3>
+      <div class="summary-heading">
+
+        <h3>
+          Resumo por Mês
+        </h3>
+
+
+        <label
+          class="summary-year-filter"
+          *ngIf="availableYears.length > 0"
+        >
+          <span>Ano:</span>
+
+          <select
+            [value]="selectedYear"
+            [disabled]="summaryLoading"
+            (change)="onSummaryYearChange($event)"
+          >
+            <option
+              *ngFor="let year of availableYears"
+              [value]="year"
+            >
+              {{ year }}
+            </option>
+          </select>
+        </label>
+
+      </div>
 
       <p class="subtitle">
         Distribuição mensal de ECOs por status
@@ -707,6 +732,10 @@
       <div
         class="table-wrap"
         *ngIf="
+          !summaryLoading
+          &&
+          !summaryError
+          &&
           summary.length > 0;
           else emptySummary
         "
@@ -801,7 +830,12 @@
       <ng-template #emptySummary>
 
         <div class="summary-empty">
-          Nenhum dado mensal disponível.
+          {{
+            summaryLoading
+              ? 'Carregando Resumo por Mês...'
+              : summaryError
+                || 'Nenhum dado mensal disponível.'
+          }}
         </div>
 
       </ng-template>
