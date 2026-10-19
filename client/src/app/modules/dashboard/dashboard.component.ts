@@ -6,6 +6,7 @@ import {
 import {
   finalize,
   forkJoin,
+  Subscription,
 } from 'rxjs';
 
 import {
@@ -66,10 +67,6 @@ export class DashboardComponent
 
   selectedYear: number | null = null;
 
-  summaryLoading = false;
-
-  summaryError = '';
-
 
   // =====================================================
   // ESTADO GERAL
@@ -125,6 +122,15 @@ export class DashboardComponent
     };
 
 
+  private chartRequests:
+    Partial<
+      Record<
+        DashboardFilter,
+        Subscription
+      >
+    > = {};
+
+
   // =====================================================
   // FILTROS
   // =====================================================
@@ -157,9 +163,7 @@ export class DashboardComponent
 
     this.checkAnnualBackupWarning();
 
-    this.loadDashboard();
-
-    this.loadSummaryYears();
+    this.loadAvailableYears();
   }
 
 
@@ -167,15 +171,67 @@ export class DashboardComponent
   // CARREGAR DASHBOARD
   // =====================================================
 
-  loadDashboard(): void {
+  private loadAvailableYears(): void {
 
-    if (
-      this.loading
-    ) {
 
-      return;
-    }
+    this.loading = true;
 
+    this.loadError = '';
+
+
+    this.api
+      .get<number[]>(
+        '/dashboard/years'
+      )
+      .subscribe({
+
+        next: years => {
+
+          this.availableYears = years;
+
+
+          const currentYear =
+            new Date().getFullYear();
+
+
+          this.selectedYear =
+            years.includes(currentYear)
+              ? currentYear
+              : years[0] ?? null;
+
+
+          if (this.selectedYear === null) {
+
+            this.clearDashboardData();
+            this.loading = false;
+
+            return;
+          }
+
+
+          this.loadDashboard(
+            this.selectedYear
+          );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao carregar anos do Dashboard:',
+            error,
+          );
+
+
+          this.loading = false;
+          this.loadError =
+            'Não foi possível carregar os anos disponíveis. Tente novamente.';
+        },
+      });
+  }
+
+
+  loadDashboard(year: number): void {
 
     this.loading = true;
 
@@ -186,52 +242,68 @@ export class DashboardComponent
 
       stats:
         this.api.get<DashboardStats>(
-          '/dashboard/stats'
+          '/dashboard/stats',
+          { year },
         ),
 
       months:
         this.api.get<string[]>(
-          '/dashboard/months'
+          '/dashboard/months',
+          { year },
         ),
 
       status:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/status'
+          '/dashboard/group/status',
+          { year },
         ),
 
       groups:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/group'
+          '/dashboard/group/group',
+          { year },
         ),
 
       owner:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/owner'
+          '/dashboard/group/owner',
+          { year },
         ),
 
       obu:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/obu'
+          '/dashboard/group/obu',
+          { year },
         ),
 
       au:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/au'
+          '/dashboard/group/au',
+          { year },
         ),
 
       types:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/eco_type'
+          '/dashboard/group/eco_type',
+          { year },
         ),
 
       evolution:
         this.api.get<ChartDatum[]>(
-          '/dashboard/evolution'
+          '/dashboard/evolution',
+          { year },
         ),
 
       delay:
         this.api.get<ChartDatum[]>(
-          '/dashboard/delay'
+          '/dashboard/delay',
+          { year },
+        ),
+
+      summary:
+        this.api.get<any[]>(
+          '/dashboard/monthly-summary',
+          { year },
         ),
 
     })
@@ -278,6 +350,9 @@ export class DashboardComponent
           this.delay =
             response.delay;
 
+          this.summary =
+            response.summary;
+
         },
 
 
@@ -302,74 +377,25 @@ export class DashboardComponent
 
   retry(): void {
 
-    this.loadDashboard();
+    if (this.selectedYear === null) {
+
+      this.loadAvailableYears();
+
+      return;
+    }
+
+
+    this.loadDashboard(
+      this.selectedYear
+    );
   }
 
 
   // =====================================================
-  // RESUMO POR MÊS
+  // FILTRO GLOBAL DE ANO
   // =====================================================
 
-  private loadSummaryYears(): void {
-
-    this.summaryLoading = true;
-    this.summaryError = '';
-
-
-    this.api
-      .get<number[]>(
-        '/dashboard/years'
-      )
-      .subscribe({
-
-        next: years => {
-
-          this.availableYears = years;
-
-
-          const currentYear =
-            new Date().getFullYear();
-
-
-          this.selectedYear =
-            years.includes(currentYear)
-              ? currentYear
-              : years[0] ?? null;
-
-
-          if (this.selectedYear === null) {
-
-            this.summary = [];
-            this.summaryLoading = false;
-
-            return;
-          }
-
-
-          this.loadMonthlySummary(
-            this.selectedYear
-          );
-        },
-
-
-        error: error => {
-
-          console.error(
-            'Erro ao carregar anos do Resumo por Mês:',
-            error,
-          );
-
-
-          this.summaryError =
-            'Não foi possível carregar os anos disponíveis.';
-
-          this.summaryLoading = false;
-        },
-      });
-  }
-
-
-  onSummaryYearChange(event: Event): void {
+  onGlobalYearChange(event: Event): void {
 
     const year = Number(
       (event.target as HTMLSelectElement).value
@@ -378,6 +404,7 @@ export class DashboardComponent
 
     if (
       !Number.isInteger(year)
+      || !this.availableYears.includes(year)
       || year === this.selectedYear
     ) {
 
@@ -387,58 +414,78 @@ export class DashboardComponent
 
     this.selectedYear = year;
 
-    this.loadMonthlySummary(year);
+    this.resetLocalMonthFilters();
+
+    this.loadDashboard(year);
   }
 
 
-  private loadMonthlySummary(year: number): void {
+  private resetLocalMonthFilters(): void {
 
-    this.summaryLoading = true;
-    this.summaryError = '';
+    this.cancelChartRequests();
 
-
-    this.api
-      .get<any[]>(
-        '/dashboard/monthly-summary',
-        { year },
-      )
-      .pipe(
-        finalize(
-          () => {
-
-            if (this.selectedYear === year) {
-
-              this.summaryLoading = false;
-            }
-          }
-        )
-      )
-      .subscribe({
-
-        next: summary => {
-
-          if (this.selectedYear === year) {
-
-            this.summary = summary;
-          }
-        },
+    this.filters = {
+      status: '',
+      group: '',
+      owner: '',
+      obu: '',
+      au: '',
+      eco_type: '',
+      delay: '',
+    };
 
 
-        error: error => {
+    this.chartErrors = {
+      status: '',
+      group: '',
+      owner: '',
+      obu: '',
+      au: '',
+      eco_type: '',
+      delay: '',
+    };
 
-          console.error(
-            'Erro ao carregar Resumo por Mês:',
-            error,
-          );
+
+    this.chartLoading = {
+      status: false,
+      group: false,
+      owner: false,
+      obu: false,
+      au: false,
+      eco_type: false,
+      delay: false,
+    };
+  }
 
 
-          if (this.selectedYear === year) {
+  private cancelChartRequests(): void {
 
-            this.summaryError =
-              'Não foi possível carregar o Resumo por Mês.';
-          }
-        },
-      });
+    Object.values(
+      this.chartRequests
+    ).forEach(
+      request => request?.unsubscribe()
+    );
+
+
+    this.chartRequests = {};
+  }
+
+
+  private clearDashboardData(): void {
+
+    this.months = [];
+    this.stats = null;
+    this.status = [];
+    this.groups = [];
+    this.owner = [];
+    this.obu = [];
+    this.au = [];
+    this.types = [];
+    this.evolution = [];
+    this.delay = [];
+    this.summary = [];
+
+    this.resetLocalMonthFilters();
   }
 
 
@@ -632,6 +679,7 @@ export class DashboardComponent
       this.chartLoading[
         kind
       ]
+      || this.selectedYear === null
     ) {
 
       return;
@@ -661,6 +709,7 @@ export class DashboardComponent
               '/dashboard/delay',
               {
                 month,
+                year: this.selectedYear,
               },
             )
 
@@ -669,11 +718,12 @@ export class DashboardComponent
               `/dashboard/group/${kind}`,
               {
                 month,
+                year: this.selectedYear,
               },
             );
 
 
-    request
+    this.chartRequests[kind] = request
       .pipe(
         finalize(
           () => {
@@ -681,6 +731,8 @@ export class DashboardComponent
             this.chartLoading[
               kind
             ] = false;
+
+            delete this.chartRequests[kind];
           }
         )
       )
