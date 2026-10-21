@@ -2,6 +2,22 @@
    INDICADORES
    ===================================================== */
 
+.gap-report-link {
+  display: block;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: box-shadow 150ms ease;
+}
+
+.gap-report-link:hover {
+  box-shadow: 0 0 0 2px #555;
+}
+
+.gap-report-link:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 4px;
+}
+
 .stats {
   display: grid;
 

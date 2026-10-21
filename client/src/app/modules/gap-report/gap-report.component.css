@@ -1,0 +1,41 @@
+.prototype-notice {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid #66501f;
+  border-radius: 8px;
+  background: #282112;
+  color: #f3c76b;
+  font-size: 13px;
+}
+
+.period-panel, .report-panel { margin-top: 18px; }
+h2 { margin: 0 0 14px; font-size: 16px; }
+.toolbar { align-items: flex-end; }
+label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+input { color-scheme: dark; }
+.period-summary { color: #aaa; font-size: 13px; margin-bottom: 0; }
+.export-help { color: #aaa; font-size: 12px; margin: 0 0 12px; }
+.export-button:disabled {
+  color: #999;
+  background: #1b1b1b;
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+.export-button:not(:disabled):hover { background: #303030; }
+caption { padding: 12px; text-align: left; color: #aaa; font-size: 12px; }
+.table .empty-state { white-space: normal; text-align: center; padding: 38px 20px; color: #aaa; line-height: 1.6; }
+
+/* Classes reservadas ao layout futuro; nenhuma regra de GAP aplicada nesta versão. */
+.gap-normal { color: var(--text); }
+.gap-attention { color: var(--orange); background: #282112; font-weight: 600; }
+.gap-justification { white-space: normal; min-width: 220px; }
+
+button:focus-visible, input:focus-visible, .table-wrap:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .toolbar { align-items: stretch; flex-direction: column; }
+  label, button { width: 100%; }
+}

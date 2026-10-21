@@ -1,0 +1,59 @@
+<div class="page">
+  <h1 class="title">Relatório de GAP</h1>
+  <p class="subtitle">Acompanhamento das ECOs e do intervalo entre Effective Date e Approval Date.</p>
+  <p class="prototype-notice">Versão para validação</p>
+
+  <section class="card period-panel" aria-labelledby="period-heading">
+    <h2 id="period-heading">Período do relatório</h2>
+    <form (ngSubmit)="applyPeriod()" novalidate>
+      <div class="toolbar">
+        <label for="start-date">Data inicial
+          <input id="start-date" name="startDate" class="input" type="date" required
+            [(ngModel)]="startDate" [attr.aria-invalid]="validationError ? 'true' : null"
+            [attr.aria-describedby]="validationError ? 'period-error' : null">
+        </label>
+        <label for="end-date">Data final
+          <input id="end-date" name="endDate" class="input" type="date" required
+            [(ngModel)]="endDate" [attr.aria-invalid]="validationError ? 'true' : null"
+            [attr.aria-describedby]="validationError ? 'period-error' : null">
+        </label>
+        <button class="btn btn-primary" type="submit">Aplicar</button>
+        <button class="btn btn-ghost" type="button" (click)="restorePeriod()">Restaurar período</button>
+        <!-- Habilitar somente após integrar linhas reais e a exportação XLSX.
+             Nome futuro: Relatorio_GAP_<data-inicial>_a_<data-final>.xlsx,
+             usando as datas de appliedPeriod. -->
+        <button class="btn btn-ghost export-button" type="button" disabled
+          aria-describedby="export-help">Exportar relatório</button>
+      </div>
+      <p id="export-help" class="export-help">Não há dados para exportar no período selecionado.</p>
+      <p *ngIf="validationError" id="period-error" class="danger" role="alert">{{ validationError }}</p>
+    </form>
+    <p class="period-summary" role="status">
+      Período aplicado: {{ appliedPeriod.start | date:'dd/MM/yyyy' }} até {{ appliedPeriod.end | date:'dd/MM/yyyy' }}.
+    </p>
+  </section>
+
+  <section class="card report-panel" aria-labelledby="report-heading">
+    <h2 id="report-heading">ECOs no período</h2>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Tabela do relatório de GAP">
+      <table class="table">
+        <caption>Relatório de GAP — estrutura para validação</caption>
+        <thead>
+          <tr>
+            <th scope="col">ECO</th>
+            <th scope="col">Owner</th>
+            <th scope="col">Effective Date</th>
+            <th scope="col">Approval Date</th>
+            <th scope="col">GAP 14D</th>
+            <th scope="col">Comentário / Justificativa</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="6" class="empty-state">Nenhum dado carregado. A integração do relatório será concluída após a validação das regras com o cliente.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

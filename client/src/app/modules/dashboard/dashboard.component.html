@@ -268,11 +268,13 @@
       ></app-stat-card>
 
 
-      <app-stat-card
-        label="Gap > 14 dias"
-        [value]="stats.gap14"
-        tone="danger"
-      ></app-stat-card>
+      <a class="gap-report-link" routerLink="/relatorio-gap">
+        <app-stat-card
+          label="Gap > 14 dias"
+          [value]="stats.gap14"
+          tone="danger"
+        ></app-stat-card>
+      </a>
 
     </div>
 

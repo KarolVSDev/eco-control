@@ -33,6 +33,7 @@ interface MenuSection {
 type NavIcon =
   | 'layout-dashboard'
   | 'file-text'
+  | 'chart-bars'
   | 'history'
   | 'users'
   | 'shield'
@@ -65,6 +66,11 @@ export class SidebarComponent
           label: 'ECO Control',
           icon: 'file-text',
           route: '/eco-control',
+        },
+        {
+          label: 'Relatório',
+          icon: 'chart-bars',
+          route: '/relatorio-gap',
         },
         {
           label: 'Histórico',
@@ -102,6 +108,7 @@ export class SidebarComponent
   private readonly iconSymbols: Record<NavIcon, string> = {
     'layout-dashboard': '▦',
     'file-text': '▤',
+    'chart-bars': '▥',
     history: '↺',
     users: '♙',
     shield: '♢',
