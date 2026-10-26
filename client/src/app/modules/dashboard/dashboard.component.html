@@ -268,7 +268,9 @@
       ></app-stat-card>
 
 
-      <a class="gap-report-link" routerLink="/relatorio-gap">
+      <a class="gap-report-link" routerLink="/relatorio-gap"
+        aria-label="Abrir Relatório de GAP. Indicador atual: AZ Gap superior a 14 dias."
+        title="Abrir Relatório de GAP — período padrão da semana anterior">
         <app-stat-card
           label="Gap > 14 dias"
           [value]="stats.gap14"
