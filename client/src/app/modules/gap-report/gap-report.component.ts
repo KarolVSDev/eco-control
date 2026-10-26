@@ -55,6 +55,8 @@ export class GapReportComponent implements OnInit, OnDestroy {
   validationError = '';
   loading = false;
   loadError = '';
+  exporting = false;
+  exportError = '';
   items: GapReportItem[] = [];
   total = 0;
   noteDrafts: Record<string, string> = {};
@@ -128,6 +130,33 @@ export class GapReportComponent implements OnInit, OnDestroy {
       error: () => {
         this.savingNoteIds.delete(item.id);
         this.noteErrors[item.id] = 'Não foi possível salvar a justificativa.';
+      },
+    }));
+  }
+
+  exportReport(): void {
+    if (this.exporting || this.loading || this.loadError || this.total === 0 || this.savingNoteIds.size > 0) return;
+    const period = { ...this.appliedPeriod };
+    this.exporting = true;
+    this.exportError = '';
+    this.saves.add(this.api.getBlob('/reports/gap/export', {
+      start_date: period.start,
+      end_date: period.end,
+    }).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `relatorio_gap_${period.start}_${period.end}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.exporting = false;
+      },
+      error: () => {
+        this.exporting = false;
+        this.exportError = 'Não foi possível exportar o relatório. Tente novamente.';
       },
     }));
   }

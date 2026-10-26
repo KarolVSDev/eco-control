@@ -169,3 +169,70 @@ def test_report_rejects_invalid_token(db):
     finally:
         app.dependency_overrides = before
     assert response.status_code == 401
+
+
+@pytest.mark.parametrize("path", [URL, URL + "/export"])
+def test_export_auth_required(db, path):
+    before = app.dependency_overrides.copy()
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides.pop(current_user, None)
+    try:
+        response = TestClient(app).get(path, params=PARAMS)
+    finally:
+        app.dependency_overrides = before
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("params", [{}, {"start_date": "2026-10-10", "end_date": "2026-10-01"}])
+def test_export_invalid_params(client, params):
+    assert client.get(URL + "/export", params=params).status_code == 422
+
+
+def test_gap_export_valid_workbook_matches_report(client, db):
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    add_eco(db, eco="START", second_aprov_rd_finish_1=START)
+    add_eco(db, eco="END", second_aprov_rd_finish_1=END, effective_date=None, gap_14d_note=None)
+    add_eco(db, eco="NEGATIVE", effective_date=date(2026, 10, 6))
+    add_eco(db, eco="NORMALIZED", status=" released ")
+    add_eco(db, eco="BEFORE", second_aprov_rd_finish_1=date(2026, 9, 30))
+    add_eco(db, eco="AFTER", second_aprov_rd_finish_1=date(2026, 10, 11))
+    add_eco(db, eco="WORKING", status="WORKING")
+    add_eco(db, eco="FINISH2", second_aprov_rd_finish_1=None, second_aprov_rd_finish_2=START)
+    add_eco(db, eco="=1+1", gap_14d_note="=HYPERLINK(123)")
+    report = client.get(URL, params=PARAMS).json()
+    response = client.get(URL + "/export", params=PARAMS)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    assert response.headers["content-disposition"] == 'attachment; filename="relatorio_gap_2026-10-01_2026-10-10.xlsx"'
+    workbook = load_workbook(BytesIO(response.content))
+    sheet = workbook.active
+    assert [c.value for c in sheet[1]] == ["ECO", "Owner", "Effective Date", "Approval Date", "GAP 14D", "Coment\u00e1rio / Justificativa"]
+    assert sheet.max_row == report["total"] + 1
+    for cells, item in zip(sheet.iter_rows(min_row=2), report["items"]):
+        assert cells[0].value == item["eco"]
+        assert cells[1].value == item["owner"]
+        assert (cells[2].value.date().isoformat() if cells[2].value else None) == item["effective_date"]
+        assert cells[3].value.date().isoformat() == item["approval_date"]
+        assert cells[3].number_format == "dd/mm/yyyy"
+        assert cells[4].value == item["gap_14d"]
+        assert cells[4].data_type == "n"
+        assert cells[5].value == item["gap_14d_note"]
+        assert cells[0].data_type != "f"
+        assert cells[5].data_type != "f"
+    assert sheet.freeze_panes == "A2"
+    assert sheet.auto_filter.ref == f"A1:F{sheet.max_row}"
+    workbook.close()
+    assert client.get(URL, params=PARAMS).json() == report
+
+
+def test_gap_export_empty_workbook(client):
+    from io import BytesIO
+    from openpyxl import load_workbook
+    response = client.get(URL + "/export", params=PARAMS)
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content))
+    assert workbook.active.max_row == 1
+    assert workbook.active.max_column == 6
+    workbook.close()

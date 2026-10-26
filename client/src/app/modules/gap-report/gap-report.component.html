@@ -18,10 +18,14 @@
         </label>
         <button class="btn btn-primary" type="submit">Aplicar</button>
         <button class="btn btn-ghost" type="button" (click)="restorePeriod()">Restaurar período</button>
-        <button class="btn btn-ghost export-button" type="button" disabled
-          aria-describedby="export-help">Exportar relatório</button>
+        <button class="btn btn-ghost export-button" type="button"
+          [disabled]="exporting || loading || !!loadError || total === 0 || savingNoteIds.size > 0"
+          (click)="exportReport()" aria-describedby="export-help">
+          {{ exporting ? 'Exportando...' : 'Exportar relatório' }}
+        </button>
       </div>
-      <p id="export-help" class="export-help">Exportação em Excel será disponibilizada na próxima etapa.</p>
+      <p id="export-help" class="export-help">O Excel usa o período aplicado e as justificativas salvas.</p>
+      <p *ngIf="exportError" class="danger" role="alert">{{ exportError }}</p>
       <p *ngIf="validationError" id="period-error" class="danger" role="alert">{{ validationError }}</p>
     </form>
     <p class="period-summary" role="status">
