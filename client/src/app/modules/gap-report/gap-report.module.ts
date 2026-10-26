@@ -3,9 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GapReportRoutingModule } from './gap-report-routing.module';
 import { GapReportComponent } from './gap-report.component';
+import { NoteAutoResizeDirective } from './note-auto-resize.directive';
 
 @NgModule({
-  declarations: [GapReportComponent],
+  declarations: [GapReportComponent, NoteAutoResizeDirective],
   imports: [CommonModule, FormsModule, GapReportRoutingModule],
 })
 export class GapReportModule {}

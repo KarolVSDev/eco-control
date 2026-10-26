@@ -127,6 +127,10 @@ class EcoService:
             )
 
 
+            if key in {"effective_date", "gap_14d_note"}:
+                allowed[key] = value
+                continue
+
             permission = permissions.get(
                 external_key
             )
@@ -888,7 +892,8 @@ class EcoService:
         ) in permissions.items():
 
             if (
-                permission.can_view
+                field_key not in {"effective_date", "gap_14d", "gap_14d_note"}
+                and permission.can_view
                 is False
             ):
 

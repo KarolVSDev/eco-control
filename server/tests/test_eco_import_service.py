@@ -7,7 +7,7 @@ import pytest
 
 from fastapi import HTTPException
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app.services.eco_import_service import (
     EcoImportService,
@@ -59,55 +59,57 @@ CTRL_GERAL_HEADERS = {
     34: "AZ ECO CREATION DATE",
     35: "GAP Start AZ ECO",
     36: "Contar Eco emitida > 1 dias",
-    37: "GAP AGREEMENT",
+    37: "Effective Date",
+    38: "GAP AGREEMENT",
 
-    38: "AGREEMENT\nOTHER\nDEPTS START\n(1)",
-    39: "AGREEMENT\nOTHER\nDEPTS FINSHI\n(1)",
-    40: "GAP AGREEMENT\nOTHER\nDEPTS (1)",
+    39: "AGREEMENT\nOTHER\nDEPTS START\n(1)",
+    40: "AGREEMENT\nOTHER\nDEPTS FINSHI\n(1)",
+    41: "GAP AGREEMENT\nOTHER\nDEPTS (1)",
 
-    41: "AGREEMENT\nOTHER\nDEPTS START\n(2)",
-    42: "AGREEMENT\nOTHER\nDEPTS FINSHI\n(2)",
-    43: "GAP AGREEMENT\nOTHER\nDEPTS (2)",
+    42: "AGREEMENT\nOTHER\nDEPTS START\n(2)",
+    43: "AGREEMENT\nOTHER\nDEPTS FINSHI\n(2)",
+    44: "GAP AGREEMENT\nOTHER\nDEPTS (2)",
 
-    44: "AGREEMENT\nOTHER\nDEPTS START\n(3)",
-    45: "AGREEMENT\nOTHER\nDEPTS FINSHI\n(3)",
-    46: "GAP AGREEMENT\nOTHER\nDEPTS (3)",
+    45: "AGREEMENT\nOTHER\nDEPTS START\n(3)",
+    46: "AGREEMENT\nOTHER\nDEPTS FINSHI\n(3)",
+    47: "GAP AGREEMENT\nOTHER\nDEPTS (3)",
 
-    47: "GAP TOTAL AGREEMENT\nOTHER\nDEPTS",
+    48: "GAP TOTAL AGREEMENT\nOTHER\nDEPTS",
 
-    48: "2ST APROV R&D",
-    49: "2ST APROV R&D START (1)",
-    50: "2ST APROV R&D FINISH (1)",
-    51: "GAP 2ST APROV R&D (1)",
+    49: "2ST APROV R&D",
+    50: "2ST APROV R&D START (1)",
+    51: "2ST APROV R&D FINISH (1)",
+    52: "GAP 2ST APROV R&D (1)",
 
-    52: "2ST APROV R&D START (2)",
-    53: "2ST APROV R&D FINISH (2)",
-    54: "GAP 2ST APROV R&D (2)",
-    55: "GAP TOTAL 2ST APROV R&D",
+    53: "2ST APROV R&D START (2)",
+    54: "2ST APROV R&D FINISH (2)",
+    55: "GAP 2ST APROV R&D (2)",
+    56: "GAP TOTAL 2ST APROV R&D",
 
-    56: "ECO release week",
-    57: "AZ Gap",
-    58: "Contar Eco concluída > 7 dias",
-    59: "Contar Eco concluída > 10 dias",
-    60: "Total Gap",
-    61: "RELEASE MONTH",
-    62: "RELEASE YEAR",
+    57: "ECO release week",
+    58: "AZ Gap",
+    59: "Contar Eco concluída > 7 dias",
+    60: "Contar Eco concluída > 10 dias",
+    61: "GAP 14D",
+    62: "Total Gap",
+    63: "RELEASE MONTH",
+    64: "RELEASE YEAR",
 
-    63: "CHANGE REASON",
-    64: "MODEL",
-    65: "New Model?\n(Check in NPI plan 26Y)",
-    66: (
+    65: "CHANGE REASON",
+    66: "MODEL",
+    67: "New Model?\n(Check in NPI plan 26Y)",
+    68: (
         "Origem approval\n"
         "(mandatory for local and AV ECO)"
     ),
-    67: "Event",
-    68: "COMMENTS",
+    69: "Event",
+    70: "COMMENTS",
 
-    69: "SET ECO",
-    70: "SET ECO REGISTER DATE",
-    71: "SET ECO RELEASE DATE",
-    72: "CHANGE REASON",
-    73: "MODEL",
+    71: "SET ECO",
+    72: "SET ECO REGISTER DATE",
+    73: "SET ECO RELEASE DATE",
+    74: "CHANGE REASON",
+    75: "MODEL",
 }
 
 
@@ -272,6 +274,8 @@ def create_workbook(
                         12,
                     ),
 
+                "effective_date": date(2026, 2, 4),
+
                 "comments":
                     "Teste de importação",
             }
@@ -363,35 +367,35 @@ def test_rd_columns_match_ctrl_geral():
 
 
     assert (
-        specs[48]["field"]
+        specs[49]["field"]
         ==
         "second_aprov_rd"
     )
 
 
     assert (
-        specs[49]["field"]
+        specs[50]["field"]
         ==
         "second_aprov_rd_start_1"
     )
 
 
     assert (
-        specs[50]["field"]
+        specs[51]["field"]
         ==
         "second_aprov_rd_finish_1"
     )
 
 
     assert (
-        specs[52]["field"]
+        specs[53]["field"]
         ==
         "second_aprov_rd_start_2"
     )
 
 
     assert (
-        specs[53]["field"]
+        specs[54]["field"]
         ==
         "second_aprov_rd_finish_2"
     )
@@ -1388,3 +1392,108 @@ def test_preview_requires_eco_code():
             "errors"
         ]
     )
+
+def edit_workbook(content, edit):
+    workbook = load_workbook(io.BytesIO(content))
+    try:
+        edit(workbook.active)
+        output = io.BytesIO()
+        workbook.save(output)
+        return output.getvalue()
+    finally:
+        workbook.close()
+
+
+@pytest.mark.parametrize(("column", "field", "value"), [
+    (37, "effective_date", date(2026, 2, 4)),
+    (39, "agreement_start_1", date(2026, 2, 5)),
+    (40, "agreement_finish_1", date(2026, 2, 6)),
+    (42, "agreement_start_2", date(2026, 2, 7)),
+    (43, "agreement_finish_2", date(2026, 2, 8)),
+    (45, "agreement_start_3", date(2026, 2, 9)),
+    (46, "agreement_finish_3", date(2026, 2, 10)),
+    (49, "second_aprov_rd", "R&D-COLUMN-49"),
+    (50, "second_aprov_rd_start_1", date(2026, 1, 8)),
+    (51, "second_aprov_rd_finish_1", date(2026, 2, 12)),
+    (53, "second_aprov_rd_start_2", date(2026, 2, 13)),
+    (54, "second_aprov_rd_finish_2", date(2026, 2, 14)),
+    (65, "change_reason_az", "Reason column 65"),
+    (66, "model_az", "Model column 66"),
+    (67, "new_model", "YES"),
+    (68, "origem_approval", "HQ"),
+    (69, "event", "YES"),
+    (70, "comments", "Comments column 70"),
+    (71, "set_eco", "SET-COLUMN-71"),
+    (72, "set_eco_register_date", date(2026, 2, 15)),
+    (73, "set_eco_release_date", date(2026, 2, 16)),
+    (74, "set_eco_change_reason", "Reason column 74"),
+    (75, "set_eco_model", "Model column 75"),
+])
+def test_preview_reads_official_column_positions(column, field, value):
+    content = edit_workbook(create_workbook(), lambda sheet: sheet.cell(8, column, value))
+    result = create_service().preview(content, "controle.xlsx")
+    assert result["error_rows"] == 0
+    assert result["rows"][0]["data"][field] == value
+
+
+@pytest.mark.parametrize("header", ["Effective Date", "effective date", "  Effective   Date  ", "Effective\nDate"])
+def test_effective_date_header_normalization(header):
+    content = edit_workbook(create_workbook(), lambda sheet: sheet.cell(7, 37, header))
+    result = create_service().preview(content, "controle.xlsx")
+    assert result["rows"][0]["data"]["effective_date"] == date(2026, 2, 4)
+
+
+def test_effective_date_rejects_wrong_header():
+    content = edit_workbook(create_workbook(), lambda sheet: sheet.cell(7, 37, "Wrong date"))
+    with pytest.raises(HTTPException) as exc:
+        create_service().preview(content, "controle.xlsx")
+    assert exc.value.status_code == 422
+
+
+def test_old_ctrl_geral_layout_is_rejected():
+    def old_layout(sheet):
+        sheet.delete_cols(61)
+        sheet.delete_cols(37)
+    content = edit_workbook(create_workbook(), old_layout)
+    with pytest.raises(HTTPException) as exc:
+        create_service().preview(content, "controle.xlsx")
+    assert exc.value.status_code == 422
+
+
+def test_effective_date_formula_is_rejected():
+    content = edit_workbook(create_workbook(), lambda sheet: sheet.cell(8, 37, "=TODAY()"))
+    result = create_service().preview(content, "controle.xlsx")
+    assert result["can_import"] is False
+    assert any("EFFECTIVE DATE" in error for error in result["rows"][0]["errors"])
+
+
+@pytest.mark.parametrize("calculated_value", [999, "=999"])
+def test_gap_14d_is_not_imported_or_persisted(calculated_value):
+    specs = EcoImportService.COLUMN_SPECS
+    assert 61 not in specs
+    assert "gap_14d" not in {spec["field"] for spec in specs.values()}
+    calculated_columns = set(range(1, 76)) - set(specs) - {2}
+    def populate_calculated(sheet):
+        for column in calculated_columns:
+            sheet.cell(8, column, calculated_value)
+    content = edit_workbook(create_workbook(), populate_calculated)
+    service = create_service()
+    preview = service.preview(content, "controle.xlsx")
+    assert preview["error_rows"] == 0
+    assert "gap_14d" not in preview["rows"][0]["data"]
+    assert calculated_value not in preview["rows"][0]["data"].values()
+    persisted = []
+    service.db = SimpleNamespace(
+        add=persisted.append, flush=lambda: None,
+        commit=lambda: None, rollback=lambda: None,
+    )
+    service.ecos.next_item = lambda: 10
+    service.ecos.next_position = lambda: 20
+    service.history.add = lambda event: None
+    result = service.import_file(content, "controle.xlsx")
+    assert result["imported_rows"] == 1
+    assert persisted[0].effective_date == date(2026, 2, 4)
+    assert persisted[0].gap_14d_note is None
+    assert not hasattr(persisted[0], "gap_14d")
+    assert all(getattr(persisted[0], column.name) != calculated_value
+               for column in persisted[0].__table__.columns)

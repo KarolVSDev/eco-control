@@ -12,6 +12,7 @@ import pytest
 from app.utils.eco_calculations import (
     OPEN_STATUSES,
     business_days_between,
+    calculate_gap_14d,
     compute_eco_fields,
     days_between,
     excel_week_number,
@@ -1306,3 +1307,60 @@ def test_missing_dates():
         ==
         "-"
     )
+
+@pytest.mark.parametrize(
+    ("status", "effective", "finish_1", "finish_2", "expected", "requires_note"),
+    [
+        ("RELEASED", "2026-02-04", "2026-02-06", None, 2, False),
+        ("RELEASED", "2026-02-01", "2026-02-16", None, 15, True),
+        ("RELEASED", "2026-02-01", "2026-02-15", None, 14, False),
+        ("WORKING", "2026-02-01", "2026-02-16", None, None, False),
+        ("CANCELLED", "2026-02-01", "2026-02-16", None, None, False),
+        (None, "2026-02-01", "2026-02-16", None, None, False),
+        ("RELEASED", None, "2026-02-16", None, None, False),
+        ("RELEASED", "2026-02-01", None, None, None, False),
+        ("RELEASED", "2026-02-01", None, "2026-02-16", None, False),
+        ("RELEASED", "2026-02-04", "2026-02-06", "2026-03-01", 2, False),
+        ("RELEASED", "2026-02-04", "2026-02-04", None, 0, False),
+        ("RELEASED", "2026-02-06", "2026-02-09", None, 3, False),
+        ("RELEASED", "2026-02-09", "2026-02-06", None, -3, False),
+        ("  released  ", "2026-02-01", "2026-02-16", None, 15, True),
+        ("\tReLeAsEd\n", "2026-02-01", "2026-02-16", None, 15, True),
+        ("RELEASED", "invalid", "2026-02-16", None, None, False),
+        ("RELEASED", "2026-02-01", "invalid", None, None, False),
+        ("RELEASED", date(2026, 2, 4), datetime(2026, 2, 6, 23), None, 2, False),
+    ],
+)
+def test_gap_14d_calendar_days_and_conditions(status, effective, finish_1, finish_2, expected, requires_note):
+    row = calculation_row(
+        status=status, effective_date=effective,
+        second_aprov_rd_finish_1=finish_1,
+        second_aprov_rd_finish_2=finish_2,
+    )
+    assert calculate_gap_14d(row) == expected
+    result = compute_eco_fields(row)
+    assert result["gap_14d"] == expected
+    assert result["requires_gap_14d_note"] is requires_note
+
+
+def test_gap_14d_missing_attributes_are_optional():
+    assert calculate_gap_14d(SimpleNamespace()) is None
+    assert calculate_gap_14d(SimpleNamespace(status="RELEASED")) is None
+
+
+@pytest.mark.parametrize(("effective", "new_gap", "new_note"), [
+    (date(2026, 2, 1), 15, True),
+    (date(2026, 2, 16), 0, False),
+])
+def test_gap_14d_does_not_change_legacy_az_gap(effective, new_gap, new_note):
+    row = calculation_row(
+        status="RELEASED", effective_date=effective,
+        az_eco_register_date=date(2026, 2, 16),
+        second_aprov_rd_finish_1=date(2026, 2, 16),
+        second_aprov_rd_finish_2=date(2026, 3, 16),
+    )
+    result = compute_eco_fields(row)
+    assert result["gap_14d"] == new_gap
+    assert result["requires_gap_14d_note"] is new_note
+    assert result["az_gap"] == 21
+    assert result["contar_eco_14"] is True

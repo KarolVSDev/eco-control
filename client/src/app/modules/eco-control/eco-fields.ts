@@ -385,6 +385,11 @@ export const COLUMN_GROUPS:
         type: FIELD_TYPES.CALC_BOOL,
       },
       {
+        key: 'effective_date',
+        label: 'Effective Date',
+        type: FIELD_TYPES.DATE,
+      },
+      {
         key: 'gap_agreement',
         label: 'GAP AGREEMENT',
         type: FIELD_TYPES.CALC_NUMBER,
@@ -550,6 +555,16 @@ export const COLUMN_GROUPS:
         label:
           'Contar Eco concluída > 10 dias',
         type: FIELD_TYPES.CALC_BOOL,
+      },
+      {
+        key: 'gap_14d',
+        label: 'GAP 14D',
+        type: FIELD_TYPES.CALC_NUMBER,
+      },
+      {
+        key: 'gap_14d_note',
+        label: 'GAP 14D NOTE',
+        type: FIELD_TYPES.TEXTAREA,
       },
       {
         key: 'total_gap',

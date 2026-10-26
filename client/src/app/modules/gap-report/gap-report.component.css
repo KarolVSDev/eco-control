@@ -1,13 +1,3 @@
-.prototype-notice {
-  display: inline-block;
-  padding: 8px 12px;
-  border: 1px solid #66501f;
-  border-radius: 8px;
-  background: #282112;
-  color: #f3c76b;
-  font-size: 13px;
-}
-
 .period-panel, .report-panel { margin-top: 18px; }
 h2 { margin: 0 0 14px; font-size: 16px; }
 .toolbar { align-items: flex-end; }
@@ -25,12 +15,11 @@ input { color-scheme: dark; }
 caption { padding: 12px; text-align: left; color: #aaa; font-size: 12px; }
 .table .empty-state { white-space: normal; text-align: center; padding: 38px 20px; color: #aaa; line-height: 1.6; }
 
-/* Classes reservadas ao layout futuro; nenhuma regra de GAP aplicada nesta versão. */
 .gap-normal { color: var(--text); }
 .gap-attention { color: var(--orange); background: #282112; font-weight: 600; }
 .gap-justification { white-space: normal; min-width: 220px; }
 
-button:focus-visible, input:focus-visible, .table-wrap:focus-visible {
+button:focus-visible, input:focus-visible, textarea:focus-visible, .table-wrap:focus-visible {
   outline: 2px solid var(--pink);
   outline-offset: 3px;
 }
@@ -39,3 +28,16 @@ button:focus-visible, input:focus-visible, .table-wrap:focus-visible {
   .toolbar { align-items: stretch; flex-direction: column; }
   label, button { width: 100%; }
 }
+
+.gap-value { text-align: center; font-variant-numeric: tabular-nums; }
+.gap-value span { display: inline-block; padding: 5px 9px; border-radius: 6px; }
+.gap-justification { width: 380px; vertical-align: top; }
+.note-editor { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 260px; max-width: 420px; }
+.note-editor-row { display: flex; align-items: flex-end; gap: 8px; }
+.note-input { flex: 1; display: block; box-sizing: border-box; width: 100%; min-width: 0; height: 42px; min-height: 42px; max-height: 130px; resize: none; overflow-y: hidden; line-height: 1.5; }
+.note-actions { flex-shrink: 0; }
+.note-actions .btn { width: 90px; padding: 9px 10px; }
+.note-required { color: #f3c76b; }
+.note-feedback { font-size: 12px; line-height: 1.4; }
+.note-feedback p { margin: 0; }
+.note-success { color: #8ddbaf; }

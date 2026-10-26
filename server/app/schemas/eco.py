@@ -60,6 +60,7 @@ class EcoBase(BaseModel):
     change_reason2: str | None = None
     change_bom_az: str | None = None
     az_eco_creation_date: date | None = None
+    effective_date: date | None = None
 
     # ----------------------------------------
     # AGREEMENT OTHER DEPTS
@@ -93,6 +94,7 @@ class EcoBase(BaseModel):
     origem_approval: str | None = None
     event: str | None = None
     comments: str | None = None
+    gap_14d_note: str | None = None
 
     # ----------------------------------------
     # SET ECO
@@ -137,6 +139,8 @@ class EcoOut(EcoBase):
     au: str | None = None
 
     # calculados
+    gap_14d: int | None = None
+    requires_gap_14d_note: bool = False
     gap: str | int | None = None
 
     delay_eco_register: int | None = None

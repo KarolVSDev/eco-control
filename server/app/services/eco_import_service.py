@@ -277,42 +277,48 @@ class EcoImportService:
         # AGREEMENT OTHER DEPTS
         # -----------------------------------------------------
 
-        38: {
+        37: {
+            "field": "effective_date",
+            "header": "EFFECTIVE DATE",
+            "type": "date",
+        },
+
+        39: {
             "field": "agreement_start_1",
             "header":
                 "AGREEMENT OTHER DEPTS START (1)",
             "type": "date",
         },
 
-        39: {
+        40: {
             "field": "agreement_finish_1",
             "header":
                 "AGREEMENT OTHER DEPTS FINSHI (1)",
             "type": "date",
         },
 
-        41: {
+        42: {
             "field": "agreement_start_2",
             "header":
                 "AGREEMENT OTHER DEPTS START (2)",
             "type": "date",
         },
 
-        42: {
+        43: {
             "field": "agreement_finish_2",
             "header":
                 "AGREEMENT OTHER DEPTS FINSHI (2)",
             "type": "date",
         },
 
-        44: {
+        45: {
             "field": "agreement_start_3",
             "header":
                 "AGREEMENT OTHER DEPTS START (3)",
             "type": "date",
         },
 
-        45: {
+        46: {
             "field": "agreement_finish_3",
             "header":
                 "AGREEMENT OTHER DEPTS FINSHI (3)",
@@ -323,34 +329,34 @@ class EcoImportService:
         # R&D APPROVAL
         # -----------------------------------------------------
 
-        48: {
+        49: {
             "field": "second_aprov_rd",
             "header": "2ST APROV R&D",
             "type": "text",
         },
 
-        49: {
+        50: {
             "field": "second_aprov_rd_start_1",
             "header":
                 "2ST APROV R&D START (1)",
             "type": "date",
         },
 
-        50: {
+        51: {
             "field": "second_aprov_rd_finish_1",
             "header":
                 "2ST APROV R&D FINISH (1)",
             "type": "date",
         },
 
-        52: {
+        53: {
             "field": "second_aprov_rd_start_2",
             "header":
                 "2ST APROV R&D START (2)",
             "type": "date",
         },
 
-        53: {
+        54: {
             "field": "second_aprov_rd_finish_2",
             "header":
                 "2ST APROV R&D FINISH (2)",
@@ -360,38 +366,38 @@ class EcoImportService:
         # ADICIONAIS
         # -----------------------------------------------------
 
-        63: {
+        65: {
             "field": "change_reason_az",
             "header": "CHANGE REASON",
             "type": "text",
         },
 
-        64: {
+        66: {
             "field": "model_az",
             "header": "MODEL",
             "type": "text",
         },
 
-        65: {
+        67: {
             "field": "new_model",
             "header":
                 "NEW MODEL? (CHECK IN NPI PLAN 26Y)",
             "type": "text",
         },
 
-        66: {
+        68: {
             "field": "origem_approval",
             "header": "ORIGEM APPROVAL",
             "type": "text",
         },
 
-        67: {
+        69: {
             "field": "event",
             "header": "EVENT",
             "type": "text",
         },
 
-        68: {
+        70: {
             "field": "comments",
             "header": "COMMENTS",
             "type": "text",
@@ -401,31 +407,31 @@ class EcoImportService:
         # SET ECO
         # -----------------------------------------------------
 
-        69: {
+        71: {
             "field": "set_eco",
             "header": "SET ECO",
             "type": "text",
         },
 
-        70: {
+        72: {
             "field": "set_eco_register_date",
             "header": "SET ECO REGISTER DATE",
             "type": "date",
         },
 
-        71: {
+        73: {
             "field": "set_eco_release_date",
             "header": "SET ECO RELEASE DATE",
             "type": "date",
         },
 
-        72: {
+        74: {
             "field": "set_eco_change_reason",
             "header": "CHANGE REASON",
             "type": "text",
         },
 
-        73: {
+        75: {
             "field": "set_eco_model",
             "header": "MODEL",
             "type": "text",
@@ -2387,7 +2393,7 @@ class EcoImportService:
                     min_row=start_row,
                     max_row=end_row,
                     min_col=1,
-                    max_col=73,
+                    max_col=max(self.COLUMN_SPECS),
                 ),
                 start=start_row,
             ):

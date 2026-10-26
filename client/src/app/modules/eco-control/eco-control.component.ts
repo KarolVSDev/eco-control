@@ -1808,7 +1808,8 @@ export class EcoControlComponent
     const element =
       event.target as
         HTMLInputElement |
-        HTMLSelectElement;
+        HTMLSelectElement |
+        HTMLTextAreaElement;
 
 
     const rawValue =
