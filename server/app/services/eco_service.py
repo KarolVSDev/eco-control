@@ -1652,7 +1652,10 @@ class EcoService:
             "status": "updated" if changed_fields else "unchanged",
             "eco_id": str(eco.id),
             "eco": eco.eco,
-            "changed_fields": changed_fields,
+            "changed_fields": [
+                "group" if key == "group_name" else key
+                for key in changed_fields
+            ],
         }
 
 

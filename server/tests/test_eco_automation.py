@@ -296,7 +296,8 @@ def test_automation_assignments_update_audit_and_idempotence(context):
     response = client.post(PATH, json={"eco": "ECO123"})
     assert response.status_code == 200
     assert response.json()["status"] == "updated"
-    assert set(response.json()["changed_fields"]) == {"group_name", "owner"}
+    assert set(response.json()["changed_fields"]) == {"group", "owner"}
+    assert "group_name" not in response.text
     assert (eco.group_name, eco.owner) == ("BOM", "giseli.santos")
     events = {e.field_key: e for e in histories(db)}
     assert set(events) == {"group", "owner"}
@@ -328,3 +329,23 @@ def test_normal_create_and_patch_do_not_apply_automation_assignments(context):
     result = client.patch(f"/api/v1/ecos/{eco.id}", json={"owner": "edited.owner", "group": "HW"})
     assert result.status_code == 200
     assert (eco.owner, eco.group_name) == ("edited.owner", "HW")
+
+
+def test_existing_eco_group_response_uses_external_name(context):
+    client, db, eco, _ = context
+    eco.group_name = "DEV"
+    db.commit()
+    response = client.post(PATH, json={"eco": "ECO123"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "updated"
+    assert response.json()["changed_fields"] == ["group"]
+    assert "group_name" not in response.text
+    assert eco.group_name == "BOM"
+    events = histories(db)
+    assert len(events) == 1
+    assert events[0].field_key == "group"
+    assert (events[0].old_value, events[0].new_value, events[0].action) == ("DEV", "BOM", "updated")
+    second = client.post(PATH, json={"eco": "ECO123"})
+    assert second.json()["status"] == "unchanged"
+    assert second.json()["changed_fields"] == []
+    assert len(histories(db)) == 1
