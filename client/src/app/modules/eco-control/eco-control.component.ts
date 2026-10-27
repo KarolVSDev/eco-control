@@ -16,6 +16,8 @@ import {
   monthLabel,
 } from '../../shared/utils/month-label';
 
+import { Eco } from './eco.model';
+
 import {
   COLUMN_GROUPS,
   EcoColumn,
@@ -61,7 +63,7 @@ export class EcoControlComponent
   // DADOS
   // =====================================================
 
-  rows: any[] = [];
+  rows: Eco[] = [];
 
   total = 0;
 
@@ -158,7 +160,7 @@ export class EcoControlComponent
   // LINHA SELECIONADA
   // =====================================================
 
-  selectedRow: any = null;
+  selectedRow: Eco | null = null;
 
   selectedRowIds = new Set<string>();
 
@@ -169,7 +171,7 @@ export class EcoControlComponent
   // DRAWER
   // =====================================================
 
-  viewingRow: any = null;
+  viewingRow: Eco | null = null;
 
   drawerEditing = false;
 
@@ -384,7 +386,7 @@ export class EcoControlComponent
               this.rows.find(
                 row =>
                   row.id ===
-                  this.selectedRow.id
+                  this.selectedRow?.id
               );
 
 
@@ -403,7 +405,7 @@ export class EcoControlComponent
               this.rows.find(
                 row =>
                   row.id ===
-                  this.viewingRow.id
+                  this.viewingRow?.id
               );
 
 
@@ -918,7 +920,7 @@ export class EcoControlComponent
   // =====================================================
 
   isRowSelected(
-    row: any,
+    row: Eco,
   ): boolean {
 
     return (
@@ -929,7 +931,7 @@ export class EcoControlComponent
 
 
   selectRow(
-    row: any,
+    row: Eco,
   ): void {
 
     if (
@@ -949,7 +951,7 @@ export class EcoControlComponent
 
 
   isRowChecked(
-    row: any,
+    row: Eco,
   ): boolean {
 
     return this.selectedRowIds
@@ -1008,7 +1010,7 @@ export class EcoControlComponent
 
 
   toggleRowChecked(
-    row: any,
+    row: Eco,
     checked: boolean,
   ): void {
 
@@ -1104,7 +1106,7 @@ export class EcoControlComponent
 
 
     this.api
-      .post<any>(
+      .post<Eco>(
         endpoint,
         {},
       )
@@ -1159,7 +1161,7 @@ export class EcoControlComponent
   // =====================================================
 
   openDetails(
-    row: any,
+    row: Eco,
   ): void {
 
     this.viewingRow =
@@ -1280,7 +1282,7 @@ export class EcoControlComponent
   // =====================================================
 
   private buildDrawerDraft(
-    row: any,
+    row: Eco,
   ): Record<string, any> {
 
     const draft:
@@ -1415,7 +1417,7 @@ export class EcoControlComponent
 
 
         const oldValue =
-          this.viewingRow[
+          this.viewingRow?.[
             column.key
           ] ?? '';
 
@@ -1474,7 +1476,7 @@ export class EcoControlComponent
 
 
       const previousValue =
-        this.viewingRow[
+        this.viewingRow?.[
           column.key
         ] ?? null;
 
@@ -1532,7 +1534,7 @@ export class EcoControlComponent
 
 
     const id =
-      this.viewingRow.id;
+      this.viewingRow?.id;
 
 
     this.drawerSaving =
@@ -1544,7 +1546,7 @@ export class EcoControlComponent
 
 
     this.api
-      .patch<any>(
+      .patch<Eco>(
         `/ecos/${id}`,
         changes,
       )
@@ -1769,7 +1771,7 @@ export class EcoControlComponent
 
 
   isCellSaving(
-    row: any,
+    row: Eco,
     column: EcoColumn,
   ): boolean {
 
@@ -1790,7 +1792,7 @@ export class EcoControlComponent
   // =====================================================
 
   updateCell(
-    row: any,
+    row: Eco,
     column: EcoColumn,
     event: Event,
   ): void {
@@ -1854,7 +1856,7 @@ export class EcoControlComponent
 
 
     this.api
-      .patch<any>(
+      .patch<Eco>(
         `/ecos/${row.id}`,
         {
           [column.key]:
@@ -1937,7 +1939,7 @@ export class EcoControlComponent
   // =====================================================
 
   remove(
-    row: any,
+    row: Eco,
   ): void {
 
     if (
@@ -2492,7 +2494,7 @@ export class EcoControlComponent
   // =====================================================
 
   displayValue(
-    row: any,
+    row: Eco,
     column: EcoColumn,
   ): string {
 
@@ -2584,7 +2586,7 @@ export class EcoControlComponent
 
   trackRow(
     _index: number,
-    row: any,
+    row: Eco,
   ): string {
 
     return row.id;

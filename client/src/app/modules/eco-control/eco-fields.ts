@@ -247,6 +247,11 @@ export const COLUMN_GROUPS:
         type: FIELD_TYPES.MONO,
       },
       {
+        key: 'title',
+        label: 'Title',
+        type: FIELD_TYPES.TEXT,
+      },
+      {
         key: 'change_reason',
         label: 'CHANGE REASON',
         type: FIELD_TYPES.TEXTAREA,
