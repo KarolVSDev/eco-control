@@ -1,6 +1,7 @@
 import {
   Component,
   OnInit,
+  OnDestroy,
   inject,
 } from '@angular/core';
 
@@ -15,6 +16,9 @@ import {
 import {
   monthLabel,
 } from '../../shared/utils/month-label';
+
+import { DOCUMENT } from '@angular/common';
+import { Subject, Subscription, interval, takeUntil, finalize } from 'rxjs';
 
 import { Eco } from './eco.model';
 
@@ -33,7 +37,7 @@ import {
   styleUrls: ['./eco-control.component.css'],
 })
 export class EcoControlComponent
-  implements OnInit {
+  implements OnInit, OnDestroy {
 
   private readonly api =
     inject(ApiService);
@@ -197,12 +201,59 @@ export class EcoControlComponent
   // INIT
   // =====================================================
 
+  private readonly document = inject(DOCUMENT);
+  private readonly destroyed$ = new Subject<void>();
+  private listRequest?: Subscription;
+  private listInFlight = false;
+  private initialLoadComplete = false;
+  private readonly knownEcoIds = new Set<string>();
+  readonly highlightedEcoIds = new Set<string>();
+  private readonly highlightTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  private refreshPaused(): boolean {
+    return this.drawerEditing || this.drawerSaving || this.cellSaving.size > 0
+      || this.creatingEco || this.deletingSelected || this.importingFile
+      || !!this.document.activeElement?.closest('.eco-table input, .eco-table textarea, .eco-table select');
+  }
+
+  private rememberRows(rows: Eco[]): void {
+    for (const row of rows) {
+      if (this.initialLoadComplete && !this.knownEcoIds.has(row.id)) {
+        this.highlightedEcoIds.add(row.id);
+        this.highlightTimers.set(row.id, setTimeout(() => {
+          this.highlightedEcoIds.delete(row.id);
+          this.highlightTimers.delete(row.id);
+        }, 4000));
+      }
+      this.knownEcoIds.add(row.id);
+    }
+    this.initialLoadComplete = true;
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
+    for (const timer of this.highlightTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.highlightTimers.clear();
+    this.highlightedEcoIds.clear();
+    this.knownEcoIds.clear();
+  }
+
   ngOnInit(): void {
+    interval(3000).pipe(takeUntil(this.destroyed$)).subscribe(() => {
+      if (this.initialLoadComplete && !this.listInFlight && !this.refreshPaused()) {
+        this.load(true);
+      }
+    });
+
 
     this.loadOwnerOptions();
 
     this.permissions
       .load()
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: () => {
@@ -342,16 +393,21 @@ export class EcoControlComponent
   // CARREGAR ECOS
   // =====================================================
 
-  load(): void {
+  load(silent = false): void {
+    if (silent && (this.listInFlight || this.refreshPaused())) {
+      return;
+    }
+    // Explicit navigation supersedes an older query, including background refresh.
+    this.listRequest?.unsubscribe();
+    this.listInFlight = true;
+    if (!silent) {
+      this.loading = true;
+      this.loadError = '';
+      this.cellError = '';
+    }
 
-    this.loading = true;
 
-    this.loadError = '';
-
-    this.cellError = '';
-
-
-    this.api
+    this.listRequest = this.api
       .get<any>(
         '/ecos',
         {
@@ -368,9 +424,17 @@ export class EcoControlComponent
             this.columnFiltersParam(),
         },
       )
+      .pipe(finalize(() => {
+        this.listInFlight = false;
+        if (!silent) this.loading = false;
+      }))
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: response => {
+          // An editor may have gained focus while the request was in flight.
+          if (silent && this.refreshPaused()) return;
+          this.rememberRows(response.items);
 
 
           this.rows =
@@ -391,7 +455,7 @@ export class EcoControlComponent
 
 
             this.selectedRow =
-              selected || null;
+              selected || (silent ? this.selectedRow : null);
           }
 
 
@@ -428,6 +492,8 @@ export class EcoControlComponent
             error,
           );
 
+
+          if (silent) return;
 
           this.loadError =
             'Não foi possível carregar as ECOs. Tente novamente.';
@@ -1110,6 +1176,7 @@ export class EcoControlComponent
         endpoint,
         {},
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: created => {
@@ -1550,6 +1617,7 @@ export class EcoControlComponent
         `/ecos/${id}`,
         changes,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: updated => {
@@ -1638,6 +1706,7 @@ export class EcoControlComponent
       >(
         '/settings/owner-options'
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: items => {
@@ -1863,6 +1932,7 @@ export class EcoControlComponent
             value,
         },
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: updated => {
@@ -1972,6 +2042,7 @@ export class EcoControlComponent
       .delete(
         `/ecos/${row.id}`,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: () => {
@@ -2065,6 +2136,7 @@ export class EcoControlComponent
             ),
         },
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: () => {
           this.deletingSelected =
@@ -2212,6 +2284,7 @@ export class EcoControlComponent
         '/ecos/import/preview',
         formData,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: response => {
           this.importPreview = response;
@@ -2258,6 +2331,7 @@ export class EcoControlComponent
         '/ecos/import',
         formData,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: response => {
           this.importResult = response;
@@ -2331,6 +2405,7 @@ export class EcoControlComponent
             this.columnFiltersParam(),
         },
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: blob => {

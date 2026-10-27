@@ -987,8 +987,8 @@
   font-size: 13px;
 
   transition:
-    background 0.1s ease,
-    border-color 0.1s ease;
+    background 0.35s ease,
+    border-color 0.35s ease;
 }
 
 
@@ -2695,3 +2695,12 @@ tr.row-selected
 }
 
 
+
+/* New IDs detected during this screen session; includes sticky cells. */
+.eco-table tbody tr.eco-new-highlight td,
+.eco-table tbody tr.eco-new-highlight:hover td,
+.eco-table tbody tr.eco-new-highlight .row-tools-column {
+  background: #432027;
+  border-bottom-color: #ab4856;
+  transition: background 0.35s ease, border-color 0.35s ease;
+}
