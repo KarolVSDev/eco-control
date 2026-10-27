@@ -15,6 +15,7 @@ from app.models.entities import (
     FieldPermission,
 )
 
+from app.schemas.eco import EcoCreate
 from app.repository.eco_repository import EcoRepository
 from app.repository.history_repository import HistoryRepository
 from app.repository.settings_repository import SettingsRepository
@@ -910,7 +911,11 @@ class EcoService:
     # CREATE NORMAL
     # =========================================================
 
-    def create(
+    def create(self, payload):
+        return self.serialize(self._create_eco(payload))
+
+
+    def _create_eco(
         self,
         payload,
     ):
@@ -1102,9 +1107,7 @@ class EcoService:
         self.db.commit()
 
 
-        return self.serialize(
-            eco
-        )
+        return eco
 
 
     # =========================================================
@@ -1619,17 +1622,28 @@ class EcoService:
 
     def sync_automation(self, payload):
         matches = self.repo.find_exact_code(payload.eco)
-        if not matches:
-            raise HTTPException(status_code=404, detail="ECO não encontrada")
         if len(matches) > 1:
             raise HTTPException(status_code=409, detail="Código ECO ambíguo: mais de um registro encontrado")
-        eco = matches[0]
-        changes = {
+        data = {
             key: value
             for key, value in payload.model_dump(exclude_unset=True).items()
-            if key != "eco" and value is not None
+            if value is not None
             and not (isinstance(value, str) and not value.strip())
         }
+        if not matches:
+            try:
+                eco = self._create_eco(EcoCreate(**data))
+            except Exception:
+                self.db.rollback()
+                raise
+            return {
+                "status": "created",
+                "eco_id": str(eco.id),
+                "eco": eco.eco,
+                "changed_fields": list(data),
+            }
+        eco = matches[0]
+        changes = {key: value for key, value in data.items() if key != "eco"}
         changed_fields = self._apply_update(eco, changes) if changes else []
         return {
             "status": "updated" if changed_fields else "unchanged",

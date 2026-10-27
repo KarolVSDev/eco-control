@@ -85,12 +85,15 @@ def test_partial_update_and_omitted_fields(context):
     assert client.post(PATH, json={"eco": "ECO123"}).json()["status"] == "unchanged"
 
 
-def test_missing_and_partial_code(context):
+def test_missing_and_partial_code_create_separate_records(context):
     client, db, eco, _ = context
     for code in ["MISSING", "ECO12", "eco123"]:
-        assert client.post(PATH, json={"eco": code, "title": "New"}).status_code == 404
-    assert len(db.scalars(select(Eco)).all()) == 1
-    assert histories(db) == []
+        response = client.post(PATH, json={"eco": code, "title": "New"})
+        assert response.status_code == 200
+        assert response.json()["status"] == "created"
+        assert response.json()["eco"] == code
+    assert len(db.scalars(select(Eco)).all()) == 4
+    assert eco.title == "Original"
 
 
 def test_duplicate_normalized_code_changes_nothing(context):
@@ -190,3 +193,79 @@ def test_title_migration_upgrade_and_downgrade_preserve_existing_rows():
             assert connection.execute(text("SELECT eco FROM ecos")).scalar_one() == "EXISTING"
             assert "title" not in {c["name"] for c in inspect(connection).get_columns("ecos")}
     engine.dispose()
+
+
+@pytest.mark.parametrize("empty", [None, "", "   "])
+def test_create_ignores_empty_optional_fields_and_uses_defaults(context, empty):
+    client, db, _, _ = context
+    payload = {key: empty for key in ["obu", "change_reason", "eco_type",
+        "az_eco_register_date", "auto_ecr", "change_bom", "title"]}
+    payload["eco"] = " NEW-ECO "
+    result = client.post(PATH, json=payload)
+    assert result.status_code == 200
+    assert result.json()["status"] == "created"
+    assert result.json()["changed_fields"] == ["eco"]
+    new = db.scalar(select(Eco).where(Eco.eco == "NEW-ECO"))
+    for key in payload.keys() - {"eco"}:
+        assert getattr(new, key) is None
+    for key in ["owner", "effective_date", "agreement_start_1", "agreement_finish_1",
+                "second_aprov_rd_finish_1", "gap_14d_note", "set_eco"]:
+        assert getattr(new, key) is None
+    assert new.status == "WORKING"
+    assert new.item == 1 and new.position == 1 and new.month
+    assert new.au is None
+    events = histories(db)
+    assert [(e.field_key, e.action) for e in events] == [("eco", "created")]
+    assert client.post(PATH, json=payload).json()["status"] == "unchanged"
+    assert len(histories(db)) == 1
+
+
+def test_create_all_available_fields_and_obu_mapping(context):
+    client, db, _, user = context
+    db.add(ObuAuMapping(obu="NEW", au="NEW-AU"))
+    db.commit()
+    payload = dict(eco="NEW-ECO", obu="NEW", change_reason="Reason", eco_type="TYPE",
+                   az_eco_register_date="2026-10-27", auto_ecr="YES", change_bom="NO", title="Title")
+    result = client.post(PATH, json=payload)
+    assert result.status_code == 200 and result.json()["status"] == "created"
+    new = db.scalar(select(Eco).where(Eco.eco == "NEW-ECO"))
+    assert result.json()["eco_id"] == str(new.id)
+    for key, value in payload.items():
+        assert getattr(new, key) == (date(2026, 10, 27) if key == "az_eco_register_date" else value)
+    assert new.au == "NEW-AU"
+    events = histories(db)
+    assert {e.field_key for e in events} == set(payload)
+    assert all(e.action == "created" and e.user_email == user.email for e in events)
+    assert client.post(PATH, json=payload).json()["status"] == "unchanged"
+    assert len(histories(db)) == len(events)
+    assert len(db.scalars(select(Eco)).all()) == 2
+
+
+def test_create_requires_normal_creation_and_field_permissions(context):
+    from app.models.entities import AnalystPermission
+    client, db, _, user = context
+    user.role = "analyst"
+    payload = {"eco": "NEW-ECO", "title": "Title"}
+    assert client.post(PATH, json=payload).status_code == 403
+    db.add(AnalystPermission(user_email=user.email, can_create_eco=True))
+    db.add(FieldPermission(user_email=user.email, field_key="eco", can_edit=True))
+    db.commit()
+    assert client.post(PATH, json=payload).status_code == 403
+    assert db.scalar(select(Eco).where(Eco.eco == "NEW-ECO")) is None
+    assert histories(db) == []
+    db.add(FieldPermission(user_email=user.email, field_key="title", can_edit=True))
+    db.commit()
+    response = client.post(PATH, json=payload)
+    assert response.status_code == 200 and response.json()["status"] == "created"
+
+
+def test_create_commit_failure_rolls_back_record_and_audit(context, monkeypatch):
+    from app.schemas.eco_automation import EcoAutomationRequest
+    _, db, _, user = context
+    def fail():
+        raise RuntimeError("commit failed")
+    monkeypatch.setattr(db, "commit", fail)
+    with pytest.raises(RuntimeError, match="commit failed"):
+        EcoService(db, user).sync_automation(EcoAutomationRequest(eco="NEW-ECO", title="Title"))
+    assert db.scalar(select(Eco).where(Eco.eco == "NEW-ECO")) is None
+    assert histories(db) == []

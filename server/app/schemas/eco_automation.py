@@ -29,7 +29,7 @@ class EcoAutomationRequest(BaseModel):
 
 
 class EcoAutomationResponse(BaseModel):
-    status: Literal["updated", "unchanged"]
+    status: Literal["created", "updated", "unchanged"]
     eco_id: str
     eco: str
     changed_fields: list[str]
