@@ -1630,6 +1630,9 @@ class EcoService:
             if value is not None
             and not (isinstance(value, str) and not value.strip())
         }
+        # Temporary assignment policy applies only to automation synchronization.
+        # Pass through the normal create/update paths for permissions and audit.
+        data.update(group="BOM", owner="giseli.santos")
         if not matches:
             try:
                 eco = self._create_eco(EcoCreate(**data))

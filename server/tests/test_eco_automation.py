@@ -24,7 +24,8 @@ def context():
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         user = SimpleNamespace(role="admin", email="test@example.com", full_name="Test")
-        eco = Eco(eco="ECO123", obu="OLD", au="OLD-AU", title="Original", change_reason="Reason")
+        eco = Eco(eco="ECO123", obu="OLD", au="OLD-AU", title="Original", change_reason="Reason",
+                  group_name="BOM", owner="giseli.santos")
         db.add(eco)
         db.commit()
         overrides = app.dependency_overrides.copy()
@@ -110,6 +111,8 @@ def test_field_permissions_are_atomic(context):
     client, db, eco, user = context
     user.role = "analyst"
     assert client.post(PATH, json={"eco": "ECO123", "title": "New"}).status_code == 403
+    for key in ["group", "owner"]:
+        db.add(FieldPermission(user_email=user.email, field_key=key, can_edit=True))
     db.add(FieldPermission(user_email=user.email, field_key="title", can_edit=True, can_view=True))
     db.commit()
     assert client.post(PATH, json={"eco": "ECO123", "title": "New", "obu": "NEW"}).status_code == 403
@@ -120,7 +123,7 @@ def test_field_permissions_are_atomic(context):
 
 @pytest.mark.parametrize("payload", [
     {}, {"eco": "   "}, {"eco": "ECO123", "az_eco_register_date": "2026-02-30"},
-    *[{"eco": "ECO123", key: "unexpected"} for key in ["au", "gap_14d", "effective_date", "approved_date", "origin_eco", "suffix", "applied_to_manaus", "prod_plan", "item", "position", "month"]],
+    *[{"eco": "ECO123", key: "unexpected"} for key in ["group", "group_name", "owner", "au", "gap_14d", "effective_date", "approved_date", "origin_eco", "suffix", "applied_to_manaus", "prod_plan", "item", "position", "month"]],
     {"eco": "ECO123", "auto_ecr": True}, {"eco": "ECO123", "change_bom": "INVALID"},
 ])
 def test_invalid_payload(context, payload):
@@ -204,24 +207,28 @@ def test_create_ignores_empty_optional_fields_and_uses_defaults(context, empty):
     result = client.post(PATH, json=payload)
     assert result.status_code == 200
     assert result.json()["status"] == "created"
-    assert result.json()["changed_fields"] == ["eco"]
+    assert set(result.json()["changed_fields"]) == {"eco", "group", "owner"}
     new = db.scalar(select(Eco).where(Eco.eco == "NEW-ECO"))
     for key in payload.keys() - {"eco"}:
         assert getattr(new, key) is None
-    for key in ["owner", "effective_date", "agreement_start_1", "agreement_finish_1",
+    for key in ["effective_date", "agreement_start_1", "agreement_finish_1",
                 "second_aprov_rd_finish_1", "gap_14d_note", "set_eco"]:
         assert getattr(new, key) is None
+    assert new.group_name == "BOM" and new.owner == "giseli.santos"
     assert new.status == "WORKING"
     assert new.item == 1 and new.position == 1 and new.month
     assert new.au is None
     events = histories(db)
-    assert [(e.field_key, e.action) for e in events] == [("eco", "created")]
+    assert {(e.field_key, e.action) for e in events} == {
+        ("eco", "created"), ("group", "created"), ("owner", "created")}
     assert client.post(PATH, json=payload).json()["status"] == "unchanged"
-    assert len(histories(db)) == 1
+    assert len(histories(db)) == 3
 
 
 def test_create_all_available_fields_and_obu_mapping(context):
     client, db, _, user = context
+    from app.models.entities import OwnerGroupMapping
+    db.add(OwnerGroupMapping(owner="giseli.santos", group_name="MEC"))
     db.add(ObuAuMapping(obu="NEW", au="NEW-AU"))
     db.commit()
     payload = dict(eco="NEW-ECO", obu="NEW", change_reason="Reason", eco_type="TYPE",
@@ -233,8 +240,9 @@ def test_create_all_available_fields_and_obu_mapping(context):
     for key, value in payload.items():
         assert getattr(new, key) == (date(2026, 10, 27) if key == "az_eco_register_date" else value)
     assert new.au == "NEW-AU"
+    assert (new.group_name, new.owner) == ("BOM", "giseli.santos")
     events = histories(db)
-    assert {e.field_key for e in events} == set(payload)
+    assert {e.field_key for e in events} == set(payload) | {"group", "owner"}
     assert all(e.action == "created" and e.user_email == user.email for e in events)
     assert client.post(PATH, json=payload).json()["status"] == "unchanged"
     assert len(histories(db)) == len(events)
@@ -255,6 +263,9 @@ def test_create_requires_normal_creation_and_field_permissions(context):
     assert histories(db) == []
     db.add(FieldPermission(user_email=user.email, field_key="title", can_edit=True))
     db.commit()
+    for key in ["group", "owner"]:
+        db.add(FieldPermission(user_email=user.email, field_key=key, can_edit=True))
+    db.commit()
     response = client.post(PATH, json=payload)
     assert response.status_code == 200 and response.json()["status"] == "created"
 
@@ -269,3 +280,51 @@ def test_create_commit_failure_rolls_back_record_and_audit(context, monkeypatch)
         EcoService(db, user).sync_automation(EcoAutomationRequest(eco="NEW-ECO", title="Title"))
     assert db.scalar(select(Eco).where(Eco.eco == "NEW-ECO")) is None
     assert histories(db) == []
+
+
+def test_automation_assignments_update_audit_and_idempotence(context):
+    from app.models.entities import OwnerGroupMapping
+    client, db, eco, user = context
+    eco.group_name = "DEV"
+    eco.owner = "previous.owner"
+    # Explicit integration group must take priority over owner mapping.
+    db.add(OwnerGroupMapping(owner="giseli.santos", group_name="MEC"))
+    db.commit()
+    other = Eco(eco="UNTOUCHED", group_name="HW", owner="other.owner")
+    db.add(other)
+    db.commit()
+    response = client.post(PATH, json={"eco": "ECO123"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "updated"
+    assert set(response.json()["changed_fields"]) == {"group_name", "owner"}
+    assert (eco.group_name, eco.owner) == ("BOM", "giseli.santos")
+    events = {e.field_key: e for e in histories(db)}
+    assert set(events) == {"group", "owner"}
+    assert (events["group"].old_value, events["group"].new_value) == ("DEV", "BOM")
+    assert (events["owner"].old_value, events["owner"].new_value) == ("previous.owner", "giseli.santos")
+    assert all(e.action == "updated" and e.user_email == user.email for e in events.values())
+    assert client.post(PATH, json={"eco": "ECO123"}).json()["status"] == "unchanged"
+    assert client.post(PATH, json={"eco": "ECO123"}).json()["changed_fields"] == []
+    assert len(histories(db)) == 2
+    assert (other.group_name, other.owner) == ("HW", "other.owner")
+
+
+def test_automation_assignment_permissions_are_not_bypassed(context):
+    client, db, eco, user = context
+    user.role = "analyst"
+    eco.owner = "previous.owner"
+    db.add(FieldPermission(user_email=user.email, field_key="title", can_edit=True))
+    db.commit()
+    assert client.post(PATH, json={"eco": "ECO123", "title": "New"}).status_code == 403
+    assert eco.owner == "previous.owner" and eco.title == "Original"
+    assert histories(db) == []
+
+
+def test_normal_create_and_patch_do_not_apply_automation_assignments(context):
+    client, db, eco, _ = context
+    result = client.post("/api/v1/ecos", json={"eco": "MANUAL", "owner": "manual.owner", "group": "DEV"})
+    assert result.status_code == 200
+    assert result.json()["owner"] == "manual.owner" and result.json()["group"] == "DEV"
+    result = client.patch(f"/api/v1/ecos/{eco.id}", json={"owner": "edited.owner", "group": "HW"})
+    assert result.status_code == 200
+    assert (eco.owner, eco.group_name) == ("edited.owner", "HW")
