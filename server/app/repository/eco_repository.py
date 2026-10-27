@@ -18,6 +18,14 @@ class EcoRepository:
         self.db = db
 
 
+    def find_exact_code(self, code):
+        # Limit to two: enough to detect ambiguity without choosing a record.
+        return self.db.scalars(
+            select(Eco).where(func.trim(Eco.eco) == code.strip())
+            .limit(2).with_for_update()
+        ).all()
+
+
     # =========================================================
     # LISTAGEM
     # =========================================================

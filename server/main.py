@@ -17,3 +17,6 @@ app.include_router(
 )
 @app.get('/health')
 def health(): return {'status':'ok'}
+
+from app.controller import integration_controller
+app.include_router(integration_controller.router, prefix="/api/v1")

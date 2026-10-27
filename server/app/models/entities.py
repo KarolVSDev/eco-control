@@ -31,6 +31,7 @@ class Eco(Base):
     status: Mapped[str | None] = mapped_column(Text, default="WORKING", index=True)
     receb: Mapped[str | None] = mapped_column(Text)
     eco: Mapped[str | None] = mapped_column(Text, index=True)
+    title: Mapped[str | None] = mapped_column(Text)
     change_reason: Mapped[str | None] = mapped_column(Text)
     hq_eco_release_date: Mapped[object | None] = mapped_column(Date)
     az_eco_register_date: Mapped[object | None] = mapped_column(Date)

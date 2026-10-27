@@ -1613,6 +1613,41 @@ class EcoService:
         )
 
 
+        self._apply_update(eco, raw_changes)
+        return self.serialize(eco)
+
+
+    def sync_automation(self, payload):
+        matches = self.repo.find_exact_code(payload.eco)
+        if not matches:
+            raise HTTPException(status_code=404, detail="ECO não encontrada")
+        if len(matches) > 1:
+            raise HTTPException(status_code=409, detail="Código ECO ambíguo: mais de um registro encontrado")
+        eco = matches[0]
+        changes = {
+            key: value
+            for key, value in payload.model_dump(exclude_unset=True).items()
+            if key != "eco" and value is not None
+            and not (isinstance(value, str) and not value.strip())
+        }
+        changed_fields = self._apply_update(eco, changes) if changes else []
+        return {
+            "status": "updated" if changed_fields else "unchanged",
+            "eco_id": str(eco.id),
+            "eco": eco.eco,
+            "changed_fields": changed_fields,
+        }
+
+
+    def _apply_update(self, eco, raw_changes):
+        try:
+            return self._apply_update_transaction(eco, raw_changes)
+        except Exception:
+            self.db.rollback()
+            raise
+
+
+    def _apply_update_transaction(self, eco, raw_changes):
         changes = {
             key: normalize_text(
                 value
@@ -1732,11 +1767,7 @@ class EcoService:
 
 
         self.db.commit()
-
-
-        return self.serialize(
-            eco
-        )
+        return list(updated_fields)
 
 
     # =========================================================

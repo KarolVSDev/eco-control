@@ -34,6 +34,7 @@ class EcoBase(BaseModel):
     # ----------------------------------------
     # ECO HQ
     # ----------------------------------------
+    title: str | None = None
     eco: str | None = None
     change_reason: str | None = None
     hq_eco_release_date: date | None = None
