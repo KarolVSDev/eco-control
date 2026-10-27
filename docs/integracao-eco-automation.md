@@ -12,7 +12,7 @@ Referência técnica do contrato atual, conferida no código em 27/10/2026.
 - [Matching e persistência](#matching-e-persistência)
 - [Respostas e idempotência](#respostas-e-idempotência)
 - [Status HTTP e erros](#status-http-e-erros)
-- [Permissões da conta técnica](#permissões-da-conta-técnica)
+- [Conta técnica da automação](#conta-técnica-da-automação)
 - [Auditoria](#auditoria)
 - [Exemplos de chamadas](#exemplos-de-chamadas)
 - [Interface e segurança](#interface-e-segurança)
@@ -423,10 +423,39 @@ No 422, `detail` normalmente é uma lista de erros de validação. Não tratar t
 resposta de erro como se `detail` fosse necessariamente string. O serviço não
 define um corpo JSON específico para todo erro 500.
 
-## Permissões da conta técnica
+## Conta técnica da automação
 
-A conta técnica pode ser `analyst`, sem privilégios administrativos. Deve estar
-ativa e ter, para suportar criação e sincronização completas:
+### Perfil recomendado
+
+Perfil mínimo para uma conta exclusiva da automação, capaz de criar e sincronizar
+ECOs com qualquer payload aceito atualmente:
+
+```yaml
+Nome conceitual: ECO Automation
+Role: analyst
+active: true
+
+can_create_eco: true
+can_bulk_edit: false
+can_view_history: false
+```
+
+Configurar `can_edit=true` somente para estes campos:
+
+```text
+eco
+obu
+change_reason
+eco_type
+az_eco_register_date
+auto_ecr
+change_bom
+title
+group
+owner
+```
+
+### Permissões verificadas
 
 | Configuração | Necessidade |
 |---|---|
@@ -434,7 +463,7 @@ ativa e ter, para suportar criação e sincronização completas:
 | `eco.can_edit = True` | Necessário na criação: o código faz parte dos dados criados |
 | `obu.can_edit`, `change_reason.can_edit`, `eco_type.can_edit` | Necessários quando esses opcionais válidos são utilizados |
 | `az_eco_register_date.can_edit`, `auto_ecr.can_edit`, `change_bom.can_edit`, `title.can_edit` | Necessários quando esses opcionais válidos são utilizados |
-| `group.can_edit = True`, `owner.can_edit = True` | Necessários em toda sincronização, pois são acrescentados pelo servidor |
+| `group.can_edit = True`, `owner.can_edit = True` | Necessários em toda sincronização: o backend fixa `BOM` e `giseli.santos`, mesmo sem esses campos no payload |
 
 As permissões são registros de `FieldPermission` por e-mail, campo e `can_edit`.
 Use `group` como chave externa de permissão; o serviço também normaliza a chave
@@ -442,19 +471,64 @@ legada `group_name` para `group`.
 
 A validação de edição ocorre **antes** da comparação dos valores: enviar um
 campo válido já igual ao atual também exige sua permissão. GROUP e OWNER passam
-por essa validação mesmo quando já estão corretos. Opcionais ignorados não
-exigem permissão de edição por esse envio.
+por essa validação mesmo quando já estão corretos. Opcionais omitidos, null,
+vazios ou somente espaços são ignorados e não exigem autorização por esse envio.
 
 Para atualizar uma ECO existente, não é necessário `can_create_eco` nem editar
 `eco`, pois o código é removido das alterações. Para criar, ambos são necessários.
 AU é derivado após a validação de campos recebidos e não exige autorização
-separada de edição de `au` nesse fluxo. `can_view` regula visualização pelos
-fluxos existentes, não substitui `can_edit`. O resumo da integração não filtra
-seus campos por `can_view`.
+separada de edição de `au` nesse fluxo.
 
-`can_bulk_edit` e `can_view_history` não são pré-requisitos da operação.
-Administradores seguem a autorização normal existente. Nenhum usuário é criado
-ou configurado por este documento.
+### can_view e privilégio mínimo
+
+`can_view` **não é requisito técnico** para
+`POST /api/v1/integrations/eco-automation`. A autorização da integração utiliza
+`can_edit`. Uma conta exclusiva de automação não precisa de acesso visual.
+`can_view` regula a visualização nos fluxos existentes e não substitui `can_edit`;
+o resumo retornado pela integração não filtra seus campos por `can_view`.
+
+A conta não necessita de admin, bulk edit, histórico visível, exclusão,
+gerenciamento de usuários, gerenciamento de settings, importação Excel nem
+permissões adicionais de edição. Manter `can_bulk_edit=false` e
+`can_view_history=false`; essas permissões não são pré-requisitos da integração.
+Administradores seguem a autorização normal existente, mas o perfil recomendado
+é `analyst`, não `admin`.
+
+### Limitação do modelo atual
+
+As permissões por campo são compartilhadas pelo sistema. Portanto, uma conta
+autorizada a editar esses campos pela integração também pode utilizá-los em
+outras rotas autenticadas que reutilizem essas permissões, como o PATCH genérico.
+Não existe atualmente uma permissão exclusiva `can_use_eco_automation`.
+
+Isso é uma limitação conhecida e possível melhoria futura, não um bloqueador
+da integração atual. Não interpretar a ausência de necessidade de outras funções
+como garantia de que todas elas estejam bloqueadas para a conta autenticada.
+
+### Backlog técnico
+
+1. O login pode emitir token para usuário inativo (`active=false`), embora seu
+   uso posterior seja rejeitado pela validação do usuário autenticado.
+2. A redefinição de senha não revoga automaticamente JWTs existentes.
+3. `eco` não possui constraint UNIQUE: idempotência sequencial não protege contra
+   duas criações simultâneas do mesmo código.
+4. Avaliar futuramente uma permissão/autenticação exclusiva para integrações.
+
+Essas questões **não bloqueiam a primeira versão da ECO Automation**. São itens
+de evolução técnica; este documento não implementa mudanças no sistema.
+
+### Segurança da credencial
+
+- Utilizar uma conta exclusiva da automação, com role `analyst`, não `admin`.
+- Guardar a senha em secret ou variável de ambiente; nunca versioná-la.
+- Nunca versionar tokens nem registrar Authorization em logs.
+- Utilizar HTTPS fora de desenvolvimento.
+- Manter o token somente em memória durante sua utilização e descartá-lo quando
+  deixar de ser necessário.
+
+Esta etapa é apenas documental: não criar usuário ou senha, não alterar
+permissões reais e não gerar token. Nenhuma conta é criada ou configurada por
+este documento.
 
 ## Auditoria
 
