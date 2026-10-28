@@ -42,6 +42,95 @@ def histories(db):
     return db.scalars(select(EcoHistory)).all()
 
 
+def test_hq_release_date_create_repeat_and_update(context):
+    client, db, _, user = context
+    payload = dict(eco="AUTO_HQ_DATE_TEST_001", title="Teste HQ Release Date",
+                   hq_eco_release_date="2026-10-28")
+    created = client.post(PATH, json=payload)
+    assert created.status_code == 200
+    result = created.json()
+    assert result["status"] == "created"
+    assert "hq_eco_release_date" in result["changed_fields"]
+    eco = db.scalar(select(Eco).where(Eco.eco == payload["eco"]))
+    assert result["eco_id"] == str(eco.id)
+    assert eco.hq_eco_release_date == date(2026, 10, 28)
+    assert eco.second_aprov_rd_finish_1 is None and eco.effective_date is None
+    event = next(e for e in histories(db) if e.field_key == "hq_eco_release_date")
+    assert (event.old_value, event.new_value, event.action) == (None, "2026-10-28", "created")
+    assert event.user_email == user.email
+    count = len(histories(db))
+    repeated = client.post(PATH, json=payload)
+    assert repeated.status_code == 200
+    assert repeated.json() == dict(status="unchanged", eco_id=str(eco.id),
+                                   eco=eco.eco, changed_fields=[])
+    assert len(histories(db)) == count
+    assert len(db.scalars(select(Eco).where(Eco.eco == payload["eco"])).all()) == 1
+    updated = client.post(PATH, json=dict(eco=eco.eco, hq_eco_release_date="2026-10-29"))
+    assert updated.status_code == 200
+    assert updated.json() == dict(status="updated", eco_id=str(eco.id),
+                                  eco=eco.eco, changed_fields=["hq_eco_release_date"])
+    assert eco.hq_eco_release_date == date(2026, 10, 29)
+    assert eco.title == payload["title"]
+    events = histories(db)
+    assert len(events) == count + 1
+    event = next(e for e in events if e.action == "updated")
+    assert (event.field_key, event.old_value, event.new_value) == (
+        "hq_eco_release_date", "2026-10-28", "2026-10-29")
+
+
+@pytest.mark.parametrize("optional", [{}, *[{"hq_eco_release_date": v} for v in [None, "", "   "]]])
+def test_hq_release_date_empty_or_omitted_preserves_data(context, optional):
+    client, db, eco, _ = context
+    eco.hq_eco_release_date = date(2026, 10, 28)
+    db.commit()
+    response = client.post(PATH, json={"eco": eco.eco, **optional})
+    assert response.status_code == 200
+    assert response.json()["status"] == "unchanged"
+    assert response.json()["changed_fields"] == []
+    assert eco.hq_eco_release_date == date(2026, 10, 28)
+    assert histories(db) == []
+
+
+@pytest.mark.parametrize("field", ["az_eco_register_date", "hq_eco_release_date"])
+@pytest.mark.parametrize("value", ["28/10/2026", "2026-02-30"])
+def test_automation_dates_preserve_existing_validation(context, field, value):
+    client, db, _, _ = context
+    assert client.post(PATH, json={"eco": "AUTO_HQ_DATE_TEST_002", field: value}).status_code == 422
+    assert db.scalar(select(Eco).where(Eco.eco == "AUTO_HQ_DATE_TEST_002")) is None
+    assert histories(db) == []
+
+
+@pytest.mark.parametrize("create", [False, True])
+def test_hq_release_date_requires_field_permission(context, create):
+    from app.models.entities import AnalystPermission
+    client, db, eco, user = context
+    user.role = "analyst"
+    db.add(AnalystPermission(user_email=user.email, can_create_eco=True))
+    for key in ["eco", "group", "owner", "title"]:
+        db.add(FieldPermission(user_email=user.email, field_key=key, can_edit=True))
+    permission = FieldPermission(user_email=user.email, field_key="hq_eco_release_date", can_edit=False)
+    db.add(permission)
+    db.commit()
+    code = "NEW-HQ" if create else eco.eco
+    payload = dict(eco=code, title="Changed", hq_eco_release_date="2026-10-28")
+    assert client.post(PATH, json=payload).status_code == 403
+    assert eco.title == "Original" and eco.hq_eco_release_date is None
+    assert histories(db) == []
+    if create:
+        assert db.scalar(select(Eco).where(Eco.eco == code)) is None
+    permission.can_edit = True
+    db.commit()
+    response = client.post(PATH, json=payload)
+    assert response.status_code == 200
+    assert response.json()["status"] == ("created" if create else "updated")
+    assert "hq_eco_release_date" in response.json()["changed_fields"]
+    permission.can_edit = False
+    db.commit()
+    count = len(histories(db))
+    assert client.post(PATH, json=payload).status_code == 403
+    assert len(histories(db)) == count
+
+
 def test_full_update_audit_and_idempotence(context):
     client, db, eco, user = context
     db.add(ObuAuMapping(obu="NEW", au="NEW-AU"))
@@ -202,7 +291,7 @@ def test_title_migration_upgrade_and_downgrade_preserve_existing_rows():
 def test_create_ignores_empty_optional_fields_and_uses_defaults(context, empty):
     client, db, _, _ = context
     payload = {key: empty for key in ["obu", "change_reason", "eco_type",
-        "az_eco_register_date", "auto_ecr", "change_bom", "title"]}
+        "az_eco_register_date", "hq_eco_release_date", "auto_ecr", "change_bom", "title"]}
     payload["eco"] = " NEW-ECO "
     result = client.post(PATH, json=payload)
     assert result.status_code == 200

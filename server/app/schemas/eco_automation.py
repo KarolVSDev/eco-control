@@ -14,6 +14,7 @@ class EcoAutomationRequest(BaseModel):
     change_reason: str | None = None
     eco_type: str | None = None
     az_eco_register_date: date | None = None
+    hq_eco_release_date: date | None = None
     auto_ecr: Literal["YES", "NO"] | None = None
     change_bom: Literal["YES", "NO"] | None = None
     title: str | None = None

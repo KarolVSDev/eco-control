@@ -1,6 +1,5 @@
 # Integração da automação de ECOs com o ECO CONTROL
-
-Referência técnica do contrato atual, conferida no código em 27/10/2026.
+Referência técnica do contrato atual, conferida no código em 28/10/2026.
 
 ## Índice
 
@@ -99,7 +98,7 @@ autenticação será 401.
 
 ## Contrato do payload
 
-Somente os oito campos abaixo são aceitos. O schema usa `extra="forbid"`:
+Somente os nove campos abaixo são aceitos. O schema usa `extra="forbid"`:
 qualquer outro campo provoca HTTP 422.
 
 | Campo API | Origem na automação | Obrigatório | Tipo aceito |
@@ -109,6 +108,7 @@ qualquer outro campo provoca HTTP 422.
 | `change_reason` | `Change Reason` | Não | string ou null |
 | `eco_type` | `ECO Type` | Não | string ou null |
 | `az_eco_register_date` | `AZ ECO REGISTER DATE` | Não | date ou null |
+| `hq_eco_release_date` | `Approved Date` | Não | date ou null |
 | `auto_ecr` | `Auto ECR?` | Não | string `YES` / `NO` ou null |
 | `change_bom` | `Change BOM?` | Não | string `YES` / `NO` ou null |
 | `title` | `Title` | Não | string ou null |
@@ -121,6 +121,7 @@ obu: str | None = None
 change_reason: str | None = None
 eco_type: str | None = None
 az_eco_register_date: date | None = None
+hq_eco_release_date: date | None = None
 auto_ecr: Literal["YES", "NO"] | None = None
 change_bom: Literal["YES", "NO"] | None = None
 title: str | None = None
@@ -135,6 +136,7 @@ Exemplo de payload:
   "change_reason": "BOM Sync.",
   "eco_type": "REGULAR",
   "az_eco_register_date": "2026-10-27",
+  "hq_eco_release_date": "2026-10-28",
   "auto_ecr": "YES",
   "change_bom": "NO",
   "title": "Alteração de componente"
@@ -143,11 +145,18 @@ Exemplo de payload:
 
 ### Datas
 
-Envie `az_eco_register_date` como string JSON no formato `YYYY-MM-DD`, por
+Envie `az_eco_register_date` e `hq_eco_release_date` como strings JSON no formato `YYYY-MM-DD`, por
 exemplo `"2026-10-27"`. O campo é tipado como `date` pelo Pydantic; datas
 inválidas, como `"2026-02-30"`, resultam em 422. A integração não faz conversão
 manual de formatos de planilha. O schema não declara modo estrito adicional
 ao tipo `date`; o cliente deve utilizar o formato ISO indicado.
+O formato `DD/MM/YYYY` não é aceito e retorna 422 para ambos os campos.
+
+Mapeamento confirmado: `Approved Date (ECO Automation) -> hq_eco_release_date (ECO CONTROL)`.
+`Approved Date` corresponde a `HQ ECO RELEASE DATE` e NÃO corresponde a
+`2ST APROV R&D FINISH (1)`. Esta integração não deve preencher
+`second_aprov_rd_finish_1`. A regra do GAP 14D permanece inalterada.
+O campo já existe no modelo e no schema geral da ECO; não requer migration.
 
 ### YES / NO
 
@@ -448,6 +457,7 @@ obu
 change_reason
 eco_type
 az_eco_register_date
+hq_eco_release_date
 auto_ecr
 change_bom
 title
@@ -463,7 +473,11 @@ owner
 | `eco.can_edit = True` | Necessário na criação: o código faz parte dos dados criados |
 | `obu.can_edit`, `change_reason.can_edit`, `eco_type.can_edit` | Necessários quando esses opcionais válidos são utilizados |
 | `az_eco_register_date.can_edit`, `auto_ecr.can_edit`, `change_bom.can_edit`, `title.can_edit` | Necessários quando esses opcionais válidos são utilizados |
+| `hq_eco_release_date.can_edit = True` | Necessário quando Approved Date é enviado como data válida, mesmo se igual à armazenada |
 | `group.can_edit = True`, `owner.can_edit = True` | Necessários em toda sincronização: o backend fixa `BOM` e `giseli.santos`, mesmo sem esses campos no payload |
+
+Habilitar manualmente `hq_eco_release_date.can_edit = true` para a conta técnica
+ECO Automation no banco/interface administrativa. O código não concede essa permissão.
 
 As permissões são registros de `FieldPermission` por e-mail, campo e `can_edit`.
 Use `group` como chave externa de permissão; o serviço também normaliza a chave
@@ -568,6 +582,7 @@ Content-Type: application/json
   "change_reason": "Performance Improvement",
   "eco_type": "REGULAR",
   "az_eco_register_date": "2026-10-27",
+  "hq_eco_release_date": "2026-10-28",
   "auto_ecr": "YES",
   "change_bom": "YES",
   "title": "Alteração de componente"
@@ -582,7 +597,7 @@ Resposta ilustrativa, HTTP 200 (UUID fictício):
   "eco_id": "22222222-2222-4222-8222-222222222222",
   "eco": "ENMP900999",
   "changed_fields": [
-    "eco", "obu", "change_reason", "eco_type", "az_eco_register_date",
+    "eco", "obu", "change_reason", "eco_type", "az_eco_register_date", "hq_eco_release_date",
     "auto_ecr", "change_bom", "title", "group", "owner"
   ]
 }
@@ -627,7 +642,8 @@ contas ou um mecanismo adicional de autenticação no servidor.
 
 ## Pendências funcionais
 
-Ainda dependem de definição/mapeamento: `Approved Date` e `Origin ECO`.
+Ainda depende de definição/mapeamento: `Origin ECO`.
+`Approved Date` já está mapeado para `hq_eco_release_date`, conforme o contrato acima.
 
 Atualmente fora de escopo: `Suffix`, `Applied to Manaus?` e `Prod Plan?`.
 `Effective Date` também permanece fora do contrato desta integração.
