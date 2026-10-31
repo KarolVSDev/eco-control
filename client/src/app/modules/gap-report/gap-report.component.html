@@ -49,21 +49,23 @@
         <thead>
           <tr>
             <th scope="col">ECO</th>
-            <th scope="col">Owner</th>
+            <th scope="col">ECO TYPE</th>
             <th scope="col">Effective Date</th>
+            <th scope="col">AZ ECO CREATION DATE</th>
             <th scope="col">Approval Date</th>
-            <th scope="col">GAP 14D</th>
+            <th scope="col">LEAD TIME</th>
             <th scope="col">Comentário / Justificativa</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngIf="total === 0">
-            <td colspan="6" class="empty-state">Nenhuma ECO RELEASED encontrada no período selecionado.</td>
+            <td colspan="7" class="empty-state">Nenhuma ECO RELEASED encontrada no período selecionado.</td>
           </tr>
           <tr *ngFor="let item of items">
             <td>{{ item.eco ?? '-' }}</td>
-            <td>{{ item.owner ?? '-' }}</td>
+            <td>{{ item.eco_type ?? '-' }}</td>
             <td>{{ formatDate(item.effective_date) }}</td>
+            <td>{{ formatDate(item.az_eco_creation_date) }}</td>
             <td>{{ formatDate(item.approval_date) }}</td>
             <td class="gap-value">
               <span [class.gap-attention]="item.requires_gap_14d_note"

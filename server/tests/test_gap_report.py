@@ -36,6 +36,8 @@ def db():
 def add_eco(db, **overrides):
     values = dict(
         id=uuid4(), eco="ECO-TEST", owner="Owner", status="RELEASED",
+        eco_type="STANDARD",
+        az_eco_creation_date=date(2026, 8, 15),
         effective_date=date(2026, 9, 20),
         second_aprov_rd_finish_1=date(2026, 10, 5), gap_14d_note="Specific note",
     )
@@ -71,7 +73,9 @@ def test_report_rules(db, overrides, included, gap, requires):
     if included:
         item = result.items[0]
         assert item.id == str(row.id)
+        assert item.eco_type == row.eco_type
         assert item.approval_date == row.second_aprov_rd_finish_1
+        assert item.az_eco_creation_date == row.az_eco_creation_date
         assert item.effective_date == row.effective_date
         assert item.gap_14d == gap
         assert item.requires_gap_14d_note is requires
@@ -120,7 +124,8 @@ def test_report_http_response(client, db):
     assert response.json() == {
         "start_date": "2026-10-01", "end_date": "2026-10-10", "total": 1,
         "items": [{
-            "id": str(row.id), "eco": "ECO-TEST", "owner": "Owner",
+            "id": str(row.id), "eco": "ECO-TEST", "eco_type": "STANDARD",
+            "az_eco_creation_date": "2026-08-15",
             "effective_date": "2026-09-20", "approval_date": "2026-10-05",
             "gap_14d": 15, "gap_14d_note": "Specific note",
             "requires_gap_14d_note": True,
@@ -139,10 +144,11 @@ def test_report_http_invalid_params(client, params):
 
 
 def test_report_http_null_effective_date(client, db):
-    add_eco(db, effective_date=None, gap_14d_note=None)
+    add_eco(db, az_eco_creation_date=None, effective_date=None, gap_14d_note=None)
     response = client.get(URL, params=PARAMS)
     assert response.status_code == 200
     item = response.json()["items"][0]
+    assert item["az_eco_creation_date"] is None
     assert item["effective_date"] is None
     assert item["gap_14d"] is None
     assert item["gap_14d_note"] is None
@@ -193,7 +199,7 @@ def test_gap_export_valid_workbook_matches_report(client, db):
     from openpyxl import load_workbook
 
     add_eco(db, eco="START", second_aprov_rd_finish_1=START)
-    add_eco(db, eco="END", second_aprov_rd_finish_1=END, effective_date=None, gap_14d_note=None)
+    add_eco(db, eco="END", second_aprov_rd_finish_1=END, az_eco_creation_date=None, effective_date=None, gap_14d_note=None)
     add_eco(db, eco="NEGATIVE", effective_date=date(2026, 10, 6))
     add_eco(db, eco="NORMALIZED", status=" released ")
     add_eco(db, eco="BEFORE", second_aprov_rd_finish_1=date(2026, 9, 30))
@@ -208,21 +214,24 @@ def test_gap_export_valid_workbook_matches_report(client, db):
     assert response.headers["content-disposition"] == 'attachment; filename="relatorio_gap_2026-10-01_2026-10-10.xlsx"'
     workbook = load_workbook(BytesIO(response.content))
     sheet = workbook.active
-    assert [c.value for c in sheet[1]] == ["ECO", "Owner", "Effective Date", "Approval Date", "GAP 14D", "Coment\u00e1rio / Justificativa"]
+    headers = [c.value for c in sheet[1]]
+    assert headers == ["ECO", "ECO TYPE", "Effective Date", "AZ ECO CREATION DATE", "Approval Date", "LEAD TIME", "Coment\u00e1rio / Justificativa"]
+    assert "GAP 14D" not in headers
     assert sheet.max_row == report["total"] + 1
     for cells, item in zip(sheet.iter_rows(min_row=2), report["items"]):
         assert cells[0].value == item["eco"]
-        assert cells[1].value == item["owner"]
+        assert cells[1].value == item["eco_type"]
         assert (cells[2].value.date().isoformat() if cells[2].value else None) == item["effective_date"]
-        assert cells[3].value.date().isoformat() == item["approval_date"]
-        assert cells[3].number_format == "dd/mm/yyyy"
-        assert cells[4].value == item["gap_14d"]
-        assert cells[4].data_type == "n"
-        assert cells[5].value == item["gap_14d_note"]
+        assert (cells[3].value.date().isoformat() if cells[3].value else None) == item["az_eco_creation_date"]
+        assert cells[4].value.date().isoformat() == item["approval_date"]
+        assert all(cells[index].number_format == "dd/mm/yyyy" for index in (2, 3, 4) if cells[index].value)
+        assert cells[5].value == item["gap_14d"]
+        assert cells[5].data_type == "n"
+        assert cells[6].value == item["gap_14d_note"]
         assert cells[0].data_type != "f"
-        assert cells[5].data_type != "f"
+        assert cells[6].data_type != "f"
     assert sheet.freeze_panes == "A2"
-    assert sheet.auto_filter.ref == f"A1:F{sheet.max_row}"
+    assert sheet.auto_filter.ref == f"A1:G{sheet.max_row}"
     workbook.close()
     assert client.get(URL, params=PARAMS).json() == report
 
@@ -234,5 +243,5 @@ def test_gap_export_empty_workbook(client):
     assert response.status_code == 200
     workbook = load_workbook(BytesIO(response.content))
     assert workbook.active.max_row == 1
-    assert workbook.active.max_column == 6
+    assert workbook.active.max_column == 7
     workbook.close()

@@ -25,7 +25,8 @@ class GapReportService:
             items.append(GapReportItem(
                 id=str(eco.id),
                 eco=eco.eco,
-                owner=eco.owner,
+                eco_type=eco.eco_type,
+                az_eco_creation_date=eco.az_eco_creation_date,
                 effective_date=eco.effective_date,
                 approval_date=eco.second_aprov_rd_finish_1,
                 gap_14d=computed["gap_14d"],

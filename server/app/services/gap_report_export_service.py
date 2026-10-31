@@ -20,22 +20,27 @@ class GapReportExportService:
             dates = workbook.add_format({"num_format": "dd/mm/yyyy"})
             note_format = workbook.add_format({"text_wrap": True, "valign": "top"})
             sheet.write_row(0, 0, [
-                "ECO", "Owner", "Effective Date", "Approval Date", "GAP 14D",
+                "ECO", "ECO TYPE", "Effective Date", "AZ ECO CREATION DATE",
+                "Approval Date", "LEAD TIME",
                 "Comentário / Justificativa",
             ], header)
-            sheet.set_column(0, 1, 24)
-            sheet.set_column(2, 3, 18)
-            sheet.set_column(4, 4, 12)
-            sheet.set_column(5, 5, 65, note_format)
+            sheet.set_column(0, 0, 24)
+            sheet.set_column(1, 1, 24)
+            sheet.set_column(2, 2, 18)
+            sheet.set_column(3, 4, 18)
+            sheet.set_column(5, 5, 12)
+            sheet.set_column(6, 6, 65, note_format)
             sheet.freeze_panes(1, 0)
             for index, item in enumerate(report.items, start=1):
                 sheet.write(index, 0, item.eco)
-                sheet.write(index, 1, item.owner)
+                sheet.write(index, 1, item.eco_type)
                 if item.effective_date is not None:
                     sheet.write_datetime(index, 2, item.effective_date, dates)
-                sheet.write_datetime(index, 3, item.approval_date, dates)
+                if item.az_eco_creation_date is not None:
+                    sheet.write_datetime(index, 3, item.az_eco_creation_date, dates)
+                sheet.write_datetime(index, 4, item.approval_date, dates)
                 if item.gap_14d is not None:
-                    sheet.write_number(index, 4, item.gap_14d)
-                sheet.write(index, 5, item.gap_14d_note, note_format)
-            sheet.autofilter(0, 0, len(report.items), 5)
+                    sheet.write_number(index, 5, item.gap_14d)
+                sheet.write(index, 6, item.gap_14d_note, note_format)
+            sheet.autofilter(0, 0, len(report.items), 6)
         return output.getvalue()

@@ -5,7 +5,8 @@ import { ApiService } from '../../core/services/api.service';
 export interface GapReportItem {
   id: string;
   eco: string | null;
-  owner: string | null;
+  eco_type: string | null;
+  az_eco_creation_date: string | null;
   effective_date: string | null;
   approval_date: string;
   gap_14d: number | null;
