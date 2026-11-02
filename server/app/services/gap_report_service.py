@@ -24,10 +24,15 @@ class GapReportService:
             computed = compute_eco_fields(eco)
             items.append(GapReportItem(
                 id=str(eco.id),
-                eco=eco.eco,
+                origin_eco=eco.hz_in_kr_eco_1,
+                # The automation persists Title in eco.title. Historical matrix
+                # imports already store the BM description in change_reason_az,
+                # so keep it as a read-only fallback for the report.
+                title=eco.title or eco.change_reason_az,
                 eco_type=eco.eco_type,
-                az_eco_creation_date=eco.az_eco_creation_date,
                 effective_date=eco.effective_date,
+                eco=eco.eco,
+                az_eco_creation_date=eco.az_eco_creation_date,
                 approval_date=eco.second_aprov_rd_finish_1,
                 gap_14d=computed["gap_14d"],
                 gap_14d_note=eco.gap_14d_note,

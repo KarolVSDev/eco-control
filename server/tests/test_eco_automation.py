@@ -133,27 +133,117 @@ def test_hq_release_date_requires_field_permission(context, create):
 
 def test_full_update_audit_and_idempotence(context):
     client, db, eco, user = context
-    db.add(ObuAuMapping(obu="NEW", au="NEW-AU"))
+
+    # O registro existente possui OBU="OLD".
+    # Como ECO + OBU agora identificam o registro,
+    # utilizamos o mesmo OBU para testar atualização.
+    #
+    # O mapeamento também permite validar que
+    # OBU="OLD" atualiza AU para "NEW-AU".
+    db.add(
+        ObuAuMapping(
+            obu="OLD",
+            au="NEW-AU",
+        )
+    )
     db.commit()
-    payload = dict(eco=" ECO123 ", obu="NEW", change_reason="Changed", eco_type="TYPE",
-                   az_eco_register_date="2026-10-27", auto_ecr="YES", change_bom="NO", title="New title")
-    response = client.post(PATH, json=payload)
+
+    payload = dict(
+        eco=" ECO123 ",
+        obu="OLD",
+        change_reason="Changed",
+        eco_type="TYPE",
+        az_eco_register_date="2026-10-27",
+        auto_ecr="YES",
+        change_bom="NO",
+        title="New title",
+    )
+
+    response = client.post(
+        PATH,
+        json=payload,
+    )
+
     assert response.status_code == 200
     assert response.json()["status"] == "updated"
-    assert set(response.json()["changed_fields"]) == set(payload) - {"eco"} | {"au"}
+
+    # O OBU foi enviado, mas não aparece como alterado
+    # porque o registro já possuía OBU="OLD".
+    #
+    # O AU, por outro lado, muda de OLD-AU para NEW-AU.
+    expected_changed_fields = (
+        set(payload)
+        - {"eco", "obu"}
+        | {"au"}
+    )
+
+    assert (
+        set(response.json()["changed_fields"])
+        == expected_changed_fields
+    )
+
     assert eco.eco == "ECO123"
+    assert eco.obu == "OLD"
     assert eco.au == "NEW-AU"
-    assert eco.az_eco_register_date == date(2026, 10, 27)
-    for key in set(payload) - {"eco", "az_eco_register_date"}:
-        assert getattr(eco, key) == payload[key]
+
+    assert (
+        eco.az_eco_register_date
+        == date(2026, 10, 27)
+    )
+
+    assert eco.change_reason == "Changed"
+    assert eco.eco_type == "TYPE"
+    assert eco.auto_ecr == "YES"
+    assert eco.change_bom == "NO"
+    assert eco.title == "New title"
+
     events = histories(db)
-    assert len(events) == 8
-    assert all(e.action == "updated" and e.user_email == user.email and e.created_at for e in events)
-    title_event = next(e for e in events if e.field_key == "title")
-    assert (title_event.old_value, title_event.new_value) == ("Original", "New title")
-    second = client.post(PATH, json=payload).json()
-    assert second["status"] == "unchanged" and second["changed_fields"] == []
-    assert len(histories(db)) == 8
+
+    # Campos alterados:
+    # change_reason
+    # eco_type
+    # az_eco_register_date
+    # auto_ecr
+    # change_bom
+    # title
+    # au
+    assert len(events) == 7
+
+    assert all(
+        event.action == "updated"
+        and event.user_email == user.email
+        and event.created_at
+        for event in events
+    )
+
+    title_event = next(
+        event
+        for event in events
+        if event.field_key == "title"
+    )
+
+    assert (
+        title_event.old_value,
+        title_event.new_value,
+    ) == (
+        "Original",
+        "New title",
+    )
+
+    # ---------------------------------------------------------
+    # IDEMPOTÊNCIA
+    # ---------------------------------------------------------
+
+    second = client.post(
+        PATH,
+        json=payload,
+    ).json()
+
+    assert second["status"] == "unchanged"
+    assert second["changed_fields"] == []
+
+    # Nenhum histórico adicional deve ser criado.
+    assert len(histories(db)) == 7
 
 
 @pytest.mark.parametrize("value", [None, "", "   "])
@@ -210,9 +300,91 @@ def test_field_permissions_are_atomic(context):
     assert eco.title == "New"
 
 
+def test_origin_eco_maps_to_hz_in_kr_eco_1(context):
+    client, db, eco, _ = context
+
+    created = client.post(
+        PATH,
+        json={
+            "eco": "ORIGIN-ECO-NEW",
+            "origin_eco": "EKLQ500458",
+        },
+    )
+
+    assert created.status_code == 200
+    assert created.json()["status"] == "created"
+    assert "origin_eco" in created.json()["changed_fields"]
+
+    new_eco = db.scalar(
+        select(Eco).where(Eco.eco == "ORIGIN-ECO-NEW")
+    )
+
+    assert new_eco is not None
+    assert new_eco.hz_in_kr_eco_1 == "EKLQ500458"
+
+    assert any(
+        event.field_key == "hz_in_kr_eco_1"
+        and event.new_value == "EKLQ500458"
+        for event in histories(db)
+    )
+
+    updated = client.post(
+        PATH,
+        json={
+            "eco": eco.eco,
+            "origin_eco": "SKLQ900553",
+        },
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["status"] == "updated"
+    assert updated.json()["changed_fields"] == ["origin_eco"]
+
+    db.refresh(eco)
+    assert eco.hz_in_kr_eco_1 == "SKLQ900553"
+
+    repeated = client.post(
+        PATH,
+        json={
+            "eco": eco.eco,
+            "origin_eco": "SKLQ900553",
+        },
+    )
+
+    assert repeated.status_code == 200
+    assert repeated.json()["status"] == "unchanged"
+    assert repeated.json()["changed_fields"] == []
+
+    db.refresh(eco)
+    assert eco.hz_in_kr_eco_1 == "SKLQ900553"
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_origin_eco_empty_preserves_existing_data(context, value):
+    client, db, eco, _ = context
+
+    eco.hz_in_kr_eco_1 = "EXISTING-ORIGIN"
+    db.commit()
+
+    response = client.post(
+        PATH,
+        json={
+            "eco": eco.eco,
+            "origin_eco": value,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "unchanged"
+    assert response.json()["changed_fields"] == []
+
+    db.refresh(eco)
+    assert eco.hz_in_kr_eco_1 == "EXISTING-ORIGIN"
+
+
 @pytest.mark.parametrize("payload", [
     {}, {"eco": "   "}, {"eco": "ECO123", "az_eco_register_date": "2026-02-30"},
-    *[{"eco": "ECO123", key: "unexpected"} for key in ["group", "group_name", "owner", "au", "gap_14d", "effective_date", "approved_date", "origin_eco", "suffix", "applied_to_manaus", "prod_plan", "item", "position", "month"]],
+    *[{"eco": "ECO123", key: "unexpected"} for key in ["group", "group_name", "owner", "au", "gap_14d", "effective_date", "approved_date", "suffix", "applied_to_manaus", "prod_plan", "item", "position", "month"]],
     {"eco": "ECO123", "auto_ecr": True}, {"eco": "ECO123", "change_bom": "INVALID"},
 ])
 def test_invalid_payload(context, payload):

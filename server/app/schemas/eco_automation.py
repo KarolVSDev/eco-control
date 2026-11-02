@@ -18,14 +18,17 @@ class EcoAutomationRequest(BaseModel):
     auto_ecr: Literal["YES", "NO"] | None = None
     change_bom: Literal["YES", "NO"] | None = None
     title: str | None = None
+    origin_eco: str | None = None
 
     @field_validator("*", mode="before")
     @classmethod
     def normalize_input(cls, value, info):
         if isinstance(value, str):
             value = value.strip()
+
             if not value and info.field_name != "eco":
                 return None
+
         return value
 
 

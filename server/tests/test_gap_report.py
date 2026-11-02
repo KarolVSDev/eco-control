@@ -36,7 +36,7 @@ def db():
 def add_eco(db, **overrides):
     values = dict(
         id=uuid4(), eco="ECO-TEST", owner="Owner", status="RELEASED",
-        eco_type="STANDARD",
+        hz_in_kr_eco_1="ORIGIN-TEST", title="Title test", eco_type="STANDARD",
         az_eco_creation_date=date(2026, 8, 15),
         effective_date=date(2026, 9, 20),
         second_aprov_rd_finish_1=date(2026, 10, 5), gap_14d_note="Specific note",
@@ -73,6 +73,8 @@ def test_report_rules(db, overrides, included, gap, requires):
     if included:
         item = result.items[0]
         assert item.id == str(row.id)
+        assert item.origin_eco == row.hz_in_kr_eco_1
+        assert item.title == row.title
         assert item.eco_type == row.eco_type
         assert item.approval_date == row.second_aprov_rd_finish_1
         assert item.az_eco_creation_date == row.az_eco_creation_date
@@ -80,6 +82,13 @@ def test_report_rules(db, overrides, included, gap, requires):
         assert item.gap_14d == gap
         assert item.requires_gap_14d_note is requires
         assert item.gap_14d_note == "Specific note"
+
+
+def test_report_uses_matrix_bm_description_as_title_fallback(db):
+    add_eco(db, title=None, change_reason_az="Description imported from BM")
+    item = GapReportService(db).report(START, END).items[0]
+    assert item.title == "Description imported from BM"
+
 
 
 def test_report_order_is_deterministic(db):
@@ -124,7 +133,8 @@ def test_report_http_response(client, db):
     assert response.json() == {
         "start_date": "2026-10-01", "end_date": "2026-10-10", "total": 1,
         "items": [{
-            "id": str(row.id), "eco": "ECO-TEST", "eco_type": "STANDARD",
+            "id": str(row.id), "origin_eco": "ORIGIN-TEST",
+            "title": "Title test", "eco_type": "STANDARD", "eco": "ECO-TEST",
             "az_eco_creation_date": "2026-08-15",
             "effective_date": "2026-09-20", "approval_date": "2026-10-05",
             "gap_14d": 15, "gap_14d_note": "Specific note",
@@ -215,23 +225,30 @@ def test_gap_export_valid_workbook_matches_report(client, db):
     workbook = load_workbook(BytesIO(response.content))
     sheet = workbook.active
     headers = [c.value for c in sheet[1]]
-    assert headers == ["ECO", "ECO TYPE", "Effective Date", "AZ ECO CREATION DATE", "Approval Date", "LEAD TIME", "Coment\u00e1rio / Justificativa"]
+    assert headers == [
+        "ECO NO (ORIGIN ECO)", "TITLE", "ECO TYPE", "EFFECTIVE DATE",
+        "ECO NO (ECO NUMBER)", "CREATION DATE", "APPROVED DATE",
+        "LEAD TIME", "NOTE (COMENTARIO)",
+    ]
     assert "GAP 14D" not in headers
     assert sheet.max_row == report["total"] + 1
     for cells, item in zip(sheet.iter_rows(min_row=2), report["items"]):
-        assert cells[0].value == item["eco"]
-        assert cells[1].value == item["eco_type"]
-        assert (cells[2].value.date().isoformat() if cells[2].value else None) == item["effective_date"]
-        assert (cells[3].value.date().isoformat() if cells[3].value else None) == item["az_eco_creation_date"]
-        assert cells[4].value.date().isoformat() == item["approval_date"]
-        assert all(cells[index].number_format == "dd/mm/yyyy" for index in (2, 3, 4) if cells[index].value)
-        assert cells[5].value == item["gap_14d"]
-        assert cells[5].data_type == "n"
-        assert cells[6].value == item["gap_14d_note"]
+        assert cells[0].value == item["origin_eco"]
+        assert cells[1].value == item["title"]
+        assert cells[2].value == item["eco_type"]
+        assert (cells[3].value.date().isoformat() if cells[3].value else None) == item["effective_date"]
+        assert cells[4].value == item["eco"]
+        assert (cells[5].value.date().isoformat() if cells[5].value else None) == item["az_eco_creation_date"]
+        assert cells[6].value.date().isoformat() == item["approval_date"]
+        assert all(cells[index].number_format == "dd/mm/yyyy" for index in (3, 5, 6) if cells[index].value)
+        assert cells[7].value == item["gap_14d"]
+        assert cells[7].data_type == "n"
+        assert cells[8].value == item["gap_14d_note"]
         assert cells[0].data_type != "f"
-        assert cells[6].data_type != "f"
+        assert cells[1].data_type != "f"
+        assert cells[8].data_type != "f"
     assert sheet.freeze_panes == "A2"
-    assert sheet.auto_filter.ref == f"A1:G{sheet.max_row}"
+    assert sheet.auto_filter.ref == f"A1:I{sheet.max_row}"
     workbook.close()
     assert client.get(URL, params=PARAMS).json() == report
 
@@ -243,5 +260,5 @@ def test_gap_export_empty_workbook(client):
     assert response.status_code == 200
     workbook = load_workbook(BytesIO(response.content))
     assert workbook.active.max_row == 1
-    assert workbook.active.max_column == 7
+    assert workbook.active.max_column == 9
     workbook.close()

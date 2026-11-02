@@ -1621,43 +1621,218 @@ class EcoService:
 
 
     def sync_automation(self, payload):
-        matches = self.repo.find_exact_code(payload.eco)
-        if len(matches) > 1:
-            raise HTTPException(status_code=409, detail="Código ECO ambíguo: mais de um registro encontrado")
+
+        if (
+            payload.obu is not None
+            and payload.obu.strip()
+        ):
+            matches = (
+                self.repo.find_exact_code_and_obu(
+                    payload.eco,
+                    payload.obu,
+                )
+            )
+
+            if len(matches) > 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Combinação ECO + OBU ambígua: "
+                        "mais de um registro encontrado"
+                    ),
+                )
+
+        else:
+            # Compatibilidade para chamadas antigas/manuais
+            # que ainda não enviem OBU.
+            matches = (
+                self.repo.find_exact_code(
+                    payload.eco
+                )
+            )
+
+            if len(matches) > 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Código ECO ambíguo: "
+                        "mais de um registro encontrado. "
+                        "Informe também o OBU."
+                    ),
+                )
+
+        # -----------------------------------------------------
+        # CAMPOS RECEBIDOS
+        # -----------------------------------------------------
+
         data = {
             key: value
-            for key, value in payload.model_dump(exclude_unset=True).items()
+            for key, value
+            in payload.model_dump(
+                exclude_unset=True
+            ).items()
             if value is not None
-            and not (isinstance(value, str) and not value.strip())
+            and not (
+                isinstance(value, str)
+                and not value.strip()
+            )
         }
-        # Temporary assignment policy applies only to automation synchronization.
-        # Pass through the normal create/update paths for permissions and audit.
-        data.update(group="BOM", owner="giseli.santos")
+
+
+
+        origin_eco = data.pop(
+            "origin_eco",
+            None,
+        )
+
+        if origin_eco is not None:
+            data[
+                "hz_in_kr_eco_1"
+            ] = origin_eco
+
+        # -----------------------------------------------------
+        # POLÍTICA TEMPORÁRIA DA AUTOMAÇÃO
+        # -----------------------------------------------------
+
+        data.update(
+            group="BOM",
+            owner="giseli.santos",
+        )
+
+        # -----------------------------------------------------
+        # NOME EXTERNO DOS CAMPOS
+        # -----------------------------------------------------
+
+        def external_field_name(key):
+            if key == "group_name":
+                return "group"
+
+            if key == "hz_in_kr_eco_1":
+                return "origin_eco"
+
+            return key
+
+        # -----------------------------------------------------
+        # CRIAÇÃO
+        # -----------------------------------------------------
+
         if not matches:
             try:
-                eco = self._create_eco(EcoCreate(**data))
+                eco = self._create_eco(
+                    EcoCreate(**data)
+                )
+
             except Exception:
                 self.db.rollback()
                 raise
+
             return {
                 "status": "created",
                 "eco_id": str(eco.id),
                 "eco": eco.eco,
-                "changed_fields": list(data),
+                "changed_fields": [
+                    external_field_name(key)
+                    for key in data
+                ],
             }
+
+        # -----------------------------------------------------
+        # ATUALIZAÇÃO
+        # -----------------------------------------------------
+
         eco = matches[0]
-        changes = {key: value for key, value in data.items() if key != "eco"}
-        changed_fields = self._apply_update(eco, changes) if changes else []
+
+        changes = {
+            key: value
+            for key, value
+            in data.items()
+            if key != "eco"
+        }
+
+        changed_fields = (
+            self._apply_update(
+                eco,
+                changes,
+            )
+            if changes
+            else []
+        )
+
         return {
-            "status": "updated" if changed_fields else "unchanged",
+            "status": (
+                "updated"
+                if changed_fields
+                else "unchanged"
+            ),
             "eco_id": str(eco.id),
             "eco": eco.eco,
             "changed_fields": [
-                "group" if key == "group_name" else key
+                external_field_name(key)
                 for key in changed_fields
             ],
         }
 
+        def external_field_name(key):
+            if key == "group_name":
+                return "group"
+
+            if key == "hz_in_kr_eco_1":
+                return "origin_eco"
+
+            return key
+
+        # CRIAÇÃO
+        if not matches:
+            try:
+                eco = self._create_eco(
+                    EcoCreate(**data)
+                )
+
+            except Exception:
+                self.db.rollback()
+                raise
+
+            return {
+                "status": "created",
+                "eco_id": str(eco.id),
+                "eco": eco.eco,
+                "changed_fields": [
+                    external_field_name(key)
+                    for key in data
+                ],
+            }
+
+        # ATUALIZAÇÃO
+        eco = matches[0]
+
+        changes = {
+            key: value
+            for key, value in data.items()
+            if key != "eco"
+        }
+
+        changed_fields = (
+            self._apply_update(
+                eco,
+                changes,
+            )
+            if changes
+            else []
+        )
+
+        return {
+            "status": (
+                "updated"
+                if changed_fields
+                else "unchanged"
+            ),
+            "eco_id": str(eco.id),
+            "eco": eco.eco,
+            "changed_fields": [
+                external_field_name(key)
+                for key in changed_fields
+            ],
+        }
 
     def _apply_update(self, eco, raw_changes):
         try:

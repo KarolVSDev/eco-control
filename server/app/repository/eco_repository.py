@@ -34,6 +34,23 @@ class EcoRepository:
     # CONSULTA BASE
     # =========================================================
 
+    def find_exact_code_and_obu(
+        self,
+        code,
+        obu,
+    ):
+        return self.db.scalars(
+            select(Eco)
+            .where(
+                func.trim(Eco.eco)
+                == code.strip(),
+                func.trim(Eco.obu)
+                == obu.strip(),
+            )
+            .limit(2)
+            .with_for_update()
+        ).all()
+    
     def _build_query(
         self,
         search=None,

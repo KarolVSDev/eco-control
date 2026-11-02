@@ -5,8 +5,10 @@ from pydantic import BaseModel
 
 class GapReportItem(BaseModel):
     id: str
-    eco: str | None
+    origin_eco: str | None
+    title: str | None
     eco_type: str | None
+    eco: str | None
     az_eco_creation_date: date | None
     effective_date: date | None
     approval_date: date
