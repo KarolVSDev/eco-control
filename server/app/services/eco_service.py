@@ -20,26 +20,10 @@ from app.repository.history_repository import HistoryRepository
 from app.repository.settings_repository import SettingsRepository
 
 from app.utils.eco_calculations import (
+    MONTH_ABBR,
     compute_eco_fields,
     normalize_text,
 )
-
-
-MONTHS = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-]
-
 
 LABELS = {
     "status": "STATUS",
@@ -1035,7 +1019,7 @@ class EcoService:
             group_name=group,
             item=next_item,
             position=next_position,
-            month=MONTHS[
+            month=MONTH_ABBR[
                 datetime.now().month - 1
             ],
         )
@@ -1343,7 +1327,7 @@ class EcoService:
                     insertion_position
                 ),
 
-                month=MONTHS[
+                month=MONTH_ABBR[
                     datetime.now().month - 1
                 ],
 

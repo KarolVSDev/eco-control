@@ -30,7 +30,10 @@ interface Manager {
 
 @Component({
   templateUrl: './settings.component.html',
-  styleUrls: ['./settings.component.css'],
+  styleUrls: [
+    './settings.component.css',
+    './settings-redesign.component.css',
+  ],
 })
 export class SettingsComponent
   implements OnInit {

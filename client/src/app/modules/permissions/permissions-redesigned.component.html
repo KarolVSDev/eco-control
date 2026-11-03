@@ -1,0 +1,242 @@
+<div class="permissions-page">
+  <header class="permissions-heading">
+    <div class="heading-copy">
+      <h1 class="title">Permissões</h1>
+      <p class="subtitle">
+        Defina, campo a campo, o que cada analista pode visualizar e editar.
+      </p>
+    </div>
+  </header>
+
+  <section class="analyst-panel">
+    <div class="analyst-panel-top">
+      <div class="analyst-selector">
+        <label class="analyst-label" for="analyst-select">
+          Analista
+        </label>
+        <div class="analyst-controls">
+          <select
+            id="analyst-select"
+            class="select analyst-select"
+            [(ngModel)]="selectedEmail"
+            (change)="loadPermissions()"
+          >
+            <option *ngIf="users.length === 0" value="" disabled>
+              Nenhum analista cadastrado
+            </option>
+            <option *ngFor="let user of users" [value]="user.email">
+              {{ user.full_name }} — {{ user.email }}
+            </option>
+          </select>
+
+          <button
+            class="btn new-analyst-button"
+            type="button"
+            (click)="toggleCreateForm()"
+          >
+            {{ showCreateForm ? 'Fechar cadastro' : '+ Novo analista' }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <section class="card create-analyst-panel" *ngIf="showCreateForm">
+      <h3>Cadastrar analista</h3>
+      <form [formGroup]="createUserForm" (ngSubmit)="createAnalyst()">
+        <div class="grid grid-2">
+          <div class="create-analyst-field">
+            <label for="new_analyst_name">Nome</label>
+            <input
+              id="new_analyst_name"
+              class="input"
+              formControlName="full_name"
+              placeholder="Nome completo"
+              autocomplete="name"
+            >
+            <small
+              class="field-error"
+              *ngIf="createUserForm.controls.full_name.touched && createUserForm.controls.full_name.invalid"
+            >
+              Informe um nome com pelo menos 2 caracteres.
+            </small>
+          </div>
+
+          <div class="create-analyst-field">
+            <label for="new_analyst_email">E-mail</label>
+            <input
+              id="new_analyst_email"
+              class="input"
+              type="email"
+              formControlName="email"
+              placeholder="analista@eco.com"
+              autocomplete="email"
+            >
+            <small
+              class="field-error"
+              *ngIf="createUserForm.controls.email.touched && createUserForm.controls.email.invalid"
+            >
+              Informe um e-mail válido.
+            </small>
+          </div>
+
+          <div class="create-analyst-field">
+            <label for="new_analyst_password">Senha inicial</label>
+            <input
+              id="new_analyst_password"
+              class="input"
+              type="password"
+              formControlName="password"
+              placeholder="Mínimo 6 caracteres"
+              autocomplete="new-password"
+            >
+            <small
+              class="field-error"
+              *ngIf="createUserForm.controls.password.touched && createUserForm.controls.password.invalid"
+            >
+              A senha deve possuir pelo menos 6 caracteres.
+            </small>
+          </div>
+        </div>
+
+        <div class="create-analyst-actions">
+          <button class="btn btn-primary" type="submit" [disabled]="creatingUser">
+            {{ creatingUser ? 'Cadastrando...' : 'Cadastrar e configurar permissões' }}
+          </button>
+          <button
+            class="btn btn-ghost"
+            type="button"
+            [disabled]="creatingUser"
+            (click)="toggleCreateForm()"
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <div class="permissions-alert" *ngIf="createUserError">
+    {{ createUserError }}
+  </div>
+  <div class="permissions-alert success" *ngIf="createUserSuccess">
+    {{ createUserSuccess }}
+  </div>
+  <div class="permissions-alert" *ngIf="error">
+    {{ error }}
+  </div>
+  <div class="permissions-alert success" *ngIf="success">
+    {{ success }}
+  </div>
+
+  <div class="permissions-loading" *ngIf="loading">
+    Carregando permissões...
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <section class="general-section">
+      <div class="section-heading">
+        <h2>Permissões gerais</h2>
+      </div>
+
+      <div class="general-permissions-grid">
+        <label
+          class="general-toggle"
+          [class.is-enabled]="general.can_create_eco"
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="general.can_create_eco"
+          >
+          <span class="general-toggle-copy">
+            <strong>Pode criar novas ECOs</strong>
+          </span>
+        </label>
+
+        <label
+          class="general-toggle"
+          [class.is-enabled]="general.can_bulk_edit"
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="general.can_bulk_edit"
+          >
+          <span class="general-toggle-copy">
+            <strong>Pode editar em massa</strong>
+          </span>
+        </label>
+
+        <label
+          class="general-toggle"
+          [class.is-enabled]="general.can_view_history"
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="general.can_view_history"
+          >
+          <span class="general-toggle-copy">
+            <strong>Pode visualizar histórico</strong>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="field-groups-grid" aria-label="Permissões por campo">
+      <article
+        *ngFor="let group of permissionGroups; trackBy: trackGroup"
+        class="card permission-group"
+      >
+        <header class="permission-group-heading">
+          <span class="permission-group-title">
+            <span class="permission-group-dot"></span>
+            {{ group.label }}
+          </span>
+        </header>
+
+        <div class="permission-table-header">
+          <span>CAMPO</span>
+          <span>VISUALIZAR</span>
+          <span>EDITAR</span>
+        </div>
+
+        <div
+          *ngFor="let field of group.fields; trackBy: trackField"
+          class="permission-row"
+        >
+          <div class="permission-field-name">
+            <strong>{{ field.label }}</strong>
+          </div>
+
+          <label class="field-permission">
+            <input
+              type="checkbox"
+              [attr.aria-label]="'Visualizar ' + field.label"
+              [(ngModel)]="field.can_view"
+              (change)="onViewChange(field)"
+            >
+          </label>
+
+          <label class="field-permission">
+            <input
+              type="checkbox"
+              [attr.aria-label]="'Editar ' + field.label"
+              [(ngModel)]="field.can_edit"
+              (change)="onEditChange(field)"
+            >
+          </label>
+        </div>
+      </article>
+    </section>
+
+    <footer class="permissions-savebar">
+      <button
+        class="btn btn-primary save-permissions-button"
+        type="button"
+        [disabled]="saving || !selectedEmail"
+        (click)="save()"
+      >
+        {{ saving ? 'Salvando...' : 'Salvar permissões' }}
+      </button>
+    </footer>
+  </ng-container>
+</div>

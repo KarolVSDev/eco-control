@@ -108,9 +108,9 @@ def main():
 
             months = [
                 "JAN",
-                "FEB",
+                "FEV",
                 "MAR",
-                "SEP",
+                "SET",
                 "NOV",
             ]
 

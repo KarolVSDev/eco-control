@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 
 import { SharedModule } from '../../shared/shared.module';
 import { PermissionsComponent } from './permissions.component';
@@ -12,6 +13,7 @@ import { PermissionsComponent } from './permissions.component';
   imports: [
     SharedModule,
     FormsModule,
+    ReactiveFormsModule,
     RouterModule.forChild([
       {
         path: '',

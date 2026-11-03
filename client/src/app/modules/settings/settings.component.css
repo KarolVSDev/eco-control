@@ -436,6 +436,13 @@
   margin-top: 14px;
 }
 
+.owner-group-list {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .simple-list-item {
   min-height: 38px;
 

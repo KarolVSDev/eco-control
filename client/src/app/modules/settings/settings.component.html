@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page settings-page">
 
   <!-- ===================================================== -->
   <!-- CABEÇALHO -->
@@ -325,7 +325,7 @@
 
         <!-- LISTA -->
 
-        <div class="simple-list">
+        <div class="simple-list owner-group-list">
 
           <div
             *ngFor="let item of data.owner_group"
@@ -334,7 +334,12 @@
 
             <span>
               {{ item.owner }}
-              <strong>
+              <strong
+                [class.group-bom]="item.group === 'BOM'"
+                [class.group-mec]="item.group === 'MEC'"
+                [class.group-dev]="item.group === 'DEV'"
+                [class.group-hw]="item.group === 'HW'"
+              >
                 → {{ item.group }}
               </strong>
             </span>
@@ -371,92 +376,6 @@
 
       </section>
 
-
-      <!-- ================================================= -->
-      <!-- GERENTES -->
-      <!-- ================================================= -->
-
-      <section class="settings-card">
-
-        <div class="settings-card-header">
-
-          <h2>
-            Gerentes de 2ST APROV R&amp;D
-          </h2>
-
-        </div>
-
-
-        <!-- ADICIONAR -->
-
-        <div class="manager-add-row">
-
-          <input
-            class="settings-input"
-            type="text"
-            placeholder="Nome do gerente"
-            [(ngModel)]="newManager"
-            (keyup.enter)="addManager()"
-          >
-
-
-          <button
-            class="settings-add-button"
-            type="button"
-            title="Adicionar gerente"
-            aria-label="Adicionar gerente"
-            (click)="addManager()"
-          >
-            +
-          </button>
-
-        </div>
-
-
-        <!-- LISTA -->
-
-        <div class="simple-list">
-
-          <div
-            *ngFor="let manager of data.managers"
-            class="simple-list-item"
-          >
-
-            <span>
-              {{ manager.name }}
-            </span>
-
-
-            <button
-              class="settings-icon-button delete"
-              type="button"
-              title="Excluir"
-              aria-label="Excluir"
-              (click)="deleteManager(manager)"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h10l-1 11H8L7 9Zm3 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z"
-                />
-              </svg>
-            </button>
-
-          </div>
-
-
-          <div
-            *ngIf="data.managers.length === 0"
-            class="settings-empty"
-          >
-            Nenhum gerente cadastrado.
-          </div>
-
-        </div>
-
-      </section>
 
     </div>
 

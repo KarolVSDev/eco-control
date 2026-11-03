@@ -4,6 +4,11 @@ import {
   inject,
 } from '@angular/core';
 
+import {
+  FormBuilder,
+  Validators,
+} from '@angular/forms';
+
 import { ApiService } from '../../core/services/api.service';
 
 import {
@@ -37,7 +42,8 @@ interface PermissionGroup {
 
 
 @Component({
-  templateUrl: './permissions.component.html',
+  templateUrl: './permissions-redesigned.component.html',
+  styleUrls: ['./permissions.component.css'],
 })
 export class PermissionsComponent
   implements OnInit {
@@ -45,10 +51,44 @@ export class PermissionsComponent
   private readonly api =
     inject(ApiService);
 
+  private readonly fb =
+    inject(FormBuilder);
+
 
   users: User[] = [];
 
   selectedEmail = '';
+
+  showCreateForm = false;
+  creatingUser = false;
+
+  createUserError = '';
+  createUserSuccess = '';
+
+  createUserForm =
+    this.fb.nonNullable.group({
+      full_name: [
+        '',
+        [
+          Validators.required,
+          Validators.minLength(2),
+        ],
+      ],
+      email: [
+        '',
+        [
+          Validators.required,
+          Validators.email,
+        ],
+      ],
+      password: [
+        '',
+        [
+          Validators.required,
+          Validators.minLength(6),
+        ],
+      ],
+    });
 
   loading = false;
   saving = false;
@@ -182,6 +222,73 @@ export class PermissionsComponent
         error: () => {
           this.error =
             'Não foi possível carregar os analistas.';
+        },
+      });
+  }
+
+
+  toggleCreateForm(): void {
+    this.showCreateForm =
+      !this.showCreateForm;
+
+    this.createUserError = '';
+    this.createUserSuccess = '';
+
+    if (!this.showCreateForm) {
+      this.createUserForm.reset();
+    }
+  }
+
+
+  createAnalyst(): void {
+    if (this.createUserForm.invalid) {
+      this.createUserForm
+        .markAllAsTouched();
+      return;
+    }
+
+    if (this.creatingUser) {
+      return;
+    }
+
+    this.creatingUser = true;
+    this.createUserError = '';
+    this.createUserSuccess = '';
+
+    this.api
+      .post<User>(
+        '/users',
+        {
+          ...this.createUserForm
+            .getRawValue(),
+          role: 'analyst',
+          active: true,
+        },
+      )
+      .subscribe({
+        next: user => {
+          this.users = [
+            ...this.users,
+            user,
+          ];
+          this.selectedEmail = user.email;
+          this.showCreateForm = false;
+          this.creatingUser = false;
+          this.createUserForm.reset();
+          this.createUserSuccess =
+            'Analista cadastrado. Permissões padrão carregadas.';
+          this.loadPermissions();
+        },
+        error: err => {
+          this.creatingUser = false;
+
+          const detail =
+            err.error?.detail;
+
+          this.createUserError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível cadastrar o analista.';
         },
       });
   }
@@ -329,7 +436,6 @@ export class PermissionsComponent
 
           this.saving = false;
 
-          this.error =
             error.error?.detail
             ||
             'Não foi possível salvar as permissões.';
