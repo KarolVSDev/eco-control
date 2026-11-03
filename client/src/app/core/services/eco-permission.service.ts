@@ -102,7 +102,7 @@ export class EcoPermissionService {
     fieldKey: string,
   ): boolean {
 
-    if (['effective_date', 'gap_14d', 'gap_14d_note'].includes(fieldKey)) {
+    if (['gap_14d', 'gap_14d_note'].includes(fieldKey)) {
       return true;
     }
 
@@ -133,7 +133,7 @@ export class EcoPermissionService {
       return false;
     }
 
-    if (['effective_date', 'gap_14d_note'].includes(fieldKey)) {
+    if (fieldKey === 'gap_14d_note') {
       return true;
     }
 
