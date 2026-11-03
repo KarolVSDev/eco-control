@@ -203,7 +203,7 @@ export class PermissionsComponent
             users.filter(
               user =>
                 user.role ===
-                  'analyst'
+                'analyst'
                 &&
                 user.active
             );
@@ -307,10 +307,9 @@ export class PermissionsComponent
 
     this.api
       .get<any>(
-        `/permissions/${
-          encodeURIComponent(
-            this.selectedEmail
-          )
+        `/permissions/${encodeURIComponent(
+          this.selectedEmail
+        )
         }`
       )
       .subscribe({
@@ -416,10 +415,9 @@ export class PermissionsComponent
 
     this.api
       .put(
-        `/permissions/${
-          encodeURIComponent(
-            this.selectedEmail
-          )
+        `/permissions/${encodeURIComponent(
+          this.selectedEmail
+        )
         }`,
         body,
       )
@@ -436,6 +434,7 @@ export class PermissionsComponent
 
           this.saving = false;
 
+          this.error =
             error.error?.detail
             ||
             'Não foi possível salvar as permissões.';
