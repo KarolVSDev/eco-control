@@ -112,7 +112,7 @@ class EcoService:
             )
 
 
-            if key in {"effective_date", "gap_14d_note"}:
+            if key in {"gap_14d_note"}:
                 allowed[key] = value
                 continue
 
