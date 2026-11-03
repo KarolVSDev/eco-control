@@ -98,7 +98,7 @@ autenticação será 401.
 
 ## Contrato do payload
 
-Somente os nove campos abaixo são aceitos. O schema usa `extra="forbid"`:
+Somente os dez campos abaixo são aceitos. O schema usa `extra="forbid"`:
 qualquer outro campo provoca HTTP 422.
 
 | Campo API | Origem na automação | Obrigatório | Tipo aceito |
@@ -112,6 +112,7 @@ qualquer outro campo provoca HTTP 422.
 | `auto_ecr` | `Auto ECR?` | Não | string `YES` / `NO` ou null |
 | `change_bom` | `Change BOM?` | Não | string `YES` / `NO` ou null |
 | `title` | `Title` | Não | string ou null |
+| `origin_eco: str` | None = None
 
 Schema implementado, em notação Python:
 
@@ -175,9 +176,13 @@ externos, mas não converte caixa: envie `YES` ou `NO` em maiúsculas.
 
 ### Campos fora do contrato
 
-Não enviar `Approved Date`, `Origin ECO`, `Suffix`, `Applied to Manaus?`,
-`Prod Plan?` ou `Effective Date`, nem supostos equivalentes como `approved_date`,
-`origin_eco`, `suffix`, `applied_to_manaus`, `prod_plan` e `effective_date`.
+Não enviar `Suffix`, `Applied to Manaus?`, `Prod Plan?` ou `Effective Date`,
+nem equivalentes como `suffix`, `applied_to_manaus`, `prod_plan`
+e `effective_date`.
+`Origin ECO` é aceito pelo contrato por meio de `origin_eco` e é armazenado
+internamente em `hz_in_kr_eco_1`.
+
+`Approved Date` é aceito pelo contrato por meio de `hq_eco_release_date`.
 
 Também não enviar `group`, `group_name`, `owner`, `gap`, `gap_14d`, `au`,
 `item`, `position`, `month` ou outros campos internos/derivados. Outros campos
@@ -207,37 +212,25 @@ inclusive nos campos de data e YES/NO. `eco` é exceção: omitido, null ou vazi
 O objetivo é impedir limpeza acidental de dados existentes. Na criação, valores
 ignorados não preenchem os campos. Na atualização, preservam o valor armazenado.
 Essa regra pertence ao endpoint da integração; não descreve a semântica do PATCH
-genérico, que permite limpar campos. GROUP e OWNER continuam sendo aplicados
-internamente mesmo quando nenhum campo opcional válido é recebido.
-
-## Campos fixos GROUP e OWNER
-
-> **Regra temporária atual da integração:** GROUP = BOM; OWNER = giseli.santos.
-
-| Conceito | Nome usado pelo fluxo da API/permissões | Coluna interna | Valor |
-|---|---|---|---|
-| GROUP | `group` | `group_name` | `BOM` |
-| OWNER | `owner` | `owner` | `giseli.santos` |
-
-A automação **não envia esses campos**. `sync_automation` acrescenta os valores
-internamente antes de chamar os fluxos normais de criação ou atualização.
-Eles são aplicados também a ECOs existentes: valores diferentes são substituídos
-e auditados; valores iguais não geram histórico adicional.
-
-O GROUP explícito da integração prevalece sobre o mapeamento OWNER → GROUP.
-As permissões normais continuam sendo verificadas, inclusive para esses campos.
-A política está centralizada no ECO CONTROL e não deve ser duplicada na automação
-ou no frontend. Quando mudar, alterar o backend e atualizar este documento.
-
+genérico, que permite limpar campos.
 ## Matching e persistência
 
 ### Localização exata
 
 `eco` identifica a sincronização. O repository executa igualdade equivalente a:
 
-```sql
-WHERE trim(ecos.eco) = :codigo_normalizado
-```
+Quando `obu` é informado, a identificação utiliza a combinação ECO + OBU.
+
+Equivalente a:
+
+WHERE trim(ecos.eco) = :eco
+  AND trim(ecos.obu) = :obu
+
+Se `obu` não for informado, o endpoint mantém compatibilidade com chamadas
+anteriores e procura somente pelo código ECO.
+
+Se a busca somente por ECO encontrar mais de um registro, a operação retorna
+HTTP 409 e solicita que o OBU também seja informado.
 
 O código recebido passa por `strip()`; a consulta aplica `trim()` ao código
 armazenado, sem regravar globalmente os registros. Não usa contains, LIKE,
@@ -266,7 +259,7 @@ fixas. Gera UUID e aplica as regras normais:
 - `position`: maior posição atual mais um;
 - `month`: abreviação definida pelo serviço para o mês do relógio do servidor;
 - `au`: resultado do mapeamento OBU → AU, se houver OBU válido;
-- `group_name = "BOM"` e `owner = "giseli.santos"`;
+- `group_name` e `owner`: não são definidos pela integração;
 - `status = "WORKING"`, default atual do model;
 - timestamps e demais defaults normais do model.
 
@@ -276,14 +269,12 @@ de edição dos campos utilizados, conforme a seção de permissões.
 
 ### Atualização
 
-`eco` não é alterado: funciona somente como identificador. Os opcionais válidos,
-GROUP e OWNER passam pelo mesmo núcleo de atualização usado pelo PATCH.
-Cada valor é comparado ao anterior; somente diferenças alteram o registro e
-produzem histórico. O fluxo faz commit e realiza rollback em falhas na operação.
+`eco` não é alterado: funciona somente como identificador. Os campos opcionais válidos passam pelo mesmo núcleo de atualização usado
+pelo PATCH. GROUP e OWNER não fazem parte do payload da integração e não
+são alterados durante a sincronização.
 
 Por exemplo, enviar `title = "ABC"` e `auto_ecr = "YES"` para uma ECO que já
-possui esses valores retorna `unchanged`, **desde que GROUP e OWNER também
-estejam nos valores fixos** e nenhuma derivação de AU precise mudar.
+possui esses valores retorna `unchanged`, e nenhuma derivação de AU precise mudar.
 Se apenas Title mudar, o resultado será `updated` com `changed_fields: ["title"]`.
 
 ### OBU → AU
@@ -551,7 +542,7 @@ UUID/código da ECO, ITEM, chave/rótulo do campo, valor anterior, valor novo,
 e-mail/nome do usuário autenticado, data/hora e ação.
 
 - **Criação:** ação `created`, valor anterior NULL e valor novo para os campos
-  efetivamente passados ao fluxo de criação, incluindo ECO, GROUP e OWNER.
+  efetivamente passados ao fluxo de criação.
   Não gera um evento por todo default/campo derivado: ITEM, position, month,
   status default e AU derivado não são auditados individualmente nessa criação.
 - **Atualização:** ação `updated` somente para diferenças efetivas, incluindo
