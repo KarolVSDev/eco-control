@@ -43,9 +43,15 @@ const routes: Routes = [
 
     children: [
 
-      // Dashboard
       {
         path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard',
+      },
+
+      // Dashboard
+      {
+        path: 'dashboard',
         loadChildren: () =>
           import(
             './modules/dashboard/dashboard.module'
@@ -65,11 +71,11 @@ const routes: Routes = [
           ),
       },
 
-      // Relatórios / Histórico
+      // Histórico de Alterações
       // Só acessa quem possuir
       // can_view_history
       {
-        path: 'relatorios',
+        path: 'historico-alteracoes',
         canActivate: [historyGuard],
         loadChildren: () =>
           import(
@@ -77,6 +83,12 @@ const routes: Routes = [
           ).then(
             m => m.ReportsModule
           ),
+      },
+
+      {
+        path: 'relatorios',
+        pathMatch: 'full',
+        redirectTo: 'historico-alteracoes',
       },
 
       // =========================
