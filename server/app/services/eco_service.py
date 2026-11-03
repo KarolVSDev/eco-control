@@ -1673,16 +1673,6 @@ class EcoService:
             data[
                 "hz_in_kr_eco_1"
             ] = origin_eco
-
-        # -----------------------------------------------------
-        # POLÍTICA TEMPORÁRIA DA AUTOMAÇÃO
-        # -----------------------------------------------------
-
-        data.update(
-            group="BOM",
-            owner="giseli.santos",
-        )
-
         # -----------------------------------------------------
         # NOME EXTERNO DOS CAMPOS
         # -----------------------------------------------------
@@ -1730,68 +1720,6 @@ class EcoService:
             key: value
             for key, value
             in data.items()
-            if key != "eco"
-        }
-
-        changed_fields = (
-            self._apply_update(
-                eco,
-                changes,
-            )
-            if changes
-            else []
-        )
-
-        return {
-            "status": (
-                "updated"
-                if changed_fields
-                else "unchanged"
-            ),
-            "eco_id": str(eco.id),
-            "eco": eco.eco,
-            "changed_fields": [
-                external_field_name(key)
-                for key in changed_fields
-            ],
-        }
-
-        def external_field_name(key):
-            if key == "group_name":
-                return "group"
-
-            if key == "hz_in_kr_eco_1":
-                return "origin_eco"
-
-            return key
-
-        # CRIAÇÃO
-        if not matches:
-            try:
-                eco = self._create_eco(
-                    EcoCreate(**data)
-                )
-
-            except Exception:
-                self.db.rollback()
-                raise
-
-            return {
-                "status": "created",
-                "eco_id": str(eco.id),
-                "eco": eco.eco,
-                "changed_fields": [
-                    external_field_name(key)
-                    for key in data
-                ],
-            }
-
-        # ATUALIZAÇÃO
-        eco = matches[0]
-
-        changes = {
-            key: value
-            for key, value in data.items()
             if key != "eco"
         }
 
