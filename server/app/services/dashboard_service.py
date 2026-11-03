@@ -7,26 +7,14 @@ from sqlalchemy import (
 
 from app.models.entities import Eco
 from app.utils.eco_calculations import (
+    MONTH_ABBR,
     compute_eco_fields,
 )
 
 
 class DashboardService:
 
-    MONTH_ORDER = [
-        "JAN",
-        "FEB",
-        "MAR",
-        "APR",
-        "MAY",
-        "JUN",
-        "JUL",
-        "AUG",
-        "SEP",
-        "OCT",
-        "NOV",
-        "DEC",
-    ]
+    MONTH_ORDER = MONTH_ABBR
 
 
     def __init__(

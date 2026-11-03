@@ -10,6 +10,7 @@ from types import (
 import pytest
 
 from app.utils.eco_calculations import (
+    MONTH_ABBR,
     OPEN_STATUSES,
     business_days_between,
     compute_eco_fields,
@@ -153,6 +154,23 @@ def calculation_row(
     return SimpleNamespace(
         **values
     )
+
+
+def test_month_abbreviations_are_in_portuguese_order():
+    assert MONTH_ABBR == [
+        "JAN",
+        "FEV",
+        "MAR",
+        "ABR",
+        "MAI",
+        "JUN",
+        "JUL",
+        "AGO",
+        "SET",
+        "OUT",
+        "NOV",
+        "DEZ",
+    ]
 
 
 # =========================================================

@@ -47,6 +47,7 @@ from app.repository.settings_repository import (
 )
 
 from app.utils.eco_calculations import (
+    MONTH_ABBR,
     compute_eco_fields,
 )
 
@@ -59,20 +60,7 @@ class EcoImportService:
 
     SHEET_NAME = "CTRL GERAL"
 
-    INTERNAL_MONTHS = [
-        "JAN",
-        "FEB",
-        "MAR",
-        "APR",
-        "MAY",
-        "JUN",
-        "JUL",
-        "AUG",
-        "SEP",
-        "OCT",
-        "NOV",
-        "DEC",
-    ]
+    INTERNAL_MONTHS = MONTH_ABBR
 
     MAX_SCAN_ROWS = 10000
 
