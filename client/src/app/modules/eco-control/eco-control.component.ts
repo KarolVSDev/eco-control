@@ -1,6 +1,7 @@
 import {
   Component,
   OnInit,
+  OnDestroy,
   inject,
 } from '@angular/core';
 
@@ -15,6 +16,11 @@ import {
 import {
   monthLabel,
 } from '../../shared/utils/month-label';
+
+import { DOCUMENT } from '@angular/common';
+import { Subject, Subscription, interval, takeUntil, finalize } from 'rxjs';
+
+import { Eco } from './eco.model';
 
 import {
   COLUMN_GROUPS,
@@ -31,7 +37,7 @@ import {
   styleUrls: ['./eco-control.component.css'],
 })
 export class EcoControlComponent
-  implements OnInit {
+  implements OnInit, OnDestroy {
 
   private readonly api =
     inject(ApiService);
@@ -61,7 +67,7 @@ export class EcoControlComponent
   // DADOS
   // =====================================================
 
-  rows: any[] = [];
+  rows: Eco[] = [];
 
   total = 0;
 
@@ -158,7 +164,7 @@ export class EcoControlComponent
   // LINHA SELECIONADA
   // =====================================================
 
-  selectedRow: any = null;
+  selectedRow: Eco | null = null;
 
   selectedRowIds = new Set<string>();
 
@@ -169,7 +175,7 @@ export class EcoControlComponent
   // DRAWER
   // =====================================================
 
-  viewingRow: any = null;
+  viewingRow: Eco | null = null;
 
   drawerEditing = false;
 
@@ -195,12 +201,59 @@ export class EcoControlComponent
   // INIT
   // =====================================================
 
+  private readonly document = inject(DOCUMENT);
+  private readonly destroyed$ = new Subject<void>();
+  private listRequest?: Subscription;
+  private listInFlight = false;
+  private initialLoadComplete = false;
+  private readonly knownEcoIds = new Set<string>();
+  readonly highlightedEcoIds = new Set<string>();
+  private readonly highlightTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  private refreshPaused(): boolean {
+    return this.drawerEditing || this.drawerSaving || this.cellSaving.size > 0
+      || this.creatingEco || this.deletingSelected || this.importingFile
+      || !!this.document.activeElement?.closest('.eco-table input, .eco-table textarea, .eco-table select');
+  }
+
+  private rememberRows(rows: Eco[]): void {
+    for (const row of rows) {
+      if (this.initialLoadComplete && !this.knownEcoIds.has(row.id)) {
+        this.highlightedEcoIds.add(row.id);
+        this.highlightTimers.set(row.id, setTimeout(() => {
+          this.highlightedEcoIds.delete(row.id);
+          this.highlightTimers.delete(row.id);
+        }, 4000));
+      }
+      this.knownEcoIds.add(row.id);
+    }
+    this.initialLoadComplete = true;
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
+    for (const timer of this.highlightTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.highlightTimers.clear();
+    this.highlightedEcoIds.clear();
+    this.knownEcoIds.clear();
+  }
+
   ngOnInit(): void {
+    interval(3000).pipe(takeUntil(this.destroyed$)).subscribe(() => {
+      if (this.initialLoadComplete && !this.listInFlight && !this.refreshPaused()) {
+        this.load(true);
+      }
+    });
+
 
     this.loadOwnerOptions();
 
     this.permissions
       .load()
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: () => {
@@ -340,16 +393,21 @@ export class EcoControlComponent
   // CARREGAR ECOS
   // =====================================================
 
-  load(): void {
+  load(silent = false): void {
+    if (silent && (this.listInFlight || this.refreshPaused())) {
+      return;
+    }
+    // Explicit navigation supersedes an older query, including background refresh.
+    this.listRequest?.unsubscribe();
+    this.listInFlight = true;
+    if (!silent) {
+      this.loading = true;
+      this.loadError = '';
+      this.cellError = '';
+    }
 
-    this.loading = true;
 
-    this.loadError = '';
-
-    this.cellError = '';
-
-
-    this.api
+    this.listRequest = this.api
       .get<any>(
         '/ecos',
         {
@@ -366,9 +424,17 @@ export class EcoControlComponent
             this.columnFiltersParam(),
         },
       )
+      .pipe(finalize(() => {
+        this.listInFlight = false;
+        if (!silent) this.loading = false;
+      }))
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: response => {
+          // An editor may have gained focus while the request was in flight.
+          if (silent && this.refreshPaused()) return;
+          this.rememberRows(response.items);
 
 
           this.rows =
@@ -384,12 +450,12 @@ export class EcoControlComponent
               this.rows.find(
                 row =>
                   row.id ===
-                  this.selectedRow.id
+                  this.selectedRow?.id
               );
 
 
             this.selectedRow =
-              selected || null;
+              selected || (silent ? this.selectedRow : null);
           }
 
 
@@ -403,7 +469,7 @@ export class EcoControlComponent
               this.rows.find(
                 row =>
                   row.id ===
-                  this.viewingRow.id
+                  this.viewingRow?.id
               );
 
 
@@ -426,6 +492,8 @@ export class EcoControlComponent
             error,
           );
 
+
+          if (silent) return;
 
           this.loadError =
             'Não foi possível carregar as ECOs. Tente novamente.';
@@ -918,7 +986,7 @@ export class EcoControlComponent
   // =====================================================
 
   isRowSelected(
-    row: any,
+    row: Eco,
   ): boolean {
 
     return (
@@ -929,7 +997,7 @@ export class EcoControlComponent
 
 
   selectRow(
-    row: any,
+    row: Eco,
   ): void {
 
     if (
@@ -949,7 +1017,7 @@ export class EcoControlComponent
 
 
   isRowChecked(
-    row: any,
+    row: Eco,
   ): boolean {
 
     return this.selectedRowIds
@@ -1008,7 +1076,7 @@ export class EcoControlComponent
 
 
   toggleRowChecked(
-    row: any,
+    row: Eco,
     checked: boolean,
   ): void {
 
@@ -1104,10 +1172,11 @@ export class EcoControlComponent
 
 
     this.api
-      .post<any>(
+      .post<Eco>(
         endpoint,
         {},
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: created => {
@@ -1159,7 +1228,7 @@ export class EcoControlComponent
   // =====================================================
 
   openDetails(
-    row: any,
+    row: Eco,
   ): void {
 
     this.viewingRow =
@@ -1280,7 +1349,7 @@ export class EcoControlComponent
   // =====================================================
 
   private buildDrawerDraft(
-    row: any,
+    row: Eco,
   ): Record<string, any> {
 
     const draft:
@@ -1415,7 +1484,7 @@ export class EcoControlComponent
 
 
         const oldValue =
-          this.viewingRow[
+          this.viewingRow?.[
             column.key
           ] ?? '';
 
@@ -1474,7 +1543,7 @@ export class EcoControlComponent
 
 
       const previousValue =
-        this.viewingRow[
+        this.viewingRow?.[
           column.key
         ] ?? null;
 
@@ -1532,7 +1601,7 @@ export class EcoControlComponent
 
 
     const id =
-      this.viewingRow.id;
+      this.viewingRow?.id;
 
 
     this.drawerSaving =
@@ -1544,10 +1613,11 @@ export class EcoControlComponent
 
 
     this.api
-      .patch<any>(
+      .patch<Eco>(
         `/ecos/${id}`,
         changes,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: updated => {
@@ -1636,6 +1706,7 @@ export class EcoControlComponent
       >(
         '/settings/owner-options'
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: items => {
@@ -1769,7 +1840,7 @@ export class EcoControlComponent
 
 
   isCellSaving(
-    row: any,
+    row: Eco,
     column: EcoColumn,
   ): boolean {
 
@@ -1790,7 +1861,7 @@ export class EcoControlComponent
   // =====================================================
 
   updateCell(
-    row: any,
+    row: Eco,
     column: EcoColumn,
     event: Event,
   ): void {
@@ -1808,7 +1879,8 @@ export class EcoControlComponent
     const element =
       event.target as
         HTMLInputElement |
-        HTMLSelectElement;
+        HTMLSelectElement |
+        HTMLTextAreaElement;
 
 
     const rawValue =
@@ -1853,13 +1925,14 @@ export class EcoControlComponent
 
 
     this.api
-      .patch<any>(
+      .patch<Eco>(
         `/ecos/${row.id}`,
         {
           [column.key]:
             value,
         },
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: updated => {
@@ -1936,7 +2009,7 @@ export class EcoControlComponent
   // =====================================================
 
   remove(
-    row: any,
+    row: Eco,
   ): void {
 
     if (
@@ -1969,6 +2042,7 @@ export class EcoControlComponent
       .delete(
         `/ecos/${row.id}`,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: () => {
@@ -2062,6 +2136,7 @@ export class EcoControlComponent
             ),
         },
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: () => {
           this.deletingSelected =
@@ -2209,6 +2284,7 @@ export class EcoControlComponent
         '/ecos/import/preview',
         formData,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: response => {
           this.importPreview = response;
@@ -2255,6 +2331,7 @@ export class EcoControlComponent
         '/ecos/import',
         formData,
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: response => {
           this.importResult = response;
@@ -2328,6 +2405,7 @@ export class EcoControlComponent
             this.columnFiltersParam(),
         },
       )
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
 
         next: blob => {
@@ -2491,7 +2569,7 @@ export class EcoControlComponent
   // =====================================================
 
   displayValue(
-    row: any,
+    row: Eco,
     column: EcoColumn,
   ): string {
 
@@ -2583,7 +2661,7 @@ export class EcoControlComponent
 
   trackRow(
     _index: number,
-    row: any,
+    row: Eco,
   ): string {
 
     return row.id;

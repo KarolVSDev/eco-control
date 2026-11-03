@@ -1,15 +1,46 @@
-"""Normalize stored month abbreviations to Portuguese."""
+"""Reconcile GAP report fields and normalize stored month abbreviations."""
 
 from alembic import op
+import sqlalchemy as sa
 
 
-revision = "0004"
-down_revision = "0003"
+revision = "0006"
+down_revision = "0005"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+
+    columns = {
+        column["name"]
+        for column in sa.inspect(bind).get_columns("ecos")
+    }
+
+    # Compatibilidade com bancos que vieram do develop,
+    # onde a antiga revision 0004 era a normalização dos meses.
+    if "effective_date" not in columns:
+        op.add_column(
+            "ecos",
+            sa.Column(
+                "effective_date",
+                sa.Date(),
+                nullable=True,
+            ),
+        )
+
+    if "gap_14d_note" not in columns:
+        op.add_column(
+            "ecos",
+            sa.Column(
+                "gap_14d_note",
+                sa.Text(),
+                nullable=True,
+            ),
+        )
+
+    # Normaliza abreviações antigas em inglês para português.
     op.execute(
         """
         UPDATE ecos

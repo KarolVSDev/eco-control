@@ -675,6 +675,7 @@
               trackBy: trackRow
             "
             class="eco-row"
+            [class.eco-new-highlight]="highlightedEcoIds.has(row.id)"
             [class.row-selected]="
               isRowSelected(row)
             "
@@ -1054,6 +1055,15 @@
               <!-- TEXTO EDITÁVEL -->
               <!-- ================================================= -->
 
+              <textarea
+                *ngIf="isColumnEditable(column) && column.type === fieldTypes.TEXTAREA"
+                class="inline-control"
+                rows="3"
+                [value]="row[column.key] ?? ''"
+                [disabled]="isCellSaving(row, column)"
+                (change)="updateCell(row, column, $event)"
+              ></textarea>
+
               <input
                 *ngIf="
                   isColumnEditable(column)
@@ -1066,9 +1076,6 @@
                     ||
                     column.type
                     === fieldTypes.MONO
-                    ||
-                    column.type
-                    === fieldTypes.TEXTAREA
                   )
                 "
                 class="inline-control"

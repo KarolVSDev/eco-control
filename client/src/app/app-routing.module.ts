@@ -60,6 +60,13 @@ const routes: Routes = [
           ),
       },
 
+      {
+        path: 'relatorio-gap',
+        loadChildren: () =>
+          import('./modules/gap-report/gap-report.module')
+            .then(m => m.GapReportModule),
+      },
+
       // ECO Control
       {
         path: 'eco-control',

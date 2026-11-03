@@ -102,6 +102,10 @@ export class EcoPermissionService {
     fieldKey: string,
   ): boolean {
 
+    if (['effective_date', 'gap_14d', 'gap_14d_note'].includes(fieldKey)) {
+      return true;
+    }
+
     if (this.isAdmin) {
       return true;
     }
@@ -124,6 +128,14 @@ export class EcoPermissionService {
   canEdit(
     fieldKey: string,
   ): boolean {
+
+    if (fieldKey === 'gap_14d') {
+      return false;
+    }
+
+    if (['effective_date', 'gap_14d_note'].includes(fieldKey)) {
+      return true;
+    }
 
     if (this.isAdmin) {
       return true;
