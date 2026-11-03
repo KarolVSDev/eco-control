@@ -153,41 +153,96 @@ def test_gap_migration_preserves_existing_rows_and_reverses(monkeypatch, existin
         assert connection.exec_driver_sql("SELECT id FROM ecos").scalar_one() == 1
     engine.dispose()
 
-
 @pytest.mark.parametrize("explicit_denial", [False, True])
-def test_all_users_can_edit_and_view_gap_fields(explicit_denial):
+def test_gap_fields_work_when_effective_date_is_permitted(explicit_denial):
     engine = sa.create_engine("sqlite://")
     Eco.__table__.create(engine)
+
     from app.models.entities import EcoHistory
     EcoHistory.__table__.create(engine)
+
     with sa.orm.Session(engine) as session:
-        eco = Eco(id=uuid4(), status="RELEASED", second_aprov_rd_finish_1=date(2026, 2, 16))
+        eco = Eco(
+            id=uuid4(),
+            status="RELEASED",
+            second_aprov_rd_finish_1=date(2026, 2, 16),
+        )
+
         session.add(eco)
         session.commit()
-        service = EcoService(session, SimpleNamespace(
-            role="analyst", email="analyst@example.com", full_name="Analyst",
-        ))
+
+        service = EcoService(
+            session,
+            SimpleNamespace(
+                role="analyst",
+                email="analyst@example.com",
+                full_name="Analyst",
+            ),
+        )
+
         permissions = {
-            key: SimpleNamespace(can_view=False, can_edit=False)
-            for key in ("effective_date", "gap_14d", "gap_14d_note")
-        } if explicit_denial else {}
+            "effective_date": SimpleNamespace(
+                can_view=True,
+                can_edit=True,
+            ),
+        }
+
+        if explicit_denial:
+            permissions.update({
+                "gap_14d": SimpleNamespace(
+                    can_view=False,
+                    can_edit=False,
+                ),
+                "gap_14d_note": SimpleNamespace(
+                    can_view=False,
+                    can_edit=False,
+                ),
+            })
+
         service._field_permissions = lambda: permissions
-        first = service.update(eco.id, EcoUpdate(
-            effective_date=date(2026, 2, 1), gap_14d_note="Reason\nLong note",
-        ))
+
+        first = service.update(
+            eco.id,
+            EcoUpdate(
+                effective_date=date(2026, 2, 1),
+                gap_14d_note="Reason\nLong note",
+            ),
+        )
+
         assert first["gap_14d"] == 15
         assert first["requires_gap_14d_note"] is True
         assert first["gap_14d_note"] == "Reason\nLong note"
-        second = service.update(eco.id, EcoUpdate(effective_date=date(2026, 2, 5)))
+
+        second = service.update(
+            eco.id,
+            EcoUpdate(
+                effective_date=date(2026, 2, 5),
+            ),
+        )
+
         assert second["gap_14d"] == 11
         assert second["requires_gap_14d_note"] is False
+
         session.expire_all()
-        reloaded = service.serialize(session.get(Eco, eco.id))
+
+        reloaded = service.serialize(
+            session.get(Eco, eco.id)
+        )
+
         assert reloaded["effective_date"] == date(2026, 2, 5)
         assert reloaded["gap_14d"] == 11
         assert reloaded["gap_14d_note"] == "Reason\nLong note"
-        cleared = service.update(eco.id, EcoUpdate(effective_date=None, gap_14d_note=None))
+
+        cleared = service.update(
+            eco.id,
+            EcoUpdate(
+                effective_date=None,
+                gap_14d_note=None,
+            ),
+        )
+
         assert cleared["effective_date"] is None
         assert cleared["gap_14d_note"] is None
         assert cleared["gap_14d"] is None
+
     engine.dispose()
