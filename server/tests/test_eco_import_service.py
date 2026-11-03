@@ -557,7 +557,7 @@ def test_preview_uses_internal_month_and_sheet_release_month():
     )
     derived = result["rows"][0]["derived"]
 
-    assert derived["month"] == "FEB"
+    assert derived["month"] == "FEV"
     assert derived["release_month"] == "FEV"
 
 
@@ -571,7 +571,7 @@ def test_record_import_history_serializes_populated_fields():
         eco="ECO-HISTORY",
         item=7,
         position=3,
-        month="FEB",
+        month="FEV",
         au="GLZ",
         group_name="BOM",
     )

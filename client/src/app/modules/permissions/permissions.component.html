@@ -35,6 +35,14 @@
     >
 
       <option
+        *ngIf="users.length === 0"
+        value=""
+        disabled
+      >
+        Nenhum analista cadastrado
+      </option>
+
+      <option
         *ngFor="let user of users"
         [value]="user.email"
       >
@@ -44,7 +52,162 @@
 
     </select>
 
+    <button
+      class="btn btn-ghost"
+      style="margin-top: 12px"
+      type="button"
+      (click)="toggleCreateForm()"
+    >
+      {{
+        showCreateForm
+          ? 'Fechar cadastro'
+          : '+ Novo analista'
+      }}
+    </button>
+
   </section>
+
+
+  <section
+    *ngIf="showCreateForm"
+    class="card"
+    style="
+      margin-top: 12px;
+      max-width: 700px;
+    "
+  >
+
+    <h3 style="margin-top: 0">
+      Cadastrar analista
+    </h3>
+
+    <form
+      [formGroup]="createUserForm"
+      (ngSubmit)="createAnalyst()"
+    >
+
+      <div class="grid grid-2">
+
+        <div>
+          <label for="new_analyst_name">
+            Nome
+          </label>
+          <input
+            id="new_analyst_name"
+            class="input"
+            style="width: 100%; margin-top: 6px"
+            formControlName="full_name"
+            placeholder="Nome completo"
+            autocomplete="name"
+          >
+          <small
+            *ngIf="
+              createUserForm.controls.full_name.touched
+              && createUserForm.controls.full_name.invalid
+            "
+            class="danger"
+          >
+            Informe um nome com pelo menos 2 caracteres.
+          </small>
+        </div>
+
+        <div>
+          <label for="new_analyst_email">
+            E-mail
+          </label>
+          <input
+            id="new_analyst_email"
+            class="input"
+            style="width: 100%; margin-top: 6px"
+            type="email"
+            formControlName="email"
+            placeholder="analista@eco.com"
+            autocomplete="email"
+          >
+          <small
+            *ngIf="
+              createUserForm.controls.email.touched
+              && createUserForm.controls.email.invalid
+            "
+            class="danger"
+          >
+            Informe um e-mail válido.
+          </small>
+        </div>
+
+        <div>
+          <label for="new_analyst_password">
+            Senha inicial
+          </label>
+          <input
+            id="new_analyst_password"
+            class="input"
+            style="width: 100%; margin-top: 6px"
+            type="password"
+            formControlName="password"
+            placeholder="Mínimo 6 caracteres"
+            autocomplete="new-password"
+          >
+          <small
+            *ngIf="
+              createUserForm.controls.password.touched
+              && createUserForm.controls.password.invalid
+            "
+            class="danger"
+          >
+            A senha deve possuir pelo menos 6 caracteres.
+          </small>
+        </div>
+
+      </div>
+
+      <div
+        style="
+          display: flex;
+          gap: 10px;
+          margin-top: 18px;
+        "
+      >
+        <button
+          class="btn btn-primary"
+          type="submit"
+          [disabled]="creatingUser"
+        >
+          {{
+            creatingUser
+              ? 'Cadastrando...'
+              : 'Cadastrar e configurar permissões'
+          }}
+        </button>
+        <button
+          class="btn btn-ghost"
+          type="button"
+          [disabled]="creatingUser"
+          (click)="toggleCreateForm()"
+        >
+          Cancelar
+        </button>
+      </div>
+
+    </form>
+
+  </section>
+
+  <div
+    *ngIf="createUserError"
+    class="danger"
+    style="margin-top: 10px"
+  >
+    {{ createUserError }}
+  </div>
+
+  <div
+    *ngIf="createUserSuccess"
+    class="success"
+    style="margin-top: 10px"
+  >
+    {{ createUserSuccess }}
+  </div>
 
 
   <div

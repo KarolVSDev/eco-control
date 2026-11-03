@@ -126,15 +126,17 @@ def main():
 
             months = [
                 "JAN",
-                "FEB",
+                "FEV",
                 "MAR",
-                "APR",
-                "MAY",
+                "ABR",
+                "MAI",
                 "JUN",
                 "JUL",
-                "AUG",
-                "SEP",
-                "OCT",
+                "AGO",
+                "SET",
+                "OUT",
+                "NOV",
+                "DEZ",
             ]
 
             obus = list(
