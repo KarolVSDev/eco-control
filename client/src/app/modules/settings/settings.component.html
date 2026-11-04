@@ -68,9 +68,17 @@
         <h2>
           OBU → AU
           <span>
-            (relação editável)
+            (relação padrão editável)
           </span>
         </h2>
+
+        <button
+          class="owner-import-button"
+          type="button"
+          (click)="openObuAuImportModal()"
+        >
+          Importar relações
+        </button>
 
       </div>
 
@@ -259,6 +267,338 @@
 
     </section>
 
+    <!-- ================================================= -->
+    <!-- IMPORTAÇÃO OBU → AU -->
+    <!-- ================================================= -->
+
+    <div
+      *ngIf="obuAuImportModalOpen"
+      class="owner-import-overlay"
+      (click)="closeObuAuImportModal()"
+    >
+      <section
+        class="owner-import-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="obu-au-import-title"
+        (click)="$event.stopPropagation()"
+      >
+
+        <header class="owner-import-header">
+
+          <div>
+            <h2 id="obu-au-import-title">
+              Importar relações OBU → AU
+            </h2>
+
+            <p>
+              Arquivo XLSX com as colunas OBU e AU.
+            </p>
+          </div>
+
+
+          <button
+            class="owner-import-close"
+            type="button"
+            aria-label="Fechar importação OBU AU"
+            [disabled]="
+              previewingObuAuImport
+              || importingObuAu
+            "
+            (click)="closeObuAuImportModal()"
+          >
+            ×
+          </button>
+
+        </header>
+
+
+        <div class="owner-import-body">
+
+          <div
+            *ngIf="obuAuImportError"
+            class="
+              owner-import-message
+              owner-import-error
+            "
+          >
+            {{ obuAuImportError }}
+          </div>
+
+
+          <label class="owner-import-file">
+
+            <span>
+              Selecionar planilha
+            </span>
+
+            <input
+              type="file"
+              accept=".xlsx"
+              [disabled]="
+                previewingObuAuImport
+                || importingObuAu
+              "
+              (change)="
+                onObuAuImportFileSelected($event)
+              "
+            >
+
+          </label>
+
+
+          <div
+            *ngIf="obuAuImportFile"
+            class="owner-import-filename"
+          >
+            {{ obuAuImportFile.name }}
+          </div>
+
+
+          <button
+            *ngIf="
+              obuAuImportFile
+              && !obuAuImportPreview
+            "
+            class="owner-import-analyze"
+            type="button"
+            [disabled]="previewingObuAuImport"
+            (click)="previewObuAuImport()"
+          >
+            {{
+              previewingObuAuImport
+                ? 'Analisando arquivo...'
+                : 'Analisar arquivo'
+            }}
+          </button>
+
+
+          <ng-container
+            *ngIf="
+              obuAuImportPreview
+              as preview
+            "
+          >
+
+            <h3
+              class="owner-import-preview-title"
+            >
+              Resultado da análise
+            </h3>
+
+
+            <div
+              class="
+                owner-import-summary
+                obu-import-summary
+              "
+            >
+
+              <div
+                class="owner-import-summary-card"
+              >
+                <span>Total</span>
+                <strong>
+                  {{ preview.total_rows }}
+                </strong>
+              </div>
+
+
+              <div
+                class="
+                  owner-import-summary-card
+                  owner-import-new
+                "
+              >
+                <span>Novos</span>
+                <strong>
+                  {{ preview.new_rows }}
+                </strong>
+              </div>
+
+
+              <div
+                class="
+                  owner-import-summary-card
+                  owner-import-updates
+                "
+              >
+                <span>Atualizações</span>
+                <strong>
+                  {{ preview.update_rows }}
+                </strong>
+              </div>
+
+
+              <div
+                class="owner-import-summary-card"
+              >
+                <span>Duplicados</span>
+                <strong>
+                  {{ preview.duplicate_rows }}
+                </strong>
+              </div>
+
+
+              <div
+                class="
+                  owner-import-summary-card
+                  owner-import-conflicts
+                "
+              >
+                <span>Conflitos</span>
+                <strong>
+                  {{ preview.conflict_rows }}
+                </strong>
+              </div>
+
+
+              <div
+                class="
+                  owner-import-summary-card
+                  owner-import-errors
+                "
+              >
+                <span>Erros</span>
+                <strong>
+                  {{ preview.error_rows }}
+                </strong>
+              </div>
+
+            </div>
+
+
+            <div
+              *ngIf="
+                !preview.can_import
+                && preview.new_rows === 0
+                && preview.update_rows === 0
+                && preview.conflict_rows === 0
+                && preview.error_rows === 0
+              "
+              class="
+                owner-import-message
+                owner-import-info
+              "
+            >
+              Todas as relações já estão atualizadas.
+            </div>
+
+
+            <div class="owner-import-table-wrap">
+
+              <table class="owner-import-table">
+
+                <thead>
+                  <tr>
+                    <th>Linha</th>
+                    <th>OBU</th>
+                    <th>AU</th>
+                    <th>Situação</th>
+                    <th>Detalhe</th>
+                  </tr>
+                </thead>
+
+
+                <tbody>
+
+                  <tr
+                    *ngFor="
+                      let row
+                      of preview.rows
+                    "
+                  >
+
+                    <td>
+                      {{ row.excel_row }}
+                    </td>
+
+                    <td>
+                      {{ row.obu || '-' }}
+                    </td>
+
+                    <td>
+                      {{ row.au || '-' }}
+                    </td>
+
+                    <td>
+
+                      <span
+                        class="owner-import-status"
+                        [class.owner-import-status-new]="
+                          row.status === 'NOVO'
+                        "
+                        [class.owner-import-status-update]="
+                          row.status === 'ATUALIZAR'
+                        "
+                        [class.owner-import-status-duplicate]="
+                          row.status === 'DUPLICADO'
+                        "
+                        [class.owner-import-status-conflict]="
+                          row.status === 'CONFLITO'
+                        "
+                        [class.owner-import-status-error]="
+                          row.status === 'ERRO'
+                        "
+                      >
+                        {{ row.status }}
+                      </span>
+
+                    </td>
+
+                    <td>
+                      {{ row.message }}
+                    </td>
+
+                  </tr>
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </ng-container>
+
+        </div>
+
+
+        <footer class="owner-import-footer">
+
+          <button
+            class="owner-import-cancel"
+            type="button"
+            [disabled]="
+              previewingObuAuImport
+              || importingObuAu
+            "
+            (click)="closeObuAuImportModal()"
+          >
+            Fechar
+          </button>
+
+
+          <button
+            *ngIf="obuAuImportPreview"
+            class="owner-import-submit"
+            type="button"
+            [disabled]="
+              !obuAuImportPreview.can_import
+              || importingObuAu
+            "
+            (click)="importObuAu()"
+          >
+            {{
+              importingObuAu
+                ? 'Importando...'
+                : 'Importar'
+            }}
+          </button>
+
+        </footer>
+
+      </section>
+    </div>
 
     <!-- ================================================= -->
     <!-- GRID INFERIOR -->
