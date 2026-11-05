@@ -43,15 +43,28 @@ const routes: Routes = [
 
     children: [
 
-      // Dashboard
       {
         path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard',
+      },
+
+      // Dashboard
+      {
+        path: 'dashboard',
         loadChildren: () =>
           import(
             './modules/dashboard/dashboard.module'
           ).then(
             m => m.DashboardModule
           ),
+      },
+
+      {
+        path: 'relatorio-gap',
+        loadChildren: () =>
+          import('./modules/gap-report/gap-report.module')
+            .then(m => m.GapReportModule),
       },
 
       // ECO Control
@@ -65,11 +78,11 @@ const routes: Routes = [
           ),
       },
 
-      // Relatórios / Histórico
+      // Histórico de Alterações
       // Só acessa quem possuir
       // can_view_history
       {
-        path: 'relatorios',
+        path: 'historico-alteracoes',
         canActivate: [historyGuard],
         loadChildren: () =>
           import(
@@ -77,6 +90,12 @@ const routes: Routes = [
           ).then(
             m => m.ReportsModule
           ),
+      },
+
+      {
+        path: 'relatorios',
+        pathMatch: 'full',
+        redirectTo: 'historico-alteracoes',
       },
 
       // =========================

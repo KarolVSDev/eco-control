@@ -448,6 +448,17 @@ def select_release_date(
 # CÁLCULOS DA ECO
 # =========================================================
 
+def calculate_gap_14d(row):
+    """Calendar days from Effective Date to R&D FINISH (1), only when released."""
+    if normalize_status(getattr(row, "status", None)) != "RELEASED":
+        return None
+
+    return days_between(
+        getattr(row, "effective_date", None),
+        getattr(row, "second_aprov_rd_finish_1", None),
+    )
+
+
 def compute_eco_fields(
     row,
     *,
@@ -948,7 +959,11 @@ def compute_eco_fields(
     # RESULTADO
     # =====================================================
 
+    gap_14d = calculate_gap_14d(row)
+
     return {
+        "gap_14d": gap_14d,
+        "requires_gap_14d_note": gap_14d is not None and gap_14d > 14,
         "gap":
             gap,
 

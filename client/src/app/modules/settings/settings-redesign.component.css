@@ -1,0 +1,404 @@
+.settings-page {
+  width: min(100%, 1720px);
+  padding: 28px 30px 36px;
+  color: #d7d9e0;
+}
+
+.settings-page .settings-header {
+  align-items: flex-end;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #20232d;
+}
+
+.settings-page .title {
+  color: #f4f4f6;
+  font-size: 25px;
+  line-height: 1.25;
+}
+
+.settings-page .subtitle {
+  max-width: 720px;
+  margin-top: 7px;
+  color: #959aa7;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.settings-page .settings-message {
+  margin-top: 14px;
+  border-radius: 6px;
+}
+
+.settings-page .settings-loading {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #292d38;
+  border-radius: 7px;
+  background: #11141b;
+  color: #a4a8b2;
+}
+
+.settings-page .settings-card {
+  padding: 19px;
+  border: 1px solid #272b35;
+  border-radius: 8px;
+  background: #0f1118;
+  box-shadow: 0 0 25px -8px rgba(225, 29, 72, 0.1);
+}
+
+.settings-page .obu-card {
+  margin-top: 20px;
+}
+
+.settings-page .settings-card-header {
+  min-height: 42px;
+  margin-bottom: 15px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #232630;
+}
+
+.settings-page .settings-card-header h2 {
+  color: #f0f1f4;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.settings-page .settings-card-header h2::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  border-radius: 2px;
+  background: #e11d48;
+  content: '';
+  vertical-align: 1px;
+}
+
+.settings-page .settings-card-header h2 span {
+  color: #858b99;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.settings-page .settings-input,
+.settings-page .settings-select {
+  min-height: 39px;
+  border: 1px solid #2a2e3a;
+  border-radius: 6px;
+  background: #0b0e14;
+  color: #e4e6eb;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.settings-page .settings-input {
+  padding: 0 12px;
+}
+
+.settings-page .settings-select {
+  padding-left: 12px;
+}
+
+.settings-page .settings-input::placeholder {
+  color: #6f7582;
+}
+
+.settings-page .settings-input:focus,
+.settings-page .settings-select:focus {
+  border-color: #e11d48;
+  background: #0b0e14;
+  box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.28);
+  outline: none;
+}
+
+.settings-page .settings-select option {
+  background: #11141b;
+  color: #e4e6eb;
+}
+
+.settings-page .settings-add-button {
+  width: 39px;
+  height: 39px;
+  border: 1px solid #e11d48;
+  border-radius: 6px;
+  background: #e11d48;
+  box-shadow: 0 5px 16px rgba(225, 29, 72, 0.16);
+  font-size: 23px;
+}
+
+.settings-page .settings-add-button:hover {
+  border-color: #f43f5e;
+  background: #f43f5e;
+}
+
+.settings-page .obu-add-row {
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.settings-page .obu-add-row .settings-select {
+  width: 142px;
+}
+
+.settings-page .obu-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.settings-page .obu-item {
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid #222630;
+  border-radius: 6px;
+  background: #141720;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.settings-page .obu-item:hover {
+  border-color: #343947;
+  background: #181b25;
+}
+
+.settings-page .obu-code {
+  color: #dfe1e7;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+}
+
+.settings-page .obu-item-right strong {
+  min-width: 40px;
+  padding: 4px 7px;
+  border: 1px solid rgba(225, 29, 72, 0.25);
+  border-radius: 4px;
+  background: rgba(136, 19, 55, 0.2);
+  color: #fb7185;
+  font-size: 11px;
+  text-align: center;
+}
+
+.settings-page .settings-icon-button {
+  width: 27px;
+  height: 27px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #777d8a;
+  font-size: 14px;
+}
+
+.settings-page .settings-icon-button:hover {
+  border-color: #333845;
+  background: #222630;
+  color: #e5e7eb;
+}
+
+.settings-page .settings-icon-button.delete:hover {
+  border-color: rgba(225, 29, 72, 0.2);
+  background: rgba(225, 29, 72, 0.12);
+  color: #fb7185;
+}
+
+.settings-page .settings-icon-button.save:hover {
+  border-color: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+}
+
+.settings-page .settings-select.compact {
+  min-height: 31px;
+  border-radius: 5px;
+}
+
+.settings-page .settings-bottom-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-top: 14px;
+}
+
+.settings-page .owner-add-row {
+  grid-template-columns: minmax(0, 1fr) 112px 39px;
+  gap: 8px;
+}
+
+.settings-page .manager-add-row {
+  grid-template-columns: minmax(0, 1fr) 39px;
+  gap: 8px;
+}
+
+.settings-page .simple-list {
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.settings-page .owner-group-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 9px;
+  max-height: 320px;
+  padding-right: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #343b4c #0c0e14;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.settings-page .owner-group-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-page .owner-group-list::-webkit-scrollbar-track {
+  border-radius: 3px;
+  background: #0c0e14;
+}
+
+.settings-page .owner-group-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: #343b4c;
+}
+
+.settings-page .owner-group-list::-webkit-scrollbar-thumb:hover {
+  background: #e11d48;
+}
+
+.settings-page .simple-list-item {
+  min-height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid #222630;
+  border-radius: 6px;
+  background: #141720;
+  color: #d9dce3;
+  font-size: 12px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.settings-page .simple-list-item:hover {
+  border-color: #343947;
+  background: #181b25;
+}
+
+.settings-page .simple-list-item strong {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.settings-page .simple-list-item strong.group-bom {
+  border: 1px solid rgba(225, 29, 72, 0.3);
+  background: rgba(136, 19, 55, 0.24);
+  color: #fb7185;
+}
+
+.settings-page .simple-list-item strong.group-mec {
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(30, 58, 138, 0.3);
+  color: #60a5fa;
+}
+
+.settings-page .simple-list-item strong.group-dev {
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(6, 78, 59, 0.3);
+  color: #34d399;
+}
+
+.settings-page .simple-list-item strong.group-hw {
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(120, 53, 15, 0.3);
+  color: #fbbf24;
+}
+
+.settings-page .owner-group-list .settings-empty {
+  grid-column: 1 / -1;
+}
+
+.settings-page .settings-empty {
+  padding: 12px 2px;
+  color: #747a87;
+  font-size: 11px;
+}
+
+@media (max-width: 1150px) {
+  .settings-page .obu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-page .settings-bottom-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .settings-page {
+    padding: 20px 16px 28px;
+  }
+
+  .settings-page .settings-card {
+    padding: 15px;
+  }
+
+  .settings-page .obu-add-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 39px;
+    align-items: center;
+  }
+
+  .settings-page .obu-add-row .settings-select {
+    width: 100%;
+  }
+
+  .settings-page .obu-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page .owner-group-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-page .owner-add-row {
+    grid-template-columns: minmax(0, 1fr) 92px 39px;
+  }
+
+  .settings-page .manager-add-row {
+    grid-template-columns: minmax(0, 1fr) 39px;
+  }
+}
+
+@media (max-width: 420px) {
+  .settings-page .obu-add-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .settings-page .obu-add-row .settings-add-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .settings-page .owner-add-row {
+    grid-template-columns: minmax(0, 1fr) 39px;
+  }
+
+  .settings-page .owner-group-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page .owner-add-row .group-select {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .settings-page .owner-add-row .settings-add-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: 39px;
+    height: 100%;
+  }
+}

@@ -93,7 +93,7 @@
     <span
       *ngFor="let d of data"
     >
-      {{ d.name }}
+      {{ d.name | monthLabel }}
     </span>
 
   </div>
@@ -107,11 +107,11 @@
   >
 
     <strong>
-      {{ tooltipName }}
+      {{ tooltipName | monthLabel }}
     </strong>
 
     <span>
-      value : {{ tooltipValue }}
+      qty : {{ tooltipValue }}
     </span>
 
   </div>

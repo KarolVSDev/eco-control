@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import (
     select,
     func,
@@ -5,26 +7,14 @@ from sqlalchemy import (
 
 from app.models.entities import Eco
 from app.utils.eco_calculations import (
+    MONTH_ABBR,
     compute_eco_fields,
 )
 
 
 class DashboardService:
 
-    MONTH_ORDER = [
-        "JAN",
-        "FEB",
-        "MAR",
-        "APR",
-        "MAY",
-        "JUN",
-        "JUL",
-        "AUG",
-        "SEP",
-        "OCT",
-        "NOV",
-        "DEC",
-    ]
+    MONTH_ORDER = MONTH_ABBR
 
 
     def __init__(
@@ -100,13 +90,12 @@ class DashboardService:
     # CONSULTA BASE
     # =====================================================
 
-    def _rows(
+    def _apply_filters(
         self,
+        query,
         month=None,
+        year=None,
     ):
-        query = select(Eco)
-
-
         if month:
 
             normalized_month = (
@@ -127,6 +116,28 @@ class DashboardService:
             )
 
 
+        if year is not None:
+            query = query.where(
+                Eco.az_eco_register_date >= date(year, 1, 1),
+                Eco.az_eco_register_date < date(year + 1, 1, 1),
+            )
+
+
+        return query
+
+
+    def _rows(
+        self,
+        month=None,
+        year=None,
+    ):
+        query = self._apply_filters(
+            select(Eco),
+            month=month,
+            year=year,
+        )
+
+
         return (
             self.db
             .scalars(query)
@@ -138,18 +149,21 @@ class DashboardService:
     # MESES
     # =====================================================
 
-    def months(self):
+    def months(self, year=None):
 
         values = (
             self.db
             .scalars(
-                select(
-                    Eco.month
-                )
-                .where(
-                    Eco.month.is_not(
-                        None
+                self._apply_filters(
+                    select(
+                        Eco.month
                     )
+                    .where(
+                        Eco.month.is_not(
+                            None
+                        )
+                    ),
+                    year=year,
                 )
             )
             .all()
@@ -176,12 +190,45 @@ class DashboardService:
 
 
     # =====================================================
+    # ANOS
+    # =====================================================
+
+    def years(self):
+
+        dates = (
+            self.db
+            .scalars(
+                select(
+                    Eco.az_eco_register_date
+                )
+                .where(
+                    Eco.az_eco_register_date.is_not(
+                        None
+                    )
+                )
+            )
+            .all()
+        )
+
+
+        return sorted(
+            {
+                value.year
+                for value
+                in dates
+                if value is not None
+            },
+            reverse=True,
+        )
+
+
+    # =====================================================
     # CARDS
     # =====================================================
 
-    def stats(self):
+    def stats(self, year=None):
 
-        rows = self._rows()
+        rows = self._rows(year=year)
 
 
         computed_rows = [
@@ -304,6 +351,7 @@ class DashboardService:
         self,
         dimension,
         month=None,
+        year=None,
     ):
 
         mapping = {
@@ -332,37 +380,18 @@ class DashboardService:
         ]
 
 
-        query = (
+        query = self._apply_filters(
             select(
                 column,
                 func.count(
                     Eco.id
                 ),
-            )
-            .group_by(
-                column
-            )
+            ),
+            month=month,
+            year=year,
+        ).group_by(
+            column
         )
-
-
-        if month:
-
-            normalized_month = (
-                self._normalize_month(
-                    month
-                )
-            )
-
-
-            query = query.where(
-                func.upper(
-                    func.trim(
-                        Eco.month
-                    )
-                )
-                ==
-                normalized_month
-            )
 
 
         merged = {}
@@ -419,13 +448,13 @@ class DashboardService:
     # EVOLUÇÃO POR MÊS
     # =====================================================
 
-    def evolution(self):
+    def evolution(self, year=None):
 
         grouped = {
             item["name"]:
                 item["value"]
             for item
-            in self.group_by_month()
+            in self.group_by_month(year=year)
         }
 
 
@@ -450,20 +479,25 @@ class DashboardService:
     # AGRUPAMENTO POR MÊS
     # =====================================================
 
-    def group_by_month(self):
+    def group_by_month(self, year=None):
+
+        query = self._apply_filters(
+            select(
+                Eco.month,
+                func.count(
+                    Eco.id
+                ),
+            ),
+            year=year,
+        ).group_by(
+            Eco.month
+        )
+
 
         rows = (
             self.db
             .execute(
-                select(
-                    Eco.month,
-                    func.count(
-                        Eco.id
-                    ),
-                )
-                .group_by(
-                    Eco.month
-                )
+                query
             )
             .all()
         )
@@ -525,6 +559,7 @@ class DashboardService:
     def delay(
         self,
         month=None,
+        year=None,
     ):
 
         categories = {
@@ -543,7 +578,8 @@ class DashboardService:
 
 
         for row in self._rows(
-            month
+            month=month,
+            year=year,
         ):
 
             gap = (
@@ -607,7 +643,7 @@ class DashboardService:
     # RESUMO MENSAL
     # =====================================================
 
-    def monthly_summary(self):
+    def monthly_summary(self, year=None):
 
         result = []
 
@@ -615,7 +651,8 @@ class DashboardService:
         for month in self.MONTH_ORDER:
 
             rows = self._rows(
-                month
+                month=month,
+                year=year,
             )
 
 
