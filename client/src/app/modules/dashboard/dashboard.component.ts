@@ -6,6 +6,7 @@ import {
 import {
   finalize,
   forkJoin,
+  Subscription,
 } from 'rxjs';
 
 import {
@@ -62,6 +63,10 @@ export class DashboardComponent
 
   summary: any[] = [];
 
+  availableYears: number[] = [];
+
+  selectedYear: number | null = null;
+
 
   // =====================================================
   // ESTADO GERAL
@@ -70,6 +75,17 @@ export class DashboardComponent
   loading = false;
 
   loadError = '';
+
+
+  // =====================================================
+  // BACKUP ANUAL
+  // =====================================================
+
+  showAnnualBackupWarning = false;
+
+  backupExporting = false;
+
+  backupError = '';
 
 
   // =====================================================
@@ -106,6 +122,15 @@ export class DashboardComponent
     };
 
 
+  private chartRequests:
+    Partial<
+      Record<
+        DashboardFilter,
+        Subscription
+      >
+    > = {};
+
+
   // =====================================================
   // FILTROS
   // =====================================================
@@ -136,7 +161,9 @@ export class DashboardComponent
 
   ngOnInit(): void {
 
-    this.loadDashboard();
+    this.checkAnnualBackupWarning();
+
+    this.loadAvailableYears();
   }
 
 
@@ -144,15 +171,67 @@ export class DashboardComponent
   // CARREGAR DASHBOARD
   // =====================================================
 
-  loadDashboard(): void {
+  private loadAvailableYears(): void {
 
-    if (
-      this.loading
-    ) {
 
-      return;
-    }
+    this.loading = true;
 
+    this.loadError = '';
+
+
+    this.api
+      .get<number[]>(
+        '/dashboard/years'
+      )
+      .subscribe({
+
+        next: years => {
+
+          this.availableYears = years;
+
+
+          const currentYear =
+            new Date().getFullYear();
+
+
+          this.selectedYear =
+            years.includes(currentYear)
+              ? currentYear
+              : years[0] ?? null;
+
+
+          if (this.selectedYear === null) {
+
+            this.clearDashboardData();
+            this.loading = false;
+
+            return;
+          }
+
+
+          this.loadDashboard(
+            this.selectedYear
+          );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao carregar anos do Dashboard:',
+            error,
+          );
+
+
+          this.loading = false;
+          this.loadError =
+            'Não foi possível carregar os anos disponíveis. Tente novamente.';
+        },
+      });
+  }
+
+
+  loadDashboard(year: number): void {
 
     this.loading = true;
 
@@ -163,58 +242,70 @@ export class DashboardComponent
 
       stats:
         this.api.get<DashboardStats>(
-          '/dashboard/stats'
+          '/dashboard/stats',
+          { year },
         ),
 
       months:
         this.api.get<string[]>(
-          '/dashboard/months'
+          '/dashboard/months',
+          { year },
         ),
 
       status:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/status'
+          '/dashboard/group/status',
+          { year },
         ),
 
       groups:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/group'
+          '/dashboard/group/group',
+          { year },
         ),
 
       owner:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/owner'
+          '/dashboard/group/owner',
+          { year },
         ),
 
       obu:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/obu'
+          '/dashboard/group/obu',
+          { year },
         ),
 
       au:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/au'
+          '/dashboard/group/au',
+          { year },
         ),
 
       types:
         this.api.get<ChartDatum[]>(
-          '/dashboard/group/eco_type'
+          '/dashboard/group/eco_type',
+          { year },
         ),
 
       evolution:
         this.api.get<ChartDatum[]>(
-          '/dashboard/evolution'
+          '/dashboard/evolution',
+          { year },
         ),
 
       delay:
         this.api.get<ChartDatum[]>(
-          '/dashboard/delay'
+          '/dashboard/delay',
+          { year },
         ),
 
       summary:
         this.api.get<any[]>(
-          '/dashboard/monthly-summary'
+          '/dashboard/monthly-summary',
+          { year },
         ),
+
     })
       .pipe(
         finalize(
@@ -261,6 +352,7 @@ export class DashboardComponent
 
           this.summary =
             response.summary;
+
         },
 
 
@@ -285,7 +377,292 @@ export class DashboardComponent
 
   retry(): void {
 
-    this.loadDashboard();
+    if (this.selectedYear === null) {
+
+      this.loadAvailableYears();
+
+      return;
+    }
+
+
+    this.loadDashboard(
+      this.selectedYear
+    );
+  }
+
+
+  // =====================================================
+  // FILTRO GLOBAL DE ANO
+  // =====================================================
+
+  onGlobalYearChange(event: Event): void {
+
+    const year = Number(
+      (event.target as HTMLSelectElement).value
+    );
+
+
+    if (
+      !Number.isInteger(year)
+      || !this.availableYears.includes(year)
+      || year === this.selectedYear
+    ) {
+
+      return;
+    }
+
+
+    this.selectedYear = year;
+
+    this.resetLocalMonthFilters();
+
+    this.loadDashboard(year);
+  }
+
+
+  private resetLocalMonthFilters(): void {
+
+    this.cancelChartRequests();
+
+    this.filters = {
+      status: '',
+      group: '',
+      owner: '',
+      obu: '',
+      au: '',
+      eco_type: '',
+      delay: '',
+    };
+
+
+    this.chartErrors = {
+      status: '',
+      group: '',
+      owner: '',
+      obu: '',
+      au: '',
+      eco_type: '',
+      delay: '',
+    };
+
+
+    this.chartLoading = {
+      status: false,
+      group: false,
+      owner: false,
+      obu: false,
+      au: false,
+      eco_type: false,
+      delay: false,
+    };
+  }
+
+
+  private cancelChartRequests(): void {
+
+    Object.values(
+      this.chartRequests
+    ).forEach(
+      request => request?.unsubscribe()
+    );
+
+
+    this.chartRequests = {};
+  }
+
+
+  private clearDashboardData(): void {
+
+    this.months = [];
+    this.stats = null;
+    this.status = [];
+    this.groups = [];
+    this.owner = [];
+    this.obu = [];
+    this.au = [];
+    this.types = [];
+    this.evolution = [];
+    this.delay = [];
+    this.summary = [];
+
+    this.resetLocalMonthFilters();
+  }
+
+
+  // =====================================================
+  // AVISO DE BACKUP ANUAL
+  // =====================================================
+
+  private checkAnnualBackupWarning(): void {
+
+    const now =
+      new Date();
+
+    const month =
+      now.getMonth();
+
+
+    if (
+      month < 9
+      ||
+      month > 11
+    ) {
+
+      this.showAnnualBackupWarning =
+        false;
+
+      return;
+    }
+
+
+    const year =
+      now.getFullYear();
+
+
+    const dismissed =
+      sessionStorage.getItem(
+        `eco-control-backup-warning-${year}`,
+      );
+
+
+    this.showAnnualBackupWarning =
+      dismissed !== 'true';
+  }
+
+
+  dismissAnnualBackupWarning(): void {
+
+    const year =
+      new Date()
+        .getFullYear();
+
+
+    sessionStorage.setItem(
+      `eco-control-backup-warning-${year}`,
+      'true',
+    );
+
+
+    this.showAnnualBackupWarning =
+      false;
+  }
+
+
+  exportAnnualBackup(): void {
+
+    if (
+      this.backupExporting
+    ) {
+
+      return;
+    }
+
+
+    this.backupExporting =
+      true;
+
+    this.backupError = '';
+
+
+    this.api
+      .getBlob(
+        '/ecos/export'
+      )
+      .pipe(
+        finalize(
+          () => {
+
+            this.backupExporting =
+              false;
+          }
+        )
+      )
+      .subscribe({
+
+        next: blob => {
+
+          const url =
+            URL.createObjectURL(
+              blob
+            );
+
+
+          const link =
+            document.createElement(
+              'a'
+            );
+
+
+          const now =
+            new Date();
+
+
+          const year =
+            now.getFullYear();
+
+
+          const month =
+            String(
+              now.getMonth() + 1
+            ).padStart(
+              2,
+              '0',
+            );
+
+
+          const day =
+            String(
+              now.getDate()
+            ).padStart(
+              2,
+              '0',
+            );
+
+
+          link.href =
+            url;
+
+          link.download =
+            `ECO_CONTROL_BACKUP_${year}-${month}-${day}.xlsx`;
+
+
+          document.body
+            .appendChild(
+              link
+            );
+
+          link.click();
+
+          document.body
+            .removeChild(
+              link
+            );
+
+
+          URL.revokeObjectURL(
+            url
+          );
+        },
+
+
+        error: error => {
+
+          console.error(
+            'Erro ao gerar backup anual:',
+            error,
+          );
+
+
+          const detail =
+            error.error?.detail;
+
+
+          this.backupError =
+            typeof detail === 'string'
+              ? detail
+              : 'Não foi possível gerar o backup dos dados.';
+        },
+      });
   }
 
 
@@ -302,6 +679,7 @@ export class DashboardComponent
       this.chartLoading[
         kind
       ]
+      || this.selectedYear === null
     ) {
 
       return;
@@ -331,6 +709,7 @@ export class DashboardComponent
               '/dashboard/delay',
               {
                 month,
+                year: this.selectedYear,
               },
             )
 
@@ -339,11 +718,12 @@ export class DashboardComponent
               `/dashboard/group/${kind}`,
               {
                 month,
+                year: this.selectedYear,
               },
             );
 
 
-    request
+    this.chartRequests[kind] = request
       .pipe(
         finalize(
           () => {
@@ -351,6 +731,8 @@ export class DashboardComponent
             this.chartLoading[
               kind
             ] = false;
+
+            delete this.chartRequests[kind];
           }
         )
       )

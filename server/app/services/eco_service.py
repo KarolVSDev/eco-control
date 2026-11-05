@@ -15,31 +15,16 @@ from app.models.entities import (
     FieldPermission,
 )
 
+from app.schemas.eco import EcoCreate
 from app.repository.eco_repository import EcoRepository
 from app.repository.history_repository import HistoryRepository
 from app.repository.settings_repository import SettingsRepository
 
 from app.utils.eco_calculations import (
+    MONTH_ABBR,
     compute_eco_fields,
     normalize_text,
 )
-
-
-MONTHS = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-]
-
 
 LABELS = {
     "status": "STATUS",
@@ -126,6 +111,10 @@ class EcoService:
                 else key
             )
 
+
+            if key in {"gap_14d_note"}:
+                allowed[key] = value
+                continue
 
             permission = permissions.get(
                 external_key
@@ -888,7 +877,8 @@ class EcoService:
         ) in permissions.items():
 
             if (
-                permission.can_view
+                field_key not in {"effective_date", "gap_14d", "gap_14d_note"}
+                and permission.can_view
                 is False
             ):
 
@@ -905,7 +895,11 @@ class EcoService:
     # CREATE NORMAL
     # =========================================================
 
-    def create(
+    def create(self, payload):
+        return self.serialize(self._create_eco(payload))
+
+
+    def _create_eco(
         self,
         payload,
     ):
@@ -1035,7 +1029,7 @@ class EcoService:
             group_name=group,
             item=next_item,
             position=next_position,
-            month=MONTHS[
+            month=MONTH_ABBR[
                 datetime.now().month - 1
             ],
         )
@@ -1097,9 +1091,7 @@ class EcoService:
         self.db.commit()
 
 
-        return self.serialize(
-            eco
-        )
+        return eco
 
 
     # =========================================================
@@ -1343,7 +1335,7 @@ class EcoService:
                     insertion_position
                 ),
 
-                month=MONTHS[
+                month=MONTH_ABBR[
                     datetime.now().month - 1
                 ],
 
@@ -1608,6 +1600,161 @@ class EcoService:
         )
 
 
+        self._apply_update(eco, raw_changes)
+        return self.serialize(eco)
+
+
+    def sync_automation(self, payload):
+
+        if (
+            payload.obu is not None
+            and payload.obu.strip()
+        ):
+            matches = (
+                self.repo.find_exact_code_and_obu(
+                    payload.eco,
+                    payload.obu,
+                )
+            )
+
+            if len(matches) > 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Combinação ECO + OBU ambígua: "
+                        "mais de um registro encontrado"
+                    ),
+                )
+
+        else:
+            # Compatibilidade para chamadas antigas/manuais
+            # que ainda não enviem OBU.
+            matches = (
+                self.repo.find_exact_code(
+                    payload.eco
+                )
+            )
+
+            if len(matches) > 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Código ECO ambíguo: "
+                        "mais de um registro encontrado. "
+                        "Informe também o OBU."
+                    ),
+                )
+
+        # -----------------------------------------------------
+        # CAMPOS RECEBIDOS
+        # -----------------------------------------------------
+
+        data = {
+            key: value
+            for key, value
+            in payload.model_dump(
+                exclude_unset=True
+            ).items()
+            if value is not None
+            and not (
+                isinstance(value, str)
+                and not value.strip()
+            )
+        }
+
+
+
+        origin_eco = data.pop(
+            "origin_eco",
+            None,
+        )
+
+        if origin_eco is not None:
+            data[
+                "hz_in_kr_eco_1"
+            ] = origin_eco
+        # -----------------------------------------------------
+        # NOME EXTERNO DOS CAMPOS
+        # -----------------------------------------------------
+
+        def external_field_name(key):
+            if key == "group_name":
+                return "group"
+
+            if key == "hz_in_kr_eco_1":
+                return "origin_eco"
+
+            return key
+
+        # -----------------------------------------------------
+        # CRIAÇÃO
+        # -----------------------------------------------------
+
+        if not matches:
+            try:
+                eco = self._create_eco(
+                    EcoCreate(**data)
+                )
+
+            except Exception:
+                self.db.rollback()
+                raise
+
+            return {
+                "status": "created",
+                "eco_id": str(eco.id),
+                "eco": eco.eco,
+                "changed_fields": [
+                    external_field_name(key)
+                    for key in data
+                ],
+            }
+
+        # -----------------------------------------------------
+        # ATUALIZAÇÃO
+        # -----------------------------------------------------
+
+        eco = matches[0]
+
+        changes = {
+            key: value
+            for key, value
+            in data.items()
+            if key != "eco"
+        }
+
+        changed_fields = (
+            self._apply_update(
+                eco,
+                changes,
+            )
+            if changes
+            else []
+        )
+
+        return {
+            "status": (
+                "updated"
+                if changed_fields
+                else "unchanged"
+            ),
+            "eco_id": str(eco.id),
+            "eco": eco.eco,
+            "changed_fields": [
+                external_field_name(key)
+                for key in changed_fields
+            ],
+        }
+
+    def _apply_update(self, eco, raw_changes):
+        try:
+            return self._apply_update_transaction(eco, raw_changes)
+        except Exception:
+            self.db.rollback()
+            raise
+
+
+    def _apply_update_transaction(self, eco, raw_changes):
         changes = {
             key: normalize_text(
                 value
@@ -1727,11 +1874,7 @@ class EcoService:
 
 
         self.db.commit()
-
-
-        return self.serialize(
-            eco
-        )
+        return list(updated_fields)
 
 
     # =========================================================

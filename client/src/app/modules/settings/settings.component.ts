@@ -14,11 +14,66 @@ interface ObuAuMapping {
   au: string;
 }
 
+type ObuAuImportStatus =
+  'NOVO'
+  | 'ATUALIZAR'
+  | 'DUPLICADO'
+  | 'CONFLITO'
+  | 'ERRO';
+
+
+interface ObuAuImportRow {
+  excel_row: number;
+  obu: string;
+  au: string;
+  status: ObuAuImportStatus;
+  message: string;
+}
+
+
+interface ObuAuImportPreview {
+  total_rows: number;
+  new_rows: number;
+  update_rows: number;
+  duplicate_rows: number;
+  conflict_rows: number;
+  error_rows: number;
+  can_import: boolean;
+  rows: ObuAuImportRow[];
+}
+
 
 interface OwnerGroupMapping {
   id: string;
   owner: string;
   group: string;
+}
+
+
+type OwnerImportStatus =
+  'NOVO'
+  | 'DUPLICADO'
+  | 'CONFLITO'
+  | 'ERRO';
+
+
+interface OwnerImportRow {
+  excel_row: number;
+  owner: string;
+  group: string;
+  status: OwnerImportStatus;
+  message: string;
+}
+
+
+interface OwnerImportPreview {
+  total_rows: number;
+  new_rows: number;
+  duplicate_rows: number;
+  conflict_rows: number;
+  error_rows: number;
+  can_import: boolean;
+  rows: OwnerImportRow[];
 }
 
 
@@ -30,7 +85,10 @@ interface Manager {
 
 @Component({
   templateUrl: './settings.component.html',
-  styleUrls: ['./settings.component.css'],
+  styleUrls: [
+    './settings.component.css',
+    './settings-redesign.component.css',
+  ],
 })
 export class SettingsComponent
   implements OnInit {
@@ -84,6 +142,19 @@ export class SettingsComponent
 
   newAu = '';
 
+  obuAuImportModalOpen = false;
+
+  obuAuImportFile: File | null = null;
+
+  obuAuImportPreview:
+    ObuAuImportPreview | null = null;
+
+  previewingObuAuImport = false;
+
+  importingObuAu = false;
+
+  obuAuImportError = '';
+
 
   editingObuAu:
     ObuAuMapping | null = null;
@@ -109,6 +180,19 @@ export class SettingsComponent
   newOwner = '';
 
   newGroup = 'BOM';
+
+
+  ownerImportModalOpen = false;
+
+  ownerImportFile: File | null = null;
+
+  ownerImportPreview: OwnerImportPreview | null = null;
+
+  previewingOwnerImport = false;
+
+  importingOwners = false;
+
+  ownerImportError = '';
 
 
   // =====================================================
@@ -418,6 +502,324 @@ export class SettingsComponent
       });
   }
 
+  // =====================================================
+// OBU → AU - IMPORTAR
+// =====================================================
+
+openObuAuImportModal(): void {
+
+  this.clearMessages();
+
+  this.obuAuImportModalOpen = true;
+
+  this.obuAuImportFile = null;
+
+  this.obuAuImportPreview = null;
+
+  this.obuAuImportError = '';
+}
+
+
+closeObuAuImportModal(): void {
+
+  if (
+    this.previewingObuAuImport
+    || this.importingObuAu
+  ) {
+    return;
+  }
+
+  this.obuAuImportModalOpen = false;
+
+  this.obuAuImportFile = null;
+
+  this.obuAuImportPreview = null;
+
+  this.obuAuImportError = '';
+}
+
+
+onObuAuImportFileSelected(
+  event: Event,
+): void {
+
+  const input =
+    event.target as HTMLInputElement;
+
+  const file =
+    input.files?.[0]
+    ?? null;
+
+
+  this.obuAuImportFile = null;
+
+  this.obuAuImportPreview = null;
+
+  this.obuAuImportError = '';
+
+
+  if (!file) {
+    return;
+  }
+
+
+  if (
+    !file.name
+      .toLowerCase()
+      .endsWith('.xlsx')
+  ) {
+
+    this.obuAuImportError =
+      'Formato inválido. Envie um arquivo .xlsx.';
+
+    input.value = '';
+
+    return;
+  }
+
+
+  if (
+    file.size === 0
+  ) {
+
+    this.obuAuImportError =
+      'O arquivo enviado está vazio.';
+
+    input.value = '';
+
+    return;
+  }
+
+
+  if (
+    file.size
+    > 25 * 1024 * 1024
+  ) {
+
+    this.obuAuImportError =
+      'O arquivo excede o limite máximo de 25 MB.';
+
+    input.value = '';
+
+    return;
+  }
+
+
+  this.obuAuImportFile =
+    file;
+}
+
+
+previewObuAuImport(): void {
+
+  if (
+    !this.obuAuImportFile
+    || this.previewingObuAuImport
+    || this.importingObuAu
+  ) {
+    return;
+  }
+
+
+  const formData =
+    new FormData();
+
+
+  formData.append(
+    'file',
+    this.obuAuImportFile,
+  );
+
+
+  this.previewingObuAuImport =
+    true;
+
+  this.obuAuImportError = '';
+
+
+  this.api
+    .post<ObuAuImportPreview>(
+      '/settings/obu-au/import/preview',
+      formData,
+    )
+    .subscribe({
+
+      next: response => {
+
+        this.obuAuImportPreview =
+          response;
+
+        this.previewingObuAuImport =
+          false;
+      },
+
+
+      error: error => {
+
+        this.obuAuImportError =
+          this.obuAuImportErrorMessage(
+            error,
+            'Não foi possível analisar a planilha.',
+          );
+
+        this.previewingObuAuImport =
+          false;
+      },
+    });
+}
+
+
+importObuAu(): void {
+
+  if (
+    !this.obuAuImportFile
+    || !this.obuAuImportPreview?.can_import
+    || this.previewingObuAuImport
+    || this.importingObuAu
+  ) {
+    return;
+  }
+
+
+  const formData =
+    new FormData();
+
+
+  formData.append(
+    'file',
+    this.obuAuImportFile,
+  );
+
+
+  this.importingObuAu =
+    true;
+
+  this.obuAuImportError = '';
+
+
+  this.api
+    .post<{
+      imported_rows: number;
+      updated_rows: number;
+      duplicate_rows: number;
+    }>(
+      '/settings/obu-au/import',
+      formData,
+    )
+    .subscribe({
+
+      next: response => {
+
+        const imported =
+          response.imported_rows;
+
+        const updated =
+          response.updated_rows;
+
+        const duplicates =
+          response.duplicate_rows;
+
+
+        const messages: string[] = [];
+
+
+        if (imported > 0) {
+
+          messages.push(
+            imported === 1
+              ? '1 relação criada.'
+              : `${imported} relações criadas.`,
+          );
+        }
+
+
+        if (updated > 0) {
+
+          messages.push(
+            updated === 1
+              ? '1 relação atualizada.'
+              : `${updated} relações atualizadas.`,
+          );
+        }
+
+
+        if (duplicates > 0) {
+
+          messages.push(
+            duplicates === 1
+              ? '1 duplicado ignorado.'
+              : `${duplicates} duplicados ignorados.`,
+          );
+        }
+
+
+        if (
+          imported === 0
+          && updated === 0
+        ) {
+
+          messages.push(
+            'Nenhuma alteração necessária.',
+          );
+        }
+
+
+        this.success =
+          messages.join(' ');
+
+
+        this.importingObuAu =
+          false;
+
+
+        this.closeObuAuImportModal();
+
+        this.load();
+      },
+
+
+      error: error => {
+
+        this.obuAuImportError =
+          this.obuAuImportErrorMessage(
+            error,
+            'Não foi possível importar as relações OBU → AU.',
+          );
+
+        this.importingObuAu =
+          false;
+      },
+    });
+}
+
+
+private obuAuImportErrorMessage(
+    error: any,
+    fallback: string,
+  ): string {
+
+    const detail =
+      error?.error?.detail;
+
+
+    if (
+      typeof detail === 'string'
+    ) {
+      return detail;
+    }
+
+
+    if (
+      typeof detail?.message
+      === 'string'
+    ) {
+      return detail.message;
+    }
+
+
+    return fallback;
+  }
+
 
   // =====================================================
   // OWNER → GROUP - CRIAR
@@ -481,6 +883,188 @@ export class SettingsComponent
           );
         },
       });
+  }
+
+
+  openOwnerImportModal(): void {
+
+    this.clearMessages();
+
+    this.ownerImportModalOpen = true;
+    this.ownerImportFile = null;
+    this.ownerImportPreview = null;
+    this.ownerImportError = '';
+  }
+
+
+  closeOwnerImportModal(): void {
+
+    if (
+      this.previewingOwnerImport
+      || this.importingOwners
+    ) {
+      return;
+    }
+
+    this.ownerImportModalOpen = false;
+    this.ownerImportFile = null;
+    this.ownerImportPreview = null;
+    this.ownerImportError = '';
+  }
+
+
+  onOwnerImportFileSelected(event: Event): void {
+
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    this.ownerImportFile = null;
+    this.ownerImportPreview = null;
+    this.ownerImportError = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      this.ownerImportError =
+        'Formato inválido. Envie um arquivo .xlsx.';
+      input.value = '';
+      return;
+    }
+
+    if (file.size === 0) {
+      this.ownerImportError =
+        'O arquivo enviado está vazio.';
+      input.value = '';
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      this.ownerImportError =
+        'O arquivo excede o limite máximo de 25 MB.';
+      input.value = '';
+      return;
+    }
+
+    this.ownerImportFile = file;
+  }
+
+
+  previewOwnerImport(): void {
+
+    if (
+      !this.ownerImportFile
+      || this.previewingOwnerImport
+      || this.importingOwners
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', this.ownerImportFile);
+
+    this.previewingOwnerImport = true;
+    this.ownerImportError = '';
+
+    this.api
+      .post<OwnerImportPreview>(
+        '/settings/owner-group/import/preview',
+        formData,
+      )
+      .subscribe({
+        next: response => {
+          this.ownerImportPreview = response;
+          this.previewingOwnerImport = false;
+        },
+        error: error => {
+          this.ownerImportError = this.ownerImportErrorMessage(
+            error,
+            'Não foi possível analisar a planilha.',
+          );
+          this.previewingOwnerImport = false;
+        },
+      });
+  }
+
+
+  importOwnerGroups(): void {
+
+    if (
+      !this.ownerImportFile
+      || !this.ownerImportPreview?.can_import
+      || this.previewingOwnerImport
+      || this.importingOwners
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', this.ownerImportFile);
+
+    this.importingOwners = true;
+    this.ownerImportError = '';
+
+    this.api
+      .post<{
+        imported_rows: number;
+        duplicate_rows: number;
+      }>(
+        '/settings/owner-group/import',
+        formData,
+      )
+      .subscribe({
+        next: response => {
+          const imported = response.imported_rows;
+          const duplicates = response.duplicate_rows;
+
+          if (imported === 0) {
+            this.success =
+              'Nenhum Owner novo foi encontrado.';
+          } else {
+            const duplicateMessage = duplicates === 1
+              ? '1 duplicado foi ignorado.'
+              : `${duplicates} duplicados foram ignorados.`;
+            const importedMessage = imported === 1
+              ? 'Owner importado com sucesso.'
+              : 'Owners importados com sucesso.';
+
+            this.success =
+              `${imported} ${importedMessage}`
+              + (duplicates > 0 ? ` ${duplicateMessage}` : '');
+          }
+
+          this.importingOwners = false;
+          this.closeOwnerImportModal();
+          this.load();
+        },
+        error: error => {
+          this.ownerImportError = this.ownerImportErrorMessage(
+            error,
+            'Não foi possível importar os Owners.',
+          );
+          this.importingOwners = false;
+        },
+      });
+  }
+
+
+  private ownerImportErrorMessage(
+    error: any,
+    fallback: string,
+  ): string {
+
+    const detail = error?.error?.detail;
+
+    if (typeof detail === 'string') {
+      return detail;
+    }
+
+    if (typeof detail?.message === 'string') {
+      return detail.message;
+    }
+
+    return fallback;
   }
 
 

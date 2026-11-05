@@ -247,6 +247,11 @@ export const COLUMN_GROUPS:
         type: FIELD_TYPES.MONO,
       },
       {
+        key: 'title',
+        label: 'Title',
+        type: FIELD_TYPES.TEXT,
+      },
+      {
         key: 'change_reason',
         label: 'CHANGE REASON',
         type: FIELD_TYPES.TEXTAREA,
@@ -383,6 +388,11 @@ export const COLUMN_GROUPS:
         key: 'contar_eco_emitida_1_dias',
         label: 'Contar Eco emitida > 1 dias',
         type: FIELD_TYPES.CALC_BOOL,
+      },
+      {
+        key: 'effective_date',
+        label: 'Effective Date',
+        type: FIELD_TYPES.DATE,
       },
       {
         key: 'gap_agreement',
@@ -550,6 +560,16 @@ export const COLUMN_GROUPS:
         label:
           'Contar Eco concluída > 10 dias',
         type: FIELD_TYPES.CALC_BOOL,
+      },
+      {
+        key: 'gap_14d',
+        label: 'GAP 14D',
+        type: FIELD_TYPES.CALC_NUMBER,
+      },
+      {
+        key: 'gap_14d_note',
+        label: 'GAP 14D NOTE',
+        type: FIELD_TYPES.TEXTAREA,
       },
       {
         key: 'total_gap',

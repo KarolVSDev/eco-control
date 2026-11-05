@@ -4,13 +4,109 @@
   <!-- CABEÇALHO -->
   <!-- ================================================= -->
 
-  <h1 class="title">
-    Dashboard
-  </h1>
+  <div class="dashboard-heading">
+
+    <h1 class="title">
+      Dashboard
+    </h1>
+
+
+    <label
+      class="global-year-filter"
+      *ngIf="availableYears.length > 0"
+    >
+      <span>Ano global:</span>
+
+      <select
+        [value]="selectedYear"
+        [disabled]="loading"
+        (change)="onGlobalYearChange($event)"
+      >
+        <option
+          *ngFor="let year of availableYears"
+          [value]="year"
+        >
+          {{ year }}
+        </option>
+      </select>
+    </label>
+
+  </div>
 
   <p class="subtitle">
     Visão geral do controle de ECOs.
   </p>
+
+
+  <!-- ================================================= -->
+  <!-- AVISO DE BACKUP ANUAL -->
+  <!-- ================================================= -->
+
+  <div
+    class="annual-backup-warning"
+    *ngIf="showAnnualBackupWarning"
+  >
+
+    <div class="annual-backup-content">
+
+      <div class="annual-backup-icon">
+        !
+      </div>
+
+
+      <div class="annual-backup-text">
+
+        <strong>
+          Backup anual recomendado
+        </strong>
+
+
+        <span>
+          O período de fechamento anual está se aproximando.
+          Recomendamos exportar uma cópia dos dados do
+          ECO CONTROL para armazenamento de segurança.
+        </span>
+
+
+        <span
+          class="annual-backup-error"
+          *ngIf="backupError"
+        >
+          {{ backupError }}
+        </span>
+
+      </div>
+
+    </div>
+
+
+    <div class="annual-backup-actions">
+
+      <button
+        type="button"
+        class="annual-backup-secondary"
+        (click)="dismissAnnualBackupWarning()"
+      >
+        Lembrar depois
+      </button>
+
+
+      <button
+        type="button"
+        class="annual-backup-primary"
+        [disabled]="backupExporting"
+        (click)="exportAnnualBackup()"
+      >
+        {{
+          backupExporting
+            ? 'Gerando...'
+            : 'Exportar dados'
+        }}
+      </button>
+
+    </div>
+
+  </div>
 
 
   <!-- ================================================= -->
@@ -72,11 +168,27 @@
   <!-- CONTEÚDO -->
   <!-- ================================================= -->
 
+  <div
+    class="dashboard-state"
+    *ngIf="
+      !loading
+      &&
+      !loadError
+      &&
+      availableYears.length === 0
+    "
+  >
+    Nenhum ano com ECOs está disponível.
+  </div>
+
+
   <ng-container
     *ngIf="
       !loading
       &&
       !loadError
+      &&
+      availableYears.length > 0
     "
   >
 
@@ -156,11 +268,15 @@
       ></app-stat-card>
 
 
-      <app-stat-card
-        label="Gap > 14 dias"
-        [value]="stats.gap14"
-        tone="danger"
-      ></app-stat-card>
+      <a class="gap-report-link" routerLink="/relatorio-gap"
+        aria-label="Abrir Relatório de GAP. Indicador atual: AZ Gap superior a 14 dias."
+        title="Abrir Relatório de GAP — período padrão da semana anterior">
+        <app-stat-card
+          label="Gap > 14 dias"
+          [value]="stats.gap14"
+          tone="danger"
+        ></app-stat-card>
+      </a>
 
     </div>
 
@@ -690,7 +806,7 @@
 
               <td>
                 <b>
-                  {{ r.month }}
+                  {{ r.month | monthLabel }}
                 </b>
               </td>
 

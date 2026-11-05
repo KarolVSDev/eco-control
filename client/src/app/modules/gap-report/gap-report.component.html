@@ -1,0 +1,115 @@
+<div class="page">
+  <h1 class="title">Relatório de GAP</h1>
+  <p class="subtitle">Acompanhamento das ECOs e do intervalo entre Effective Date e Approved Date.</p>
+
+  <section class="card period-panel" aria-labelledby="period-heading">
+    <h2 id="period-heading">Período do relatório</h2>
+    <form (ngSubmit)="applyPeriod()" novalidate>
+      <div class="toolbar">
+        <label for="start-date">Data inicial
+          <input id="start-date" name="startDate" class="input" type="date" required
+            [(ngModel)]="startDate" [attr.aria-invalid]="validationError ? 'true' : null"
+            [attr.aria-describedby]="validationError ? 'period-error' : null">
+        </label>
+        <label for="end-date">Data final
+          <input id="end-date" name="endDate" class="input" type="date" required
+            [(ngModel)]="endDate" [attr.aria-invalid]="validationError ? 'true' : null"
+            [attr.aria-describedby]="validationError ? 'period-error' : null">
+        </label>
+        <button class="btn btn-primary" type="submit">Aplicar</button>
+        <button class="btn btn-ghost" type="button" (click)="restorePeriod()">Restaurar período</button>
+        <button class="btn btn-ghost export-button" type="button"
+          [disabled]="exporting || loading || !!loadError || total === 0 || savingNoteIds.size > 0"
+          (click)="exportReport()" aria-describedby="export-help">
+          {{ exporting ? 'Exportando...' : 'Exportar relatório' }}
+        </button>
+      </div>
+      <p id="export-help" class="export-help">O Excel usa o período aplicado e as justificativas salvas.</p>
+      <p *ngIf="exportError" class="danger" role="alert">{{ exportError }}</p>
+      <p *ngIf="validationError" id="period-error" class="danger" role="alert">{{ validationError }}</p>
+    </form>
+    <p class="period-summary" role="status">
+      Período aplicado: {{ formatDate(appliedPeriod.start) }} até {{ formatDate(appliedPeriod.end) }}.
+    </p>
+  </section>
+
+  <section class="card report-panel" aria-labelledby="report-heading">
+    <h2 id="report-heading">ECOs no período</h2>
+    <p *ngIf="loading" role="status">Carregando relatório...</p>
+    <div *ngIf="loadError" role="alert" class="danger">
+      <p>{{ loadError }}</p>
+      <button class="btn btn-ghost" type="button" (click)="loadReport()">Tentar novamente</button>
+    </div>
+    <p *ngIf="!loading && !loadError" role="status">
+      {{ total }} {{ total === 1 ? 'ECO encontrada' : 'ECOs encontradas' }}
+    </p>
+    <div *ngIf="!loading && !loadError" class="table-wrap" tabindex="0" role="region" aria-label="Tabela do relatório de GAP">
+      <table class="table">
+        <caption>Relatório de GAP — ECOs RELEASED</caption>
+        <thead>
+          <tr>
+            <th scope="col">ECO NO (ORIGIN ECO)</th>
+            <th scope="col">TITLE</th>
+            <th scope="col">ECO TYPE</th>
+            <th scope="col">EFFECTIVE DATE</th>
+            <th scope="col">ECO NO (ECO NUMBER)</th>
+            <th scope="col">CREATION DATE</th>
+            <th scope="col">APPROVED DATE</th>
+            <th scope="col">LEAD TIME</th>
+            <th scope="col">NOTE (COMENTARIO)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="total === 0">
+            <td colspan="9" class="empty-state">Nenhuma ECO RELEASED encontrada no período selecionado.</td>
+          </tr>
+          <tr *ngFor="let item of items">
+            <td>{{ item.origin_eco ?? '-' }}</td>
+            <td>{{ item.title ?? '-' }}</td>
+            <td>{{ item.eco_type ?? '-' }}</td>
+            <td>{{ formatDate(item.effective_date) }}</td>
+            <td>{{ item.eco ?? '-' }}</td>
+            <td>{{ formatDate(item.az_eco_creation_date) }}</td>
+            <td>{{ formatDate(item.approval_date) }}</td>
+            <td class="gap-value">
+              <span [class.gap-attention]="item.requires_gap_14d_note"
+                [attr.aria-label]="item.requires_gap_14d_note ? 'GAP superior a 14 dias' : null">
+                {{ item.gap_14d ?? '-' }}
+              </span>
+            </td>
+            <td class="gap-justification">
+              <div class="note-editor">
+              <div class="note-editor-row">
+              <textarea class="input note-input" rows="1"
+                [appNoteAutoResize]="noteDrafts[item.id]"
+                [attr.aria-label]="'Justificativa da ECO ' + (item.eco ?? item.id)"
+                [(ngModel)]="noteDrafts[item.id]"
+                [disabled]="savingNoteIds.has(item.id)"
+                [attr.aria-invalid]="noteErrors[item.id] ? 'true' : null"
+                [attr.aria-describedby]="'note-feedback-' + item.id"
+                (ngModelChange)="noteSuccess[item.id] = ''; noteErrors[item.id] = ''"></textarea>
+              <div class="note-actions">
+              <button class="btn btn-primary" type="button"
+                [disabled]="savingNoteIds.has(item.id)"
+                [attr.aria-label]="'Salvar justificativa da ECO ' + (item.eco ?? item.id)"
+                (click)="saveNote(item)">
+                {{ savingNoteIds.has(item.id) ? 'Salvando...' : 'Salvar' }}
+              </button>
+              </div>
+              </div>
+              <div [id]="'note-feedback-' + item.id" class="note-feedback">
+                <p *ngIf="noteErrors[item.id]; else noteStatus" class="danger" role="alert">{{ noteErrors[item.id] }}</p>
+                <ng-template #noteStatus>
+                  <p *ngIf="noteSuccess[item.id]" class="note-success" role="status">{{ noteSuccess[item.id] }}</p>
+                  <p *ngIf="!noteSuccess[item.id] && item.requires_gap_14d_note && !noteDrafts[item.id]?.trim()"
+                    class="note-required">Justificativa necessária</p>
+                </ng-template>
+              </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

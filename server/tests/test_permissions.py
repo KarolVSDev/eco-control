@@ -138,3 +138,64 @@ def test_analyst_snapshot_omits_hidden_fields(monkeypatch):
 
     snapshot = json.loads(response['items'][0]['new_value'])
     assert snapshot == {'eco': 'ECO-1', 'status': 'WORKING'}
+
+
+def test_analyst_cannot_edit_effective_date_without_permission():
+    permission = SimpleNamespace(
+        field_key="effective_date",
+        can_edit=False,
+    )
+
+    db = SimpleNamespace(
+        scalars=lambda query: SimpleNamespace(
+            all=lambda: [permission]
+        )
+    )
+
+    service = service_with(
+        SimpleNamespace(
+            role="analyst",
+            email="analyst@example.com",
+        ),
+        db,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        service._filter_allowed(
+            {
+                "effective_date": "2026-11-03",
+            }
+        )
+
+    assert error.value.status_code == 403
+
+
+def test_analyst_can_edit_effective_date_with_permission():
+    permission = SimpleNamespace(
+        field_key="effective_date",
+        can_edit=True,
+    )
+
+    db = SimpleNamespace(
+        scalars=lambda query: SimpleNamespace(
+            all=lambda: [permission]
+        )
+    )
+
+    service = service_with(
+        SimpleNamespace(
+            role="analyst",
+            email="analyst@example.com",
+        ),
+        db,
+    )
+
+    result = service._filter_allowed(
+        {
+            "effective_date": "2026-11-03",
+        }
+    )
+
+    assert result == {
+        "effective_date": "2026-11-03",
+    }

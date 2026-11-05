@@ -127,12 +127,16 @@ class PermissionService:
                 user.email,
                 item.field_key,
             )
+            can_view = (
+                item.can_view
+                or item.can_edit
+            )
 
             if not permission:
                 permission = FieldPermission(
                     user_email=user.email,
                     field_key=item.field_key,
-                    can_view=item.can_view,
+                    can_view=can_view,
                     can_edit=item.can_edit,
                 )
 

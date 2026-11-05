@@ -3,8 +3,10 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
+    File,
     Response,
     status,
+    UploadFile,
 )
 from app.repository.settings_repository import (
     SettingsRepository,
@@ -22,6 +24,12 @@ from app.schemas.settings import (
 
 from app.services.settings_service import (
     SettingsService,
+)
+from app.services.owner_import_service import (
+    OwnerImportService,
+)
+from app.services.obu_au_import_service import (
+    ObuAuImportService,
 )
 
 from app.utils.security import (
@@ -59,6 +67,46 @@ def owner_options(
         in repository.all_owner_group()
     ]
 
+@router.post(
+    "/obu-au/import/preview",
+)
+async def preview_obu_au_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(admin_user),
+):
+    content = await file.read(
+        ObuAuImportService.MAX_FILE_BYTES
+        + 1
+    )
+
+    return ObuAuImportService(
+        db
+    ).preview_file(
+        content,
+        file.filename,
+    )
+
+
+@router.post(
+    "/obu-au/import",
+)
+async def import_obu_au(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(admin_user),
+):
+    content = await file.read(
+        ObuAuImportService.MAX_FILE_BYTES
+        + 1
+    )
+
+    return ObuAuImportService(
+        db
+    ).import_file(
+        content,
+        file.filename,
+    )
 # =========================================================
 # OBU → AU
 # =========================================================
@@ -121,6 +169,42 @@ def delete_obu_au(
 # =========================================================
 # OWNER → GROUP
 # =========================================================
+
+@router.post(
+    "/owner-group/import/preview",
+)
+async def preview_owner_group_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(admin_user),
+):
+    content = await file.read(
+        OwnerImportService.MAX_FILE_BYTES + 1
+    )
+
+    return OwnerImportService(db).preview_file(
+        content,
+        file.filename,
+    )
+
+
+@router.post(
+    "/owner-group/import",
+)
+async def import_owner_groups(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(admin_user),
+):
+    content = await file.read(
+        OwnerImportService.MAX_FILE_BYTES + 1
+    )
+
+    return OwnerImportService(db).import_file(
+        content,
+        file.filename,
+    )
+
 
 @router.post(
     "/owner-group",

@@ -479,6 +479,14 @@
 }
 
 
+.row-tools-spacer {
+  width: 22px;
+  height: 22px;
+
+  flex: 0 0 22px;
+}
+
+
 .row-checkbox {
   width: 15px;
   height: 15px;
@@ -517,7 +525,18 @@
 
   transition:
     color 0.12s ease,
-    background 0.12s ease;
+    background 0.12s ease,
+    transform 0.12s ease;
+}
+
+
+.view-action {
+  color: #a0a0a0;
+}
+
+
+.delete-action {
+  color: #ed5b70;
 }
 
 
@@ -533,14 +552,29 @@
   background: #242424;
 
   color: #fff;
+
+  transform: scale(1.06);
 }
 
 
-.delete-action:hover {
-  background:
-    rgba(237, 23, 76, 0.12);
+.row-action-button:focus-visible {
+  outline: 2px solid #bdbdbd;
+  outline-offset: 1px;
 
-  color: #ff466e;
+  background: #242424;
+
+  color: #fff;
+}
+
+
+.delete-action:hover,
+.delete-action:focus-visible {
+  background:
+    rgba(237, 23, 76, 0.18);
+
+  color: #ff365f;
+
+  transform: scale(1.08);
 }
 
 
@@ -953,8 +987,8 @@
   font-size: 13px;
 
   transition:
-    background 0.1s ease,
-    border-color 0.1s ease;
+    background 0.35s ease,
+    border-color 0.35s ease;
 }
 
 
@@ -2661,3 +2695,12 @@ tr.row-selected
 }
 
 
+
+/* New IDs detected during this screen session; includes sticky cells. */
+.eco-table tbody tr.eco-new-highlight td,
+.eco-table tbody tr.eco-new-highlight:hover td,
+.eco-table tbody tr.eco-new-highlight .row-tools-column {
+  background: #432027;
+  border-bottom-color: #ab4856;
+  transition: background 0.35s ease, border-color 0.35s ease;
+}
