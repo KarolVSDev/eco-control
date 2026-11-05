@@ -108,8 +108,98 @@ export class PermissionsComponent
     PermissionGroup[] =
     this.buildPermissionGroups();
 
+  selectedGroupKey = '';
+
+  fieldSearch = '';
+
+
+  get selectedUser(): User | undefined {
+    return this.users.find(
+      user => user.email === this.selectedEmail
+    );
+  }
+
+
+  get activeGroup(): PermissionGroup | undefined {
+    return (
+      this.permissionGroups.find(
+        group =>
+          group.key === this.selectedGroupKey
+      )
+      ?? this.permissionGroups[0]
+    );
+  }
+
+
+  get filteredActiveFields(): FieldPermission[] {
+
+    const fields =
+      this.activeGroup?.fields ?? [];
+
+    const search =
+      this.fieldSearch
+        .trim()
+        .toLowerCase();
+
+
+    if (!search) {
+      return fields;
+    }
+
+
+    return fields.filter(
+      field =>
+        field.label
+          .toLowerCase()
+          .includes(search)
+        ||
+        field.field_key
+          .toLowerCase()
+          .includes(search)
+    );
+  }
+
+
+  get totalFields(): number {
+    return this.permissionGroups
+      .reduce(
+        (total, group) =>
+          total + group.fields.length,
+        0
+      );
+  }
+
+
+  get totalViewableFields(): number {
+    return this.permissionGroups
+      .flatMap(
+        group => group.fields
+      )
+      .filter(
+        field => field.can_view
+      )
+      .length;
+  }
+
+
+  get totalEditableFields(): number {
+    return this.permissionGroups
+      .flatMap(
+        group => group.fields
+      )
+      .filter(
+        field => field.can_edit
+      )
+      .length;
+  }
+
 
   ngOnInit(): void {
+
+    this.selectedGroupKey =
+      this.permissionGroups[0]?.key
+      ?? '';
+
     this.loadUsers();
   }
 
@@ -337,6 +427,18 @@ export class PermissionsComponent
             this.buildPermissionGroups(
               data.fields ?? []
             );
+          if (
+            !this.permissionGroups.some(
+              group =>
+                group.key ===
+                this.selectedGroupKey
+            )
+          ) {
+
+            this.selectedGroupKey =
+              this.permissionGroups[0]?.key
+              ?? '';
+          }
 
 
           this.loading = false;
@@ -442,7 +544,52 @@ export class PermissionsComponent
       });
   }
 
+  selectGroup(
+    groupKey: string,
+  ): void {
 
+    this.selectedGroupKey =
+      groupKey;
+
+    this.fieldSearch = '';
+  }
+
+
+  restoreDefaults(): void {
+
+    const confirmed =
+      confirm(
+        'Restaurar as permissões padrão deste analista? As alterações só serão aplicadas após clicar em Salvar alterações.'
+      );
+
+
+    if (!confirmed) {
+      return;
+    }
+
+
+    this.general = {
+      can_create_eco: false,
+      can_bulk_edit: false,
+      can_view_history: true,
+    };
+
+
+    this.permissionGroups =
+      this.buildPermissionGroups();
+
+
+    this.selectedGroupKey =
+      this.permissionGroups[0]?.key
+      ?? '';
+
+
+    this.fieldSearch = '';
+
+    this.success = '';
+
+    this.error = '';
+  }
   trackGroup(
     _index: number,
     group: PermissionGroup,
