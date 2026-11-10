@@ -5,8 +5,14 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-secret"
     access_token_minutes: int = 480
     cors_origins: str = "http://localhost:4200"
+    admin_email: str = ""
+    admin_password: str = ""
+    admin_name: str = "Administrador"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     @property
     def cors_list(self):
         return [x.strip() for x in self.cors_origins.split(',') if x.strip()]
+
+
 settings = Settings()
