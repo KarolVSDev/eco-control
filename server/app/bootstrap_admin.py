@@ -1,66 +1,60 @@
-import os
-
-from sqlalchemy import select
+import logging
 
 from app.config.database import SessionLocal
-from app.models.entities import User
-from app.utils.security import hash_password
+from app.config.settings import settings
+from app.repository.user_repository import UserRepository
+from app.schemas.user import UserCreate
+from app.services.user_service import UserService
 
 
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-ADMIN_NAME = os.getenv(
-    "ADMIN_NAME",
-    "Administrador ECO CONTROL",
-)
+logger = logging.getLogger(__name__)
 
 
-def main():
-    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
-        raise RuntimeError(
-            "ADMIN_EMAIL e ADMIN_PASSWORD precisam ser informados."
+def bootstrap_initial_admin() -> None:
+    email = settings.admin_email.strip().lower()
+    password = settings.admin_password
+    name = settings.admin_name.strip() or "Administrador"
+
+    if not email or not password:
+        logger.info(
+            "Initial administrator bootstrap skipped: "
+            "ADMIN_EMAIL or ADMIN_PASSWORD is not configured"
         )
+        return
 
     db = SessionLocal()
-
     try:
-        existing_user = db.scalar(
-            select(User).where(
-                User.email == ADMIN_EMAIL
-            )
-        )
-
-        if existing_user:
-            print(
-                f"O usuário {ADMIN_EMAIL} já existe. "
-                "Nenhuma alteração foi realizada."
+        repository = UserRepository(db)
+        if repository.get_by_email(email):
+            logger.info(
+                "Initial administrator already exists: %s",
+                email,
             )
             return
 
-        admin = User(
-            email=ADMIN_EMAIL,
-            full_name=ADMIN_NAME,
-            hashed_password=hash_password(
-                ADMIN_PASSWORD
+        UserService(db).create_user(
+            UserCreate(
+                email=email,
+                full_name=name,
+                password=password,
+                role="admin",
+                active=True,
             ),
-            role="admin",
-            active=True,
         )
 
-        db.add(admin)
-        db.commit()
-
-        print(
-            "Administrador inicial criado com sucesso: "
-            f"{ADMIN_EMAIL}"
+        logger.info(
+            "Initial administrator created: %s",
+            email,
         )
-
     except Exception:
         db.rollback()
         raise
-
     finally:
         db.close()
+
+
+def main() -> None:
+    bootstrap_initial_admin()
 
 
 if __name__ == "__main__":
