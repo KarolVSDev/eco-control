@@ -1,18 +1,82 @@
 services:
   db:
     image: postgres:16-alpine
+    container_name: eco-control-db
+    restart: unless-stopped
+
     environment:
-      POSTGRES_DB: eco_control
-      POSTGRES_USER: eco_user
-      POSTGRES_PASSWORD: eco_pass
+      POSTGRES_DB: ${POSTGRES_DB:-eco_control}
+      POSTGRES_USER: ${POSTGRES_USER:-eco_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eco_pass}
+
     ports:
       - "5433:5432"
+
     volumes:
       - eco_pgdata:/var/lib/postgresql/data
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U eco_user -d eco_control"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-eco_user} -d ${POSTGRES_DB:-eco_control}"
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
+
+
+  backend:
+    build:
+      context: ./server
+
+    container_name: eco-control-backend
+    restart: unless-stopped
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-eco_user}:${POSTGRES_PASSWORD:-eco_pass}@db:5432/${POSTGRES_DB:-eco_control}
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-480}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200}
+
+    ports:
+      - "8001:8000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  frontend:
+    build:
+      context: ./client
+
+    container_name: eco-control-frontend
+    restart: unless-stopped
+
+    ports:
+      - "4200:80"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+
 volumes:
   eco_pgdata:
