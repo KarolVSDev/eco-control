@@ -1,6 +1,6 @@
 # ECO CONTROL
 
-Migração do protótipo ECO CONTROL para uma arquitetura local baseada em **Angular + FastAPI + PostgreSQL**.
+Aplicação web para gerenciamento e acompanhamento de ECOs (Engineering Change Orders), desenvolvida com Angular, FastAPI e PostgreSQL.
 
 ## Stack
 
@@ -8,23 +8,42 @@ Migração do protótipo ECO CONTROL para uma arquitetura local baseada em **Ang
 - **Backend:** FastAPI + SQLAlchemy
 - **Banco de dados:** PostgreSQL 16
 - **Migrations:** Alembic
-- **Banco local:** Docker Compose
+- **Servidor web:** Nginx
+- **Containerização:** Docker + Docker Compose
+
+## Arquitetura
+
+```text
+Usuário
+   ↓
+Angular + Nginx
+   ↓ /api/v1
+FastAPI
+   ↓
+SQLAlchemy
+   ↓
+PostgreSQL
+```
+
+O frontend não acessa diretamente o banco de dados.
+
+As regras de negócio, autenticação, autorização, auditoria e persistência são tratadas pelo backend.
 
 ---
 
 ## Pré-requisitos
 
-Antes de executar o projeto, instale:
+Para executar a aplicação de forma containerizada, é necessário:
 
 - Git
-- Node.js 20+
-- npm
-- Python 3.11+
-- Docker Desktop
+- Docker Desktop / Docker Engine
+- Docker Compose
+
+Node.js e Python não são necessários na máquina de deploy quando a aplicação é executada totalmente via Docker.
 
 ---
 
-## 1. Clonar o projeto
+## Clonar o projeto
 
 ```bash
 git clone https://github.com/KarolVSDev/eco-control.git
@@ -33,67 +52,9 @@ cd eco-control
 
 ---
 
-## 2. Subir o PostgreSQL
+## Configuração do ambiente
 
-Na raiz do projeto:
-
-```bash
-docker compose up -d db
-```
-
-Verifique o status:
-
-```bash
-docker compose ps
-```
-
-O serviço do PostgreSQL deve aparecer como `healthy`.
-
-### Configuração local do banco
-
-- **Host:** `localhost`
-- **Porta:** `5433`
-- **Banco:** `eco_control`
-- **Usuário:** `eco_user`
-- **Senha:** `eco_pass`
-
-> Essas credenciais são destinadas somente ao ambiente local de desenvolvimento.
-
----
-
-## 3. Configurar o Backend
-
-Entre na pasta do backend:
-
-```bash
-cd server
-```
-
-Crie o ambiente virtual:
-
-```bash
-python -m venv .venv
-```
-
-### Windows PowerShell
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### Linux/macOS
-
-```bash
-source .venv/bin/activate
-```
-
-Instale as dependências:
-
-```bash
-pip install -r requirements.txt
-```
-
-Crie o arquivo `.env` a partir do exemplo.
+Copie o arquivo de exemplo:
 
 ### Windows PowerShell
 
@@ -101,171 +62,289 @@ Crie o arquivo `.env` a partir do exemplo.
 Copy-Item .env.example .env
 ```
 
-### Linux/macOS
+### Linux
 
 ```bash
 cp .env.example .env
 ```
 
-Aplique as migrations:
+Antes de utilizar em produção, configure no `.env` valores seguros para:
 
-```bash
-alembic upgrade head
+```env
+POSTGRES_DB=eco_control
+POSTGRES_USER=eco_user
+POSTGRES_PASSWORD=senha-segura
+
+JWT_SECRET=segredo-jwt-forte-e-aleatorio
+ACCESS_TOKEN_MINUTES=480
+
+CORS_ORIGINS=http://endereco-do-servidor
 ```
 
-Execute o seed inicial:
-
-```bash
-python -m app.seed
-```
-
-### Verificar o bootstrap do banco
-
-O `alembic upgrade head` deve concluir até a revisão `0002`. Confira a revisão aplicada:
-
-```bash
-alembic current
-```
-
-Confira o usuário administrador e as 30 ECOs sintéticas criadas pelo seed:
-
-```powershell
-docker compose exec db psql -U eco_user -d eco_control -c "SELECT email, role, active FROM users WHERE email = 'admin@eco.com';"
-docker compose exec db psql -U eco_user -d eco_control -c "SELECT count(*) AS synthetic_ecos FROM ecos WHERE eco LIKE 'DEMO%';"
-```
-
-O administrador local inicial usa `admin@eco.com` / `admin123`. O seed pode ser executado novamente sem duplicar o usuário, os mapeamentos ou os dados sintéticos.
-
-Para testar uma instalação limpa, use somente um banco/volume descartável. `docker compose down -v` apaga todos os dados do volume local e não deve ser usado em um banco que precise ser preservado.
-
-O seed cria:
-
-- usuário administrador local;
-- mapeamentos OBU → AU;
-- mapeamentos Owner → Group;
-- dados sintéticos de ECO para desenvolvimento.
-
-Execute a API:
-
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-### Endereços do Backend
-
-- **API:** http://localhost:8000
-- **Swagger:** http://localhost:8000/docs
-- **Health check:** http://localhost:8000/health
+O arquivo `.env` não deve ser versionado.
 
 ---
 
-## 4. Configurar o Frontend
-
-Abra outro terminal e entre na pasta do frontend:
-
-```bash
-cd client
-```
-
-Instale as dependências:
-
-```bash
-npm install
-```
-
-Execute o Angular:
-
-```bash
-npm start
-```
-
-### Endereço do Frontend
-
-- http://localhost:4200
-
-O frontend está configurado para consumir a API em:
-
-```text
-http://localhost:8000/api/v1
-```
-
----
-
-## Login de desenvolvimento
-
-Depois de executar:
-
-```bash
-python -m app.seed
-```
-
-use:
-
-- **E-mail:** `admin@eco.com`
-- **Senha:** `admin123`
-
-> Os dados gerados pelo seed são sintéticos e não contêm dados sensíveis da planilha original.
-
----
-
-## Execução diária
-
-Depois que o projeto já estiver configurado pela primeira vez, normalmente são necessários três terminais.
-
-### Terminal 1 — PostgreSQL
+# Execução com Docker
 
 Na raiz do projeto:
 
 ```bash
-docker compose up -d db
+docker compose up -d --build
 ```
 
-### Terminal 2 — FastAPI
+Esse comando inicializa:
 
-```powershell
-cd server
-.\.venv\Scripts\Activate.ps1
-uvicorn main:app --reload --port 8000
-```
+- PostgreSQL;
+- backend FastAPI;
+- frontend Angular/Nginx.
 
-### Terminal 3 — Angular
+Também são executadas automaticamente as migrations do Alembic antes da inicialização da API.
+
+Verifique os containers:
 
 ```bash
-cd client
-npm start
+docker compose ps
+```
+
+O resultado esperado é:
+
+```text
+eco-control-db          healthy
+eco-control-backend     healthy
+eco-control-frontend    running
 ```
 
 ---
 
-## Parar o banco
+## Endereços padrão
 
-Para parar os containers sem apagar os dados:
+### Frontend
+
+```text
+http://localhost:4200
+```
+
+### Backend
+
+```text
+http://localhost:8001
+```
+
+### Swagger
+
+```text
+http://localhost:8001/docs
+```
+
+### Health check
+
+```text
+http://localhost:8001/health
+```
+
+### PostgreSQL
+
+```text
+Host: localhost
+Porta: 5433
+Banco: eco_control
+```
+
+---
+
+# Instalação oficial
+
+Uma instalação nova **não carrega ECOs fictícias automaticamente**.
+
+Ao executar:
+
+```bash
+docker compose up -d --build
+```
+
+o sistema:
+
+1. cria o PostgreSQL;
+2. executa as migrations até a revisão mais recente;
+3. cria a estrutura das tabelas;
+4. inicia o backend;
+5. inicia o frontend.
+
+As ECOs permanecem vazias até que dados oficiais sejam inseridos pela aplicação ou pelas integrações autorizadas.
+
+Para verificar a migration aplicada:
+
+```bash
+docker compose exec backend alembic current
+```
+
+Resultado esperado atualmente:
+
+```text
+0008 (head)
+```
+
+Para verificar a quantidade de ECOs:
+
+```bash
+docker compose exec db psql -U eco_user -d eco_control -c "SELECT COUNT(*) AS ecos FROM ecos;"
+```
+
+Em uma instalação nova:
+
+```text
+ecos
+----
+0
+```
+
+---
+
+# Primeiro administrador
+
+Em um banco novo não existe usuário cadastrado.
+
+O primeiro administrador deve ser criado uma única vez utilizando o comando de bootstrap.
+
+### Windows PowerShell
+
+```powershell
+docker compose exec `
+  -e ADMIN_EMAIL="usuario@empresa.com" `
+  -e ADMIN_PASSWORD="senha-inicial-segura" `
+  -e ADMIN_NAME="Administrador ECO CONTROL" `
+  backend python -m app.bootstrap_admin
+```
+
+### Linux
+
+```bash
+docker compose exec \
+  -e ADMIN_EMAIL="usuario@empresa.com" \
+  -e ADMIN_PASSWORD="senha-inicial-segura" \
+  -e ADMIN_NAME="Administrador ECO CONTROL" \
+  backend python -m app.bootstrap_admin
+```
+
+O bootstrap:
+
+- cria somente o administrador inicial;
+- não cria ECOs;
+- não carrega dados sintéticos;
+- não substitui um usuário que já exista com o mesmo e-mail.
+
+Depois disso, os demais usuários podem ser administrados pela própria aplicação.
+
+---
+
+# Dados padrão
+
+As migrations podem cadastrar configurações necessárias ao funcionamento da aplicação.
+
+Atualmente:
+
+- migration `0007`: mapeamentos padrão OBU → AU;
+- migration `0008`: mapeamentos padrão Owner → Group.
+
+Esses registros são independentes das ECOs e fazem parte da configuração inicial do sistema.
+
+---
+
+# Seed de demonstração
+
+O módulo:
+
+```bash
+python -m app.seed
+```
+
+é destinado **exclusivamente a desenvolvimento e demonstração**.
+
+Ele pode criar:
+
+- administrador de demonstração;
+- mapeamentos fictícios;
+- ECOs sintéticas.
+
+## Não execute `app.seed` no ambiente oficial.
+
+Dados de demonstração não são executados automaticamente pelo `docker-compose.yml`.
+
+---
+
+# Parar a aplicação
+
+Para parar os containers preservando o banco:
 
 ```bash
 docker compose down
 ```
 
-Os dados permanecem no volume Docker.
+Os dados continuam armazenados no volume Docker.
 
-Para apagar também os dados locais do PostgreSQL:
+Para iniciar novamente:
+
+```bash
+docker compose up -d
+```
+
+---
+
+# Atenção ao volume do PostgreSQL
+
+O comando:
 
 ```bash
 docker compose down -v
 ```
 
-> Use `-v` somente quando realmente quiser recriar o banco do zero.
+remove também o volume do PostgreSQL.
+
+Isso significa que os dados armazenados no banco serão apagados.
+
+**Não execute `docker compose down -v` no ambiente oficial, salvo quando houver intenção explícita de excluir e recriar o banco.**
 
 ---
 
-## Estrutura do projeto
+# Logs
+
+Backend:
+
+```bash
+docker compose logs backend --tail 100
+```
+
+Frontend:
+
+```bash
+docker compose logs frontend --tail 100
+```
+
+Banco:
+
+```bash
+docker compose logs db --tail 100
+```
+
+Acompanhar logs em tempo real:
+
+```bash
+docker compose logs -f
+```
+
+---
+
+# Estrutura principal
 
 ```text
 eco-control/
 ├── client/
 │   ├── src/
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   ├── angular.json
-│   ├── package.json
-│   └── package-lock.json
+│   └── package.json
 │
 ├── server/
 │   ├── alembic/
@@ -278,168 +357,77 @@ eco-control/
 │   │   ├── schemas/
 │   │   ├── services/
 │   │   ├── utils/
+│   │   ├── bootstrap_admin.py
 │   │   └── seed.py
 │   ├── tests/
-│   ├── .env.example
+│   ├── Dockerfile
 │   ├── alembic.ini
 │   ├── main.py
 │   └── requirements.txt
 │
 ├── docs/
 ├── docker-compose.yml
+├── .env.example
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## Arquitetura
+# Desenvolvimento local sem Docker completo
 
-O fluxo principal da aplicação é:
+Para desenvolvimento, os serviços também podem ser executados separadamente.
 
-```text
-Angular
-   ↓ HTTP / JSON
-FastAPI
-   ↓ SQLAlchemy
-PostgreSQL
-```
+### Banco
 
-O frontend não acessa o PostgreSQL diretamente.
-
-As regras de negócio, autenticação, autorização, persistência e auditoria devem ser validadas no backend.
-
----
-
-## Teste de instalação em uma máquina nova
-
-Uma instalação limpa deve funcionar nesta ordem:
-
-```text
-git clone
-↓
+```bash
 docker compose up -d db
-↓
-python -m venv .venv
-↓
-ativar .venv
-↓
-pip install -r requirements.txt
-↓
-copiar .env.example para .env
-↓
-alembic upgrade head
-↓
-python -m app.seed
-↓
-uvicorn main:app --reload --port 8000
-↓
-npm install
-↓
-npm start
 ```
-
-Depois valide:
-
-1. `docker compose ps` mostra o PostgreSQL como `healthy`.
-2. http://localhost:8000/health responde `{"status":"ok"}`.
-3. http://localhost:8000/docs abre o Swagger.
-4. http://localhost:4200 abre o Angular.
-5. O login `admin@eco.com / admin123` funciona.
-
----
-
-## Desenvolvimento em equipe
-
-A separação principal do projeto é:
-
-### Frontend
-
-Responsável principalmente por:
-
-```text
-client/
-```
-
-Inclui:
-
-- telas;
-- componentes;
-- formulários;
-- tabelas;
-- filtros;
-- responsividade;
-- integração com a API;
-- aplicação visual das permissões.
 
 ### Backend
 
-Responsável principalmente por:
-
-```text
-server/
+```powershell
+cd server
+.\.venv\Scripts\Activate.ps1
+alembic upgrade head
+uvicorn main:app --reload --port 8001
 ```
 
-Inclui:
+### Frontend
 
-- endpoints FastAPI;
-- autenticação;
-- permissões;
-- regras de negócio;
-- cálculos de ECO;
-- SQLAlchemy;
-- PostgreSQL;
-- migrations;
-- auditoria;
-- testes.
-
-### Documentação
-
-Responsável principalmente por:
-
-```text
-README.md
-docs/
+```bash
+cd client
+npm install
+npm start
 ```
 
-Inclui:
+O ambiente manual é destinado principalmente ao desenvolvimento.
 
-- instalação;
-- arquitetura;
-- documentação dos endpoints;
-- modelo de dados;
-- decisões técnicas;
-- fluxo de autenticação;
-- permissões;
-- guia para novos desenvolvedores.
+Para deploy e homologação, prefira o fluxo completo com:
+
+```bash
+docker compose up -d --build
+```
 
 ---
 
-## Arquivos que não devem ser versionados
-
-O `.gitignore` do projeto exclui arquivos locais como:
-
-- `client/node_modules/`
-- `client/dist/`
-- `client/.angular/`
-- `server/.venv/`
-- `server/__pycache__/`
-- arquivos `.env`
-- caches Python
-- configurações locais de IDE
+# Segurança
 
 Nunca versione:
 
+- arquivos `.env`;
 - senhas reais;
 - tokens;
+- JWT secrets;
 - chaves privadas;
-- arquivos `.env`;
-- dados sensíveis;
-- planilhas reais de produção.
+- planilhas oficiais com dados sensíveis;
+- dumps de banco de produção.
+
+Credenciais e segredos do ambiente oficial devem ser definidos somente no servidor de deploy.
 
 ---
 
-## Repositório
+# Repositório
 
 ```text
 https://github.com/KarolVSDev/eco-control
