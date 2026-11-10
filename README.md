@@ -79,6 +79,11 @@ JWT_SECRET=segredo-jwt-forte-e-aleatorio
 ACCESS_TOKEN_MINUTES=480
 
 CORS_ORIGINS=http://endereco-do-servidor
+
+# Primeiro administrador (preencha com credenciais próprias)
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+ADMIN_NAME=Administrador
 ```
 
 O arquivo `.env` não deve ser versionado.
@@ -203,36 +208,9 @@ ecos
 
 # Primeiro administrador
 
-Em um banco novo não existe usuário cadastrado.
+Defina `ADMIN_EMAIL`, `ADMIN_PASSWORD` e, opcionalmente, `ADMIN_NAME` no arquivo `.env` antes de iniciar os serviços. Ao executar `docker compose up -d --build`, depois das migrations, o backend cria automaticamente o primeiro administrador.
 
-O primeiro administrador deve ser criado uma única vez utilizando o comando de bootstrap.
-
-### Windows PowerShell
-
-```powershell
-docker compose exec `
-  -e ADMIN_EMAIL="usuario@empresa.com" `
-  -e ADMIN_PASSWORD="senha-inicial-segura" `
-  -e ADMIN_NAME="Administrador ECO CONTROL" `
-  backend python -m app.bootstrap_admin
-```
-
-### Linux
-
-```bash
-docker compose exec \
-  -e ADMIN_EMAIL="usuario@empresa.com" \
-  -e ADMIN_PASSWORD="senha-inicial-segura" \
-  -e ADMIN_NAME="Administrador ECO CONTROL" \
-  backend python -m app.bootstrap_admin
-```
-
-O bootstrap:
-
-- cria somente o administrador inicial;
-- não cria ECOs;
-- não carrega dados sintéticos;
-- não substitui um usuário que já exista com o mesmo e-mail.
+Se email ou senha não estiverem configurados, o bootstrap não executa. Se o usuário já existir, nenhum usuário será criado e sua senha e demais dados não serão alterados. O bootstrap é executado em cada startup e permanece idempotente.
 
 Depois disso, os demais usuários podem ser administrados pela própria aplicação.
 
