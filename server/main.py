@@ -1,9 +1,22 @@
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.bootstrap_admin import bootstrap_initial_admin
 from app.config.settings import settings
 from app.controller import gap_report_controller
 from app.controller import auth_controller,eco_controller,dashboard_controller,history_controller,admin_controller,settings_controller
-app=FastAPI(title='ECO CONTROL API',version='1.0.0')
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    bootstrap_initial_admin()
+    yield
+
+
+app=FastAPI(title='ECO CONTROL API',version='1.0.0',lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=settings.cors_list,allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
 app.include_router(auth_controller.router,prefix='/api/v1')
 app.include_router(gap_report_controller.router, prefix='/api/v1')
