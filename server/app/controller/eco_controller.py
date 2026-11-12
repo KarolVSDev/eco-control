@@ -1214,13 +1214,11 @@ async def preview_eco_import(
     # -----------------------------------------------------
     # LIMITE DE TAMANHO
     #
-    # 25 MB é mais que suficiente para a
-    # CTRL GERAL atual e evita uploads
-    # excessivamente grandes.
+    # Limite máximo de upload da CTRL GERAL.
     # -----------------------------------------------------
 
     max_size = (
-        25
+        500
         * 1024
         * 1024
     )
@@ -1231,8 +1229,7 @@ async def preview_eco_import(
         raise HTTPException(
             status_code=413,
             detail=(
-                "O arquivo excede o limite "
-                "máximo de 25 MB."
+                "O arquivo excede o limite máximo de 500 MB."
             ),
         )
 
@@ -1358,7 +1355,7 @@ async def import_ecos(
     # -----------------------------------------------------
 
     max_size = (
-        25
+        500
         * 1024
         * 1024
     )
@@ -1371,8 +1368,7 @@ async def import_ecos(
         raise HTTPException(
             status_code=413,
             detail=(
-                "O arquivo excede o limite "
-                "máximo de 25 MB."
+                "O arquivo excede o limite máximo de 500 MB."
             ),
         )
 
@@ -1636,4 +1632,3 @@ def delete_eco(
             status.HTTP_204_NO_CONTENT
         )
     )
-

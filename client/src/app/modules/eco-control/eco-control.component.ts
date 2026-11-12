@@ -2250,8 +2250,12 @@ export class EcoControlComponent
       return;
     }
 
-    if (file.size > 25 * 1024 * 1024) {
-      this.importError = 'O arquivo excede o limite máximo de 25 MB.';
+    if (file.size > 500 * 1024 * 1024) {
+      this.importError = (
+        'O arquivo é muito grande. '
+        + 'O tamanho máximo permitido é 500 MB. '
+        + 'Reduza o tamanho da planilha ou selecione um arquivo menor.'
+      );
       input.value = '';
       return;
     }
@@ -2369,6 +2373,53 @@ export class EcoControlComponent
 
     if (typeof detail?.message === 'string') {
       return detail.message;
+    }
+
+    const status = error?.status;
+
+    if (status === 413) {
+      return (
+        'O arquivo é muito grande. '
+        + 'O tamanho máximo permitido é 500 MB. '
+        + 'Reduza o tamanho da planilha ou selecione um arquivo menor.'
+      );
+    }
+
+    if (status === 401) {
+      return (
+        'Sua sessão expirou ou não foi possível autenticar a solicitação. '
+        + 'Entre novamente no sistema e tente outra vez.'
+      );
+    }
+
+    if (status === 403) {
+      return (
+        'Você não possui permissão para importar planilhas. '
+        + 'Entre em contato com um administrador do sistema.'
+      );
+    }
+
+    if (status === 422) {
+      return (
+        'Não foi possível validar a planilha. '
+        + 'Verifique se o arquivo é .xlsx, possui a aba CTRL GERAL '
+        + 'e está no formato esperado.'
+      );
+    }
+
+    if (status >= 500) {
+      return (
+        'Ocorreu um erro interno ao processar a planilha. Tente novamente. '
+        + 'Se o problema continuar, entre em contato com o responsável '
+        + 'pelo sistema.'
+      );
+    }
+
+    if (status === 0) {
+      return (
+        'Não foi possível conectar ao servidor. '
+        + 'Verifique sua conexão e tente novamente.'
+      );
     }
 
     return fallback;
