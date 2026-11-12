@@ -537,7 +537,7 @@ file
 ### Regras do arquivo
 
 - somente arquivos `.xlsx`;
-- tamanho máximo de **25 MB**;
+- tamanho máximo de **500 MB**;
 - deve existir uma aba chamada `CTRL GERAL`.
 
 ### Permissão
@@ -651,7 +651,7 @@ rollback
 
 - `403 Forbidden`: sem permissão de importação;
 - `409 Conflict`: nenhuma linha nova encontrada;
-- `413 Payload Too Large`: arquivo maior que 25 MB;
+- `413 Payload Too Large`: arquivo maior que 500 MB;
 - `422 Unprocessable Entity`: arquivo inválido ou existência de erros no lote.
 
 ---
@@ -1180,7 +1180,7 @@ Remove um gerente.
 | `403 Forbidden` | Acesso negado | Usuário sem permissão |
 | `404 Not Found` | Não encontrado | Registro inexistente |
 | `409 Conflict` | Conflito | Estado incompatível ou recurso duplicado |
-| `413 Payload Too Large` | Arquivo muito grande | Upload superior ao limite de 25 MB |
+| `413 Payload Too Large` | Arquivo muito grande | Upload superior ao limite de 500 MB para a importação CTRL GERAL |
 | `422 Unprocessable Entity` | Erro de validação | Payload, arquivo ou parâmetros inválidos |
 | `500 Internal Server Error` | Erro interno | Falha inesperada no processamento |
 

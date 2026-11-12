@@ -1815,6 +1815,15 @@
           {{ importSuccess }}
         </div>
 
+        <div
+          *ngIf="previewingImport"
+          class="import-message import-message-info"
+          aria-live="polite"
+        >
+          Analisando a planilha. Arquivos grandes podem levar alguns minutos.
+          Não feche esta janela até a análise ser concluída.
+        </div>
+
         <label class="import-file-box">
           <span class="import-file-title">
             Selecionar planilha
