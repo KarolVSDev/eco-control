@@ -743,7 +743,7 @@ CTRL GERAL
 O arquivo possui limite de:
 
 ```text
-25 MB
+500 MB
 ```
 
 ---
