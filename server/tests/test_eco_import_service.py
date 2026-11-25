@@ -1,6 +1,6 @@
 import io
 
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -777,6 +777,230 @@ def test_import_file_updates_existing_eco_and_commits_once():
     )
 
 
+def test_import_file_selectively_updates_date_boolean_and_text_with_history():
+    original_row = {
+        "item": 101,
+        "product": "TITLE ORIGINAL",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "YES",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-SELECTIVE-UPDATE",
+        "change_reason": "Motivo original",
+        "hq_eco_release_date": date(2026, 1, 2),
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+    baseline = create_service().preview(
+        create_workbook(rows=[original_row]),
+        "controle.xlsx",
+    )
+    existing_record = SimpleNamespace(
+        **baseline["rows"][0]["data"],
+        id="existing-id",
+        item=101,
+    )
+    updated_row = {
+        **original_row,
+        "product": "TITLE ATUALIZADO",
+        "change_reason": "Motivo atualizado",
+        "change_bom": "no",
+        "hq_eco_release_date": date(2026, 2, 3),
+    }
+    service = create_service(
+        existing={"ECO-SELECTIVE-UPDATE": [existing_record]}
+    )
+    histories = []
+    commits = []
+    service.db = SimpleNamespace(
+        add=lambda record: None,
+        flush=lambda: None,
+        commit=lambda: commits.append(True),
+        rollback=lambda: None,
+    )
+    service.history.add = histories.append
+
+    preview = service.preview(
+        create_workbook(rows=[updated_row]),
+        "controle.xlsx",
+    )
+    assert preview["rows"][0]["action"] == "UPDATE"
+    assert preview["update_rows"] == 1
+
+    result = service.import_file(
+        create_workbook(rows=[updated_row]),
+        "controle.xlsx",
+    )
+
+    assert result["updated_rows"] == 1
+    assert set(result["updated"][0]["changed_fields"]) == {
+        "product",
+        "change_reason",
+        "change_bom",
+        "hq_eco_release_date",
+    }
+    assert existing_record.product == "TITLE ATUALIZADO"
+    assert existing_record.change_reason == "Motivo atualizado"
+    assert existing_record.change_bom == "NO"
+    assert existing_record.hq_eco_release_date == date(2026, 2, 3)
+    assert existing_record.status == "WORKING"
+    assert existing_record.eco == "ECO-SELECTIVE-UPDATE"
+    assert commits == [True]
+
+    history_by_field = {
+        event.field_key: event
+        for event in histories
+        if event.action == "updated"
+    }
+    assert set(history_by_field) == {
+        "product",
+        "change_reason",
+        "change_bom",
+        "hq_eco_release_date",
+    }
+    assert history_by_field["hq_eco_release_date"].old_value == "2026-01-02"
+    assert history_by_field["hq_eco_release_date"].new_value == "2026-02-03"
+    assert history_by_field["change_bom"].old_value == "YES"
+    assert history_by_field["change_bom"].new_value == "NO"
+
+    second_preview = service.preview(
+        create_workbook(rows=[updated_row]),
+        "controle.xlsx",
+    )
+    assert second_preview["rows"][0]["action"] == "DUPLICATE"
+    assert second_preview["update_rows"] == 0
+
+
+def test_invalid_date_blocks_update_and_preserves_existing_fields():
+    original_row = {
+        "item": 102,
+        "product": "TITLE ORIGINAL",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "YES",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-INVALID-DATE",
+        "change_reason": "Motivo original",
+        "hq_eco_release_date": date(2026, 1, 2),
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+    baseline = create_service().preview(
+        create_workbook(rows=[original_row]),
+        "controle.xlsx",
+    )
+    existing_record = SimpleNamespace(
+        **baseline["rows"][0]["data"],
+        id="existing-id",
+        item=102,
+    )
+    invalid_row = {
+        **original_row,
+        "product": "TITULO QUE NAO DEVE SER SALVO",
+        "hq_eco_release_date": "data inválida",
+    }
+    service = create_service(
+        existing={"ECO-INVALID-DATE": [existing_record]}
+    )
+    histories = []
+    commits = []
+    service.db = SimpleNamespace(
+        add=lambda record: None,
+        flush=lambda: None,
+        commit=lambda: commits.append(True),
+        rollback=lambda: None,
+    )
+    service.history.add = histories.append
+
+    preview = service.preview(
+        create_workbook(rows=[invalid_row]),
+        "controle.xlsx",
+    )
+    assert preview["can_import"] is False
+    assert preview["error_rows"] == 1
+    assert any("HQ ECO RELEASE DATE" in error for error in preview["rows"][0]["errors"])
+
+    with pytest.raises(HTTPException) as error:
+        service.import_file(
+            create_workbook(rows=[invalid_row]),
+            "controle.xlsx",
+        )
+
+    assert error.value.status_code == 422
+    assert existing_record.product == "TITLE ORIGINAL"
+    assert existing_record.hq_eco_release_date == date(2026, 1, 2)
+    assert histories == []
+    assert commits == []
+
+
+@pytest.mark.parametrize(
+    "field",
+    sorted(EcoImportService.YES_NO_FIELDS),
+)
+@pytest.mark.parametrize(
+    ("source_value", "expected"),
+    [
+        ("yes", "YES"),
+        ("Sim", "YES"),
+        ("TRUE", "YES"),
+        (True, "YES"),
+        ("1", "YES"),
+        ("no", "NO"),
+        ("Não", "NO"),
+        ("FALSE", "NO"),
+        (False, "NO"),
+        ("0", "NO"),
+    ],
+)
+def test_preview_normalizes_supported_boolean_fields(field, source_value, expected):
+    row = {
+        "item": 103,
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        field: source_value,
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-BOOLEAN-NORMALIZATION",
+    }
+
+    result = create_service().preview(
+        create_workbook(rows=[row]),
+        "controle.xlsx",
+    )
+
+    assert result["error_rows"] == 0
+    assert result["rows"][0]["data"][field] == expected
+
+
+@pytest.mark.parametrize("field", sorted(EcoImportService.YES_NO_FIELDS))
+def test_preview_rejects_unsupported_boolean_value(field):
+    row = {
+        "item": 104,
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        field: "MAYBE",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-INVALID-BOOLEAN",
+    }
+
+    result = create_service().preview(
+        create_workbook(rows=[row]),
+        "controle.xlsx",
+    )
+
+    assert result["can_import"] is False
+    assert result["error_rows"] == 1
+
+
 def test_import_file_creates_and_updates_in_same_transaction():
     existing_row = {
         "item": 1,
@@ -1058,6 +1282,62 @@ def test_preview_exact_existing_row_is_duplicate():
     }
 
 
+@pytest.mark.parametrize(
+    "source_date",
+    [
+        date(2026, 1, 2),
+        datetime(2026, 1, 2, 8, 30),
+        "02/01/2026",
+        "2026-01-02",
+    ],
+)
+def test_preview_treats_equivalent_date_formats_as_unchanged(source_date):
+    row = {
+        "item": 105,
+        "product": "TITLE",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "TRUE",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-EQUIVALENT-DATE",
+        "change_reason": "Motivo",
+        "hq_eco_release_date": source_date,
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+    existing_record = SimpleNamespace(
+        item=105,
+        id="existing-id",
+        **{
+            **create_service().preview(
+                create_workbook(rows=[{
+                    **row,
+                    "hq_eco_release_date": date(2026, 1, 2),
+                    "change_bom": "YES",
+                }]),
+                "controle.xlsx",
+            )["rows"][0]["data"],
+            "hq_eco_release_date": datetime(2026, 1, 2),
+        },
+    )
+    service = create_service(
+        existing={"ECO-EQUIVALENT-DATE": [existing_record]}
+    )
+
+    result = service.preview(
+        create_workbook(rows=[row]),
+        "controle.xlsx",
+    )
+
+    assert result["error_rows"] == 0
+    assert result["rows"][0]["data"]["hq_eco_release_date"] == date(2026, 1, 2)
+    assert result["rows"][0]["data"]["change_bom"] == "YES"
+    assert result["rows"][0]["action"] == "DUPLICATE"
+    assert result["duplicate_rows"] == 1
+
+
 def test_preview_same_eco_with_different_data_is_new():
 
     baseline = create_service().preview(
@@ -1201,6 +1481,102 @@ def test_preview_same_item_with_different_eco_is_conflict():
     assert result["rows"][0]["action"] == "CONFLICT"
     assert "ITEM 1" in result["rows"][0]["errors"][0]
     assert "ECO-OTHER" in result["rows"][0]["errors"][0]
+
+
+def test_preview_mixed_new_update_and_conflict_blocks_import_with_row_details():
+    rows = [
+        {
+            "item": 301,
+            "product": "TITLE ATUALIZADO",
+            "obu": "NW1",
+            "owner": "owner.test",
+            "item_type": "MEC",
+            "eco_type": "REGULAR",
+            "change_bom": "YES",
+            "status": "WORKING",
+            "receb": "NORMAL",
+            "eco": "ECO-MIX-UPDATE",
+            "change_reason": "Motivo",
+            "hq_eco_release_date": date(2026, 1, 2),
+            "az_eco_register_date": date(2026, 1, 5),
+        },
+        {
+            "item": 302,
+            "product": "TITLE NOVO",
+            "obu": "NW1",
+            "owner": "owner.test",
+            "item_type": "MEC",
+            "eco_type": "REGULAR",
+            "change_bom": "YES",
+            "status": "WORKING",
+            "receb": "NORMAL",
+            "eco": "ECO-MIX-NEW",
+            "change_reason": "Motivo",
+            "hq_eco_release_date": date(2026, 1, 2),
+            "az_eco_register_date": date(2026, 1, 5),
+        },
+        {
+            "item": 303,
+            "product": "TITLE EM CONFLITO",
+            "obu": "NW1",
+            "owner": "owner.test",
+            "item_type": "MEC",
+            "eco_type": "REGULAR",
+            "change_bom": "YES",
+            "status": "WORKING",
+            "receb": "NORMAL",
+            "eco": "ECO-MIX-INFORMADA",
+            "change_reason": "Motivo",
+            "hq_eco_release_date": date(2026, 1, 2),
+            "az_eco_register_date": date(2026, 1, 5),
+        },
+    ]
+    baseline = create_service().preview(
+        create_workbook(rows=rows),
+        "controle.xlsx",
+    )
+    update_data = dict(baseline["rows"][0]["data"])
+    update_data["product"] = "TITLE ORIGINAL"
+    update_record = SimpleNamespace(
+        **update_data,
+        id="update-id",
+        item=301,
+    )
+    conflict_data = dict(baseline["rows"][2]["data"])
+    conflict_data["eco"] = "ECO-MIX-ARMAZENADA"
+    conflict_record = SimpleNamespace(
+        **conflict_data,
+        id="conflict-id",
+        item=303,
+    )
+    service = create_service(
+        existing={
+            "ECO-MIX-UPDATE": [update_record],
+            "ECO-MIX-ARMAZENADA": [conflict_record],
+        }
+    )
+
+    result = service.preview(
+        create_workbook(rows=rows),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 1
+    assert result["update_rows"] == 1
+    assert result["conflict_rows"] == 1
+    assert result["can_import"] is False
+    assert [row["action"] for row in result["rows"]] == [
+        "UPDATE",
+        "NEW",
+        "CONFLICT",
+    ]
+
+    conflict = result["rows"][2]
+    assert conflict["excel_row"] == 10
+    assert conflict["source_item"] == 303
+    assert conflict["eco"] == "ECO-MIX-INFORMADA"
+    assert "ECO-MIX-ARMAZENADA" in conflict["errors"][0]
+    assert "ECO-MIX-INFORMADA" in conflict["errors"][0]
 
 
 def test_get_import_changes_ignores_empty_cells():

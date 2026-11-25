@@ -2340,9 +2340,7 @@ export class EcoControlComponent
         next: response => {
           this.importResult = response;
           this.importPreview = null;
-          this.importSuccess = (
-            `${response.imported_rows} ECO(s) importada(s) com sucesso.`
-          );
+          this.importSuccess = this.buildImportSuccessMessage(response);
           this.importingFile = false;
           this.load();
         },
@@ -2358,6 +2356,113 @@ export class EcoControlComponent
           this.importingFile = false;
         },
       });
+  }
+
+
+  getImportButtonLabel(): string {
+    if (this.importingFile) {
+      return 'Processando...';
+    }
+
+    const preview = this.importPreview;
+    if (!preview) {
+      return '';
+    }
+
+    const errorCount = Number(preview.error_rows) || 0;
+    const conflictCount = Number(preview.conflict_rows) || 0;
+    const blockers: string[] = [];
+
+    if (errorCount > 0) {
+      blockers.push(
+        this.countLabel(errorCount, 'erro', 'erros')
+      );
+    }
+
+    if (conflictCount > 0) {
+      blockers.push(
+        this.countLabel(conflictCount, 'conflito', 'conflitos')
+      );
+    }
+
+    if (blockers.length > 0) {
+      return `Corrija ${blockers.join(' e ')}`;
+    }
+
+    const newCount = Number(preview.new_rows) || 0;
+    const updateCount = Number(preview.update_rows) || 0;
+
+    if (newCount > 0 && updateCount > 0) {
+      return (
+        `Importar ${this.ecoCountLabel(newCount)}`
+        + ` e atualizar ${this.ecoCountLabel(updateCount)}`
+      );
+    }
+
+    if (newCount > 0) {
+      return `Importar ${this.ecoCountLabel(newCount)}`;
+    }
+
+    if (updateCount > 0) {
+      return `Atualizar ${this.ecoCountLabel(updateCount)}`;
+    }
+
+    return 'Nenhuma alteração';
+  }
+
+
+  getImportConflictMessage(): string {
+    const conflictCount = Number(this.importPreview?.conflict_rows) || 0;
+    const conflictLabel = this.countLabel(
+      conflictCount,
+      'conflito',
+      'conflitos',
+    );
+
+    return (
+      `A prévia encontrou ${conflictLabel}. `
+      + 'Confira o ITEM, a ECO informada, o motivo e a linha do Excel '
+      + 'na tabela abaixo. A importação está bloqueada.'
+    );
+  }
+
+
+  private buildImportSuccessMessage(response: any): string {
+    const importedCount = Number(response?.imported_rows) || 0;
+    const updatedCount = Number(response?.updated_rows) || 0;
+    const messages: string[] = [];
+
+    if (importedCount > 0) {
+      messages.push(
+        `${this.ecoCountLabel(importedCount)} `
+        + `importada${importedCount === 1 ? '' : 's'}`
+      );
+    }
+
+    if (updatedCount > 0) {
+      messages.push(
+        `${this.ecoCountLabel(updatedCount)} `
+        + `atualizada${updatedCount === 1 ? '' : 's'}`
+      );
+    }
+
+    return messages.length > 0
+      ? `${messages.join(' e ')} com sucesso.`
+      : 'Nenhuma alteração encontrada.';
+  }
+
+
+  private ecoCountLabel(count: number): string {
+    return `${count} ECO${count === 1 ? '' : 's'}`;
+  }
+
+
+  private countLabel(
+    count: number,
+    singular: string,
+    plural: string,
+  ): string {
+    return `${count} ${count === 1 ? singular : plural}`;
   }
 
 
