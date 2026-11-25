@@ -2,6 +2,7 @@ import io
 
 from datetime import date
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -134,17 +135,48 @@ def create_service(
         user=user,
     )
 
+    resolved_obu_map = obu_map or {
+        "NW1": "GLZ",
+    }
+    resolved_owner_map = owner_map or {
+        "owner.test": "BOM",
+    }
+
+    for records in (existing or {}).values():
+        for record in records:
+            if not hasattr(record, "au"):
+                obu = getattr(record, "obu", None)
+                record.au = (
+                    resolved_obu_map.get(obu.upper())
+                    if obu
+                    else None
+                )
+
+            if not hasattr(record, "group_name"):
+                owner = getattr(record, "owner", None)
+                record.group_name = (
+                    resolved_owner_map.get(owner.casefold())
+                    if owner
+                    else None
+                )
+
+            if not hasattr(record, "month"):
+                register_date = getattr(
+                    record,
+                    "az_eco_register_date",
+                    None,
+                )
+                record.month = (
+                    EcoImportService.INTERNAL_MONTHS[
+                        register_date.month - 1
+                    ]
+                    if register_date
+                    else None
+                )
 
     service._settings_maps = lambda: (
-        obu_map
-        or {
-            "NW1": "GLZ",
-        },
-
-        owner_map
-        or {
-            "owner.test": "BOM",
-        },
+        resolved_obu_map,
+        resolved_owner_map,
     )
 
 
@@ -152,6 +184,24 @@ def create_service(
         lambda eco_codes:
             existing
             or {}
+    )
+
+    service._existing_rows_by_item = (
+        lambda source_items: {
+            record.item: record
+            for records in (existing or {}).values()
+            for record in records
+            if getattr(record, "item", None) in source_items
+        }
+    )
+
+    service._locked_existing_rows_by_item = (
+        lambda source_items: {
+            record.item: record
+            for records in (existing or {}).values()
+            for record in records
+            if getattr(record, "item", None) in source_items
+        }
     )
 
 
@@ -657,7 +707,8 @@ def test_import_file_persists_only_new_rows_and_commits_once():
 
     assert result["imported_rows"] == 1
     assert result["duplicate_rows"] == 1
-    assert result["imported"][0]["item"] == 10
+    assert result["imported"][0]["item"] == 2
+    assert persisted[0].item == 2
     assert len(persisted) == 1
     assert persisted[0].product == "BBB"
     assert persisted[0].position == 20
@@ -665,6 +716,280 @@ def test_import_file_persists_only_new_rows_and_commits_once():
     assert histories
     assert commits == [True]
     assert rollbacks == []
+
+
+def test_import_file_updates_existing_eco_and_commits_once():
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    existing_data = dict(baseline["rows"][0]["data"])
+    existing_data["product"] = "OLD-PRODUCT"
+
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+    )
+
+    service = create_service(
+        existing={"ECO-001": [existing_record]}
+    )
+
+    persisted = []
+    histories = []
+    commits = []
+    rollbacks = []
+
+    service.db = SimpleNamespace(
+        add=persisted.append,
+        flush=lambda: None,
+        commit=lambda: commits.append(True),
+        rollback=lambda: rollbacks.append(True),
+    )
+    service.history.add = histories.append
+    service.ecos.next_position = lambda: 20
+    service._existing_rows_by_item = (
+        lambda items: {1: existing_record}
+    )
+
+    result = service.import_file(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    assert result["updated_rows"] == 1
+    assert result["imported_rows"] == 0
+    assert existing_record.product == "AAA"
+    assert existing_record.id == "existing-id"
+    assert existing_record.item == 1
+    assert persisted == []
+    assert commits == [True]
+    assert rollbacks == []
+
+    assert any(
+        record.action == "updated"
+        and record.field_key == "product"
+        and record.old_value == "OLD-PRODUCT"
+        and record.new_value == "AAA"
+        for record in histories
+    )
+
+
+def test_import_file_creates_and_updates_in_same_transaction():
+    existing_row = {
+        "item": 1,
+        "product": "AAA",
+        "obu": "NW1",
+        "owner": "owner.test",
+        "item_type": "MEC",
+        "eco_type": "REGULAR",
+        "change_bom": "YES",
+        "status": "WORKING",
+        "receb": "NORMAL",
+        "eco": "ECO-IMPORT",
+        "change_reason": "Teste",
+        "hq_eco_release_date": date(2026, 1, 2),
+        "az_eco_register_date": date(2026, 1, 5),
+    }
+
+    baseline = create_service().preview(
+        create_workbook(rows=[existing_row]),
+        "controle.xlsx",
+    )
+
+    existing_data = dict(baseline["rows"][0]["data"])
+    existing_data["product"] = "OLD-PRODUCT"
+
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+    )
+
+    new_row = {
+        **existing_row,
+        "item": 2,
+        "product": "BBB",
+    }
+
+    service = create_service(
+        existing={"ECO-IMPORT": [existing_record]}
+    )
+
+    events = []
+    persisted = []
+    histories = []
+    commits = []
+    rollbacks = []
+
+    def add_persisted(record):
+        events.append("add")
+        persisted.append(record)
+
+    service.db = SimpleNamespace(
+        add=add_persisted,
+        flush=lambda: None,
+        commit=lambda: commits.append(True),
+        rollback=lambda: rollbacks.append(True),
+    )
+
+    service.history.add = histories.append
+    service.ecos.next_position = lambda: 20
+    service._existing_rows_by_item = (
+        lambda items: {
+            1: existing_record
+        } if 1 in items else {}
+    )
+    locked_lookup = service._locked_existing_rows_by_item
+
+    def track_locked_lookup(items):
+        events.append("validate")
+        return locked_lookup(items)
+
+    service._locked_existing_rows_by_item = track_locked_lookup
+
+    result = service.import_file(
+        create_workbook(rows=[existing_row, new_row]),
+        "controle.xlsx",
+    )
+
+    assert result["imported_rows"] == 1
+    assert result["updated_rows"] == 1
+
+    assert len(persisted) == 1
+    assert persisted[0].item == 2
+    assert persisted[0].product == "BBB"
+    assert persisted[0].position == 20
+
+    assert existing_record.product == "AAA"
+    assert existing_record.item == 1
+    assert existing_record.id == "existing-id"
+
+    assert commits == [True]
+    assert rollbacks == []
+    assert events.index("validate") < events.index("add")
+
+    assert any(
+        record.action == "created"
+        for record in histories
+    )
+    assert any(
+        record.action == "updated"
+        and record.field_key == "product"
+        for record in histories
+    )
+
+
+def test_import_file_rolls_back_when_update_commit_fails():
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    existing_data = dict(baseline["rows"][0]["data"])
+    existing_data["product"] = "OLD-PRODUCT"
+
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+    )
+
+    service = create_service(
+        existing={"ECO-001": [existing_record]}
+    )
+
+    commits = []
+    rollbacks = []
+    histories = []
+
+    def fail_commit():
+        commits.append(True)
+        raise RuntimeError("commit failed")
+
+    service.db = SimpleNamespace(
+        add=lambda obj: None,
+        flush=lambda: None,
+        commit=fail_commit,
+        rollback=lambda: rollbacks.append(True),
+    )
+
+    service.history.add = histories.append
+
+    service._existing_rows_by_item = (
+        lambda items: {1: existing_record}
+    )
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        service.import_file(
+            create_workbook(),
+            "controle.xlsx",
+        )
+
+    assert commits == [True]
+    assert rollbacks == [True]
+
+    assert any(
+        record.action == "updated"
+        and record.field_key == "product"
+        for record in histories
+    )
+
+
+def test_import_file_handles_integrity_errors():
+    from sqlalchemy.exc import IntegrityError
+
+    class DatabaseError(Exception):
+        def __init__(self, sqlstate):
+            self.sqlstate = sqlstate
+
+    for sqlstate, expected_status in [
+        ("23505", 409),
+        ("23503", None),
+    ]:
+        service = create_service()
+
+        workbook = create_workbook()
+
+        service._validate_import_items_before_write = (
+            lambda new_rows, update_rows: {}
+        )
+
+        service.db = SimpleNamespace(
+            add=Mock(),
+            flush=Mock(),
+            commit=Mock(
+                side_effect=IntegrityError(
+                    statement="INSERT INTO ecos ...",
+                    params={},
+                    orig=DatabaseError(sqlstate),
+                )
+            ),
+            rollback=Mock(),
+        )
+        service.ecos.next_position = lambda: 20
+        service.history.add = Mock()
+
+        if expected_status == 409:
+            with pytest.raises(HTTPException) as exc:
+                service.import_file(
+                    workbook,
+                    "controle.xlsx",
+                )
+
+            assert exc.value.status_code == 409
+
+        else:
+            with pytest.raises(IntegrityError):
+                service.import_file(
+                    workbook,
+                    "controle.xlsx",
+                )
+
+        service.db.rollback.assert_called_once()
+        service.db.commit.assert_called_once()
 
 
 def test_import_file_rolls_back_when_persistence_fails():
@@ -707,7 +1032,7 @@ def test_preview_exact_existing_row_is_duplicate():
     existing_record = SimpleNamespace(
         **parsed_data,
         id="existing-id",
-        item=55,
+        item=1,
     )
 
     service = create_service(
@@ -729,7 +1054,7 @@ def test_preview_exact_existing_row_is_duplicate():
     assert result["rows"][0]["duplicate_source"] == "DATABASE"
     assert result["rows"][0]["existing"] == {
         "id": "existing-id",
-        "item": 55,
+        "item": 1,
     }
 
 
@@ -767,6 +1092,272 @@ def test_preview_same_eco_with_different_data_is_new():
     assert result["rows"][0]["existing"] is None
 
 
+def test_preview_same_item_same_eco_with_different_data_is_update():
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+    existing_data = dict(
+        baseline["rows"][0]["data"]
+    )
+    existing_data["product"] = "DIFFERENT-PRODUCT"
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+    )
+
+    service = create_service(
+        existing={
+            "ECO-001": [existing_record],
+        }
+    )
+
+    result = service.preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 0
+    assert result["update_rows"] == 1
+    assert result["duplicate_rows"] == 0
+    assert result["conflict_rows"] == 0
+    assert result["can_import"] is True
+    assert result["rows"][0]["action"] == "UPDATE"
+    assert result["rows"][0]["existing"] == {
+        "id": "existing-id",
+        "item": 1,
+    }
+
+
+def test_preview_update_when_only_derived_field_changes():
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    parsed = baseline["rows"][0]
+
+    existing_data = dict(parsed["data"])
+
+    # Os campos originais são idênticos.
+    # Apenas o campo derivado AU está diferente.
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+        au="OLD-AU",
+        group_name=parsed["derived"].get("group"),
+        month=parsed["derived"].get("month"),
+    )
+
+    service = create_service(
+        existing={"ECO-001": [existing_record]}
+    )
+
+    result = service.preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 0
+    assert result["update_rows"] == 1
+    assert result["duplicate_rows"] == 0
+    assert result["can_import"] is True
+    assert result["rows"][0]["action"] == "UPDATE"
+
+
+def test_preview_same_item_with_different_eco_is_conflict():
+    baseline = create_service().preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+    existing_data = dict(
+        baseline["rows"][0]["data"]
+    )
+    existing_data["eco"] = "ECO-OTHER"
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+    )
+
+    service = create_service(
+        existing={
+            "ECO-OTHER": [existing_record],
+        }
+    )
+
+    result = service.preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+
+    assert result["new_rows"] == 0
+    assert result["update_rows"] == 0
+    assert result["duplicate_rows"] == 0
+    assert result["conflict_rows"] == 1
+    assert result["can_import"] is False
+    assert result["rows"][0]["action"] == "CONFLICT"
+    assert "ITEM 1" in result["rows"][0]["errors"][0]
+    assert "ECO-OTHER" in result["rows"][0]["errors"][0]
+
+
+def test_get_import_changes_ignores_empty_cells():
+    service = create_service()
+    baseline = service.preview(
+        create_workbook(),
+        "controle.xlsx",
+    )
+    existing_data = dict(
+        baseline["rows"][0]["data"]
+    )
+    existing_record = SimpleNamespace(
+        **existing_data,
+        id="existing-id",
+        item=1,
+    )
+    spreadsheet_data = dict(
+        baseline["rows"][0]["data"]
+    )
+    spreadsheet_data["status"] = None
+    spreadsheet_data["comments"] = "   "
+
+    changes = service._get_import_changes(
+        {"data": spreadsheet_data},
+        existing_record,
+    )
+
+    assert changes == {}
+    assert existing_record.status == "RELEASED"
+    assert existing_record.comments == existing_data["comments"]
+
+
+def test_get_derived_import_changes():
+    service = create_service()
+
+    existing = SimpleNamespace(
+        au="OLD-AU",
+        group_name="OLD-GROUP",
+        month="JAN",
+    )
+
+    parsed_row = {
+        "derived": {
+            "au": "NEW-AU",
+            "group": "NEW-GROUP",
+            "month": "FEB",
+        }
+    }
+
+    changes = service._get_derived_import_changes(
+        parsed_row,
+        existing,
+    )
+
+    assert changes == {
+        "au": "NEW-AU",
+        "group_name": "NEW-GROUP",
+        "month": "FEB",
+    }
+
+    # Valores vazios não devem sobrescrever os existentes.
+    parsed_row["derived"] = {
+        "au": None,
+        "group": "",
+        "month": "   ",
+    }
+
+    changes = service._get_derived_import_changes(
+        parsed_row,
+        existing,
+    )
+
+    assert changes == {}
+
+
+def test_validate_import_items_before_write_detects_conflicts():
+    service = create_service()
+
+    new_row = {
+        "source_item": 2,
+        "eco": "ECO-NEW",
+    }
+
+    update_row = {
+        "source_item": 1,
+        "eco": "ECO-EXISTING",
+    }
+
+    existing_record = SimpleNamespace(
+        id="existing-id",
+        item=1,
+        eco="ECO-EXISTING",
+    )
+
+    # Cenário 1: NEW disponível e UPDATE válido.
+    service._locked_existing_rows_by_item = (
+        lambda items: {1: existing_record}
+    )
+
+    result = service._validate_import_items_before_write(
+        [new_row],
+        [update_row],
+    )
+
+    assert result == {1: existing_record}
+
+    # Cenário 2: ITEM novo já cadastrado.
+    service._locked_existing_rows_by_item = (
+        lambda items: {
+            1: existing_record,
+            2: SimpleNamespace(
+                item=2,
+                eco="ECO-OTHER",
+            ),
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        service._validate_import_items_before_write(
+            [new_row],
+            [update_row],
+        )
+
+    assert exc.value.status_code == 409
+
+    # Cenário 3: ITEM existente pertence a outra ECO.
+    service._locked_existing_rows_by_item = (
+        lambda items: {
+            1: SimpleNamespace(
+                item=1,
+                eco="ECO-DIFFERENT",
+            ),
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        service._validate_import_items_before_write(
+            [new_row],
+            [update_row],
+        )
+
+    assert exc.value.status_code == 409
+
+    # Cenário 4: ITEM de UPDATE desapareceu.
+    service._locked_existing_rows_by_item = (
+        lambda items: {}
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        service._validate_import_items_before_write(
+            [],
+            [update_row],
+        )
+
+    assert exc.value.status_code == 409
+
+
 def test_preview_mixed_new_and_duplicate_rows_can_import():
 
     new_row = {
@@ -791,7 +1382,7 @@ def test_preview_mixed_new_and_duplicate_rows_can_import():
     existing_record = SimpleNamespace(
         **baseline["rows"][0]["data"],
         id="existing-id",
-        item=55,
+        item=1,
     )
     different_row = {
         **new_row,

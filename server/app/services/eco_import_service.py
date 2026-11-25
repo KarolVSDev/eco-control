@@ -27,6 +27,7 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.exc import IntegrityError
 
 from app.models.entities import (
     AnalystPermission,
@@ -1833,6 +1834,135 @@ class EcoImportService:
         return grouped
 
 
+    def _existing_rows_by_item(
+        self,
+        source_items,
+    ):
+        """
+        Busca registros existentes pelos ITEMs da planilha.
+        Retorna um dicionário:
+            {item: Eco}
+        Não modifica o banco.
+        """
+        valid_items = {
+            item
+            for item in source_items
+            if isinstance(item, int)
+            and not isinstance(item, bool)
+            and item > 0
+        }
+        if not valid_items:
+            return {}
+
+        rows = self.db.scalars(
+            select(Eco).where(
+                Eco.item.in_(valid_items)
+            )
+        ).all()
+
+        return {
+            eco.item: eco
+            for eco in rows
+        }
+
+
+    def _locked_existing_rows_by_item(
+        self,
+        source_items,
+    ):
+        """
+        Consulta ECOs existentes pelo ITEM e solicita
+        bloqueio das linhas até o fim da transação.
+        """
+        valid_items = [
+            item
+            for item in source_items
+            if isinstance(item, int)
+            and not isinstance(item, bool)
+            and item > 0
+        ]
+
+        if not valid_items:
+            return {}
+
+        records = self.db.scalars(
+            select(Eco)
+            .where(Eco.item.in_(valid_items))
+            .with_for_update()
+        ).all()
+
+        return {
+            eco.item: eco
+            for eco in records
+        }
+
+
+    def _validate_import_items_before_write(
+        self,
+        new_rows,
+        update_rows,
+    ):
+        """
+        Revalida os ITEMs antes de iniciar as gravações.
+
+        Bloqueia os registros existentes e verifica
+        se a classificação NEW/UPDATE continua válida.
+        """
+        all_rows = new_rows + update_rows
+
+        items = [
+            row["source_item"]
+            for row in all_rows
+        ]
+
+        existing_by_item = self._locked_existing_rows_by_item(items)
+
+        for row in new_rows:
+            item = row["source_item"]
+
+            if item in existing_by_item:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"O ITEM {item} foi cadastrado após "
+                        "a pré-visualização. "
+                        "A importação foi cancelada."
+                    ),
+                )
+
+        for row in update_rows:
+            item = row["source_item"]
+            existing = existing_by_item.get(item)
+
+            if existing is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"O ITEM {item} não existe mais. "
+                        "A importação foi cancelada."
+                    ),
+                )
+
+            current_eco = str(
+                getattr(existing, "eco", "") or ""
+            ).strip().upper()
+
+            incoming_eco = str(
+                row["eco"] or ""
+            ).strip().upper()
+
+            if current_eco != incoming_eco:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"O ITEM {item} pertence a outra ECO. "
+                        "A importação foi cancelada."
+                    ),
+                )
+
+        return existing_by_item
+
+
     def _normalize_existing_value(
         self,
         field,
@@ -1886,6 +2016,90 @@ class EcoImportService:
                 return existing
 
         return None
+
+    def _get_import_changes(
+        self,
+        parsed_row,
+        existing,
+    ):
+        """
+        Retorna somente os campos preenchidos na planilha
+        cujos valores diferem dos armazenados no banco.
+        Não modifica o registro.
+        """
+        data = parsed_row["data"]
+        changes = {}
+
+        for spec in self.COLUMN_SPECS.values():
+            field = spec["field"]
+            spreadsheet_value = data.get(field)
+
+            # Células vazias não apagam dados existentes.
+            if spreadsheet_value is None:
+                continue
+
+            if (
+                isinstance(spreadsheet_value, str)
+                and not spreadsheet_value.strip()
+            ):
+                continue
+
+            database_value = self._normalize_existing_value(
+                field,
+                getattr(existing, field, None),
+            )
+
+            if spreadsheet_value != database_value:
+                changes[field] = spreadsheet_value
+
+        return changes
+
+    def _get_derived_import_changes(
+        self,
+        parsed_row,
+        existing,
+    ):
+        """
+        Identifica alterações nos campos derivados da importação.
+        Não modifica o registro existente.
+        """
+        derived = parsed_row.get("derived") or {}
+
+        field_mapping = {
+            "au": "au",
+            "group": "group_name",
+            "month": "month",
+        }
+
+        changes = {}
+
+        for source_field, target_field in field_mapping.items():
+            new_value = derived.get(source_field)
+
+            if new_value is None:
+                continue
+
+            if isinstance(new_value, str) and not new_value.strip():
+                continue
+
+            old_value = getattr(existing, target_field, None)
+
+            if old_value != new_value:
+                changes[target_field] = new_value
+
+        return changes
+
+    def _apply_import_changes(
+        self,
+        existing,
+        changes,
+    ):
+        """
+        Aplica os campos alterados ao registro existente.
+        Não executa commit.
+        """
+        for field, value in changes.items():
+            setattr(existing, field, value)
 
     # =========================================================
     # ADICIONAR CAMPOS DERIVADOS
@@ -2195,6 +2409,35 @@ class EcoImportService:
             )
 
 
+    def _record_update_history(
+        self,
+        eco,
+        changes,
+    ):
+        """
+        Registra os valores anteriores e novos
+        dos campos alterados durante a importação.
+        Deve ser chamada antes de aplicar as alterações.
+        Não executa commit.
+        """
+        for field, new_value in changes.items():
+            old_value = getattr(eco, field, None)
+            self.history.add(
+                EcoHistory(
+                    eco_id=eco.id,
+                    eco_code=eco.eco,
+                    item=eco.item,
+                    field_key=field,
+                    field_label=self._history_label(field),
+                    old_value=self._history_value(old_value),
+                    new_value=self._history_value(new_value),
+                    user_email=self.user.email,
+                    user_name=self.user.full_name,
+                    action="updated",
+                )
+            )
+
+
     def preview(
         self,
         file_bytes,
@@ -2462,10 +2705,70 @@ class EcoImportService:
                 )
             )
 
+            existing_by_item = (
+                self._existing_rows_by_item(
+                    [
+                        row.get(
+                            "source_item"
+                        )
+                        for row
+                        in parsed_rows
+                    ]
+                )
+            )
+
 
             # -------------------------------------------------
             # AÇÃO DE CADA LINHA
             # -------------------------------------------------
+
+            seen_items = {}
+            first_rows_by_item = {}
+            duplicate_rows_by_item = {}
+
+            for row in parsed_rows:
+                source_item = row.get(
+                    "source_item"
+                )
+
+                if (
+                    not isinstance(source_item, int)
+                    or isinstance(source_item, bool)
+                    or source_item <= 0
+                ):
+                    row["errors"].append(
+                        "ITEM ausente ou inválido na planilha."
+                    )
+
+                elif source_item in seen_items:
+                    row["errors"].append(
+                        f"ITEM {source_item} repetido na planilha. "
+                        f"Primeira ocorrência na linha "
+                        f"{seen_items[source_item]}."
+                    )
+                    duplicate_rows_by_item.setdefault(
+                        source_item,
+                        [],
+                    ).append(row)
+
+                else:
+                    seen_items[source_item] = row["excel_row"]
+                    first_rows_by_item[source_item] = row
+
+            for source_item, duplicate_rows in duplicate_rows_by_item.items():
+                duplicate_lines = [
+                    str(row["excel_row"])
+                    for row in duplicate_rows
+                ]
+                duplicate_location = (
+                    f"na linha {duplicate_lines[0]}"
+                    if len(duplicate_lines) == 1
+                    else f"nas linhas {', '.join(duplicate_lines)}"
+                )
+                first_rows_by_item[source_item]["errors"].append(
+                    f"ITEM {source_item} repetido na planilha. "
+                    f"Também ocorre {duplicate_location}."
+                )
 
             seen_signatures = {}
 
@@ -2527,13 +2830,60 @@ class EcoImportService:
                         )
 
 
-                    if matching_record:
+                    source_item = row.get(
+                        "source_item"
+                    )
+                    item_record = existing_by_item.get(
+                        source_item
+                    )
 
-                        action = "DUPLICATE"
-                        duplicate_source = "DATABASE"
+                    if item_record is not None:
+                        spreadsheet_eco = str(
+                            row["data"].get("eco") or ""
+                        ).strip().upper()
+                        database_eco = str(
+                            item_record.eco or ""
+                        ).strip().upper()
+
+                        if spreadsheet_eco != database_eco:
+                            action = "CONFLICT"
+                            row["errors"].append(
+                                f"O ITEM {source_item} pertence "
+                                f"à ECO {database_eco} no banco, "
+                                f"mas a planilha informa "
+                                f"{spreadsheet_eco}."
+                            )
+
+                        else:
+                            matching_record = item_record
+                            changes = self._get_import_changes(
+                                row,
+                                item_record,
+                            )
+
+                            derived_changes = self._get_derived_import_changes(
+                                row,
+                                item_record,
+                            )
+
+                            changes.update(derived_changes)
+
+                            if changes:
+                                action = "UPDATE"
+                            else:
+                                action = "DUPLICATE"
+                                duplicate_source = "DATABASE"
+
+                    elif matching_record is not None:
+                        action = "CONFLICT"
+                        row["errors"].append(
+                            f"O ITEM {source_item} não existe "
+                            "no banco, mas a ocorrência "
+                            "informada já está cadastrada "
+                            "com outro ITEM."
+                        )
 
                     else:
-
                         action = "NEW"
 
 
@@ -2605,6 +2955,13 @@ class EcoImportService:
                     ==
                     "UPDATE"
                 )
+            )
+
+
+            conflict_rows = sum(
+                1
+                for row in parsed_rows
+                if row["action"] == "CONFLICT"
             )
 
 
@@ -2687,6 +3044,9 @@ class EcoImportService:
                 "update_rows":
                     update_rows,
 
+                "conflict_rows":
+                    conflict_rows,
+
                 "duplicate_rows":
                     duplicate_rows,
 
@@ -2700,7 +3060,13 @@ class EcoImportService:
                     (
                         error_rows == 0
                         and
-                        new_rows > 0
+                        conflict_rows == 0
+                        and
+                        (
+                            new_rows > 0
+                            or
+                            update_rows > 0
+                        )
                     ),
 
                 "preview_limit":
@@ -2768,7 +3134,7 @@ class EcoImportService:
         filename,
     ):
         """
-        Importa somente linhas classificadas como NEW.
+        Processa linhas classificadas como NEW ou UPDATE.
 
         Erros cancelam toda a importação; duplicatas são
         ignoradas e qualquer falha no banco provoca rollback.
@@ -2781,7 +3147,10 @@ class EcoImportService:
             _include_all_rows=True,
         )
 
-        if preview["error_rows"] > 0:
+        if (
+            preview["error_rows"] > 0
+            or preview.get("conflict_rows", 0) > 0
+        ):
             raise HTTPException(
                 status_code=422,
                 detail={
@@ -2799,12 +3168,18 @@ class EcoImportService:
             if row["action"] == "NEW"
         ]
 
-        if not new_rows:
+        update_rows = [
+            row
+            for row in preview["rows"]
+            if row["action"] == "UPDATE"
+        ]
+
+        if not new_rows and not update_rows:
             raise HTTPException(
                 status_code=409,
                 detail={
                     "message": (
-                        "Nenhuma linha nova foi "
+                        "Nenhuma linha nova ou atualização foi "
                         "encontrada para importação."
                     ),
                     "duplicate_rows": preview.get(
@@ -2815,10 +3190,19 @@ class EcoImportService:
             )
 
         imported = []
+        updated = []
 
         try:
-            next_item = self.ecos.next_item()
-            next_position = self.ecos.next_position()
+            existing_by_item = self._validate_import_items_before_write(
+                new_rows,
+                update_rows,
+            )
+
+            next_position = (
+                self.ecos.next_position()
+                if new_rows
+                else None
+            )
 
             for row in new_rows:
                 data = dict(row["data"])
@@ -2830,7 +3214,7 @@ class EcoImportService:
 
                 eco = Eco(
                     **data,
-                    item=next_item,
+                    item=row["source_item"],
                     position=next_position,
                 )
 
@@ -2851,13 +3235,99 @@ class EcoImportService:
                     }
                 )
 
-                next_item += 1
                 next_position += 1
+
+            # Atualiza os registros existentes identificados pelo ITEM.
+            if update_rows:
+                for row in update_rows:
+                    item = row["source_item"]
+                    existing = existing_by_item.get(item)
+
+                    if existing is None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                f"O ITEM {item} não foi encontrado "
+                                "durante a atualização."
+                            ),
+                        )
+
+                    current_eco = str(
+                        getattr(existing, "eco", "") or ""
+                    ).strip().upper()
+
+                    incoming_eco = str(
+                        row["eco"] or ""
+                    ).strip().upper()
+
+                    if current_eco != incoming_eco:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                f"O ITEM {item} pertence a outra ECO. "
+                                "A importação foi cancelada."
+                            ),
+                        )
+
+                    changes = self._get_import_changes(
+                        row,
+                        existing,
+                    )
+
+                    derived_changes = self._get_derived_import_changes(
+                        row,
+                        existing,
+                    )
+
+                    changes.update(derived_changes)
+
+                    if not changes:
+                        continue
+
+                    self._record_update_history(
+                        existing,
+                        changes,
+                    )
+
+                    self._apply_import_changes(
+                        existing,
+                        changes,
+                    )
+
+                    updated.append(
+                        {
+                            "id": str(existing.id),
+                            "item": existing.item,
+                            "excel_row": row["excel_row"],
+                            "eco": existing.eco,
+                            "changed_fields": list(changes),
+                        }
+                    )
 
             self.db.commit()
 
         except HTTPException:
             self.db.rollback()
+            raise
+
+        except IntegrityError as exc:
+            self.db.rollback()
+
+            sqlstate = (
+                getattr(exc.orig, "sqlstate", None)
+                or getattr(exc.orig, "pgcode", None)
+            )
+
+            if sqlstate == "23505":
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "A importação foi cancelada porque um registro "
+                        "já foi cadastrado por outra operação. "
+                        "Atualize a pré-visualização e tente novamente."
+                    ),
+                ) from exc
+
             raise
 
         except Exception:
@@ -2868,8 +3338,10 @@ class EcoImportService:
             "file_name": filename,
             "total_rows": preview["total_rows"],
             "imported_rows": len(imported),
+            "updated_rows": len(updated),
             "duplicate_rows": preview.get("duplicate_rows", 0),
             "warning_rows": preview["warning_rows"],
             "error_rows": 0,
             "imported": imported,
+            "updated": updated,
         }
